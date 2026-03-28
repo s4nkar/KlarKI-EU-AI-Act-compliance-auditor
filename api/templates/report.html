@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="{{ report.language }}">
+<head>
+  <meta charset="UTF-8" />
+  <title>KlarKI Compliance Report — {{ report.audit_id }}</title>
+  <style>
+    /* ── Base ─────────────────────────────────────────────── */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      font-size: 11pt;
+      color: #1a1a2e;
+      background: #fff;
+      padding: 40px 50px;
+    }
+
+    /* ── Header ───────────────────────────────────────────── */
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; border-bottom: 3px solid #2563eb; padding-bottom: 20px; }
+    .brand { font-size: 22pt; font-weight: 700; color: #2563eb; }
+    .brand span { color: #1a1a2e; }
+    .meta { font-size: 9pt; color: #64748b; text-align: right; }
+
+    /* ── Score radial placeholder (WeasyPrint doesn't support SVG animations) ── */
+    .overall-score {
+      text-align: center;
+      padding: 24px;
+      background: #f8fafc;
+      border-radius: 12px;
+      margin-bottom: 24px;
+    }
+    .score-number { font-size: 48pt; font-weight: 700; }
+    .score-number.green { color: #16a34a; }
+    .score-number.amber { color: #d97706; }
+    .score-number.red   { color: #dc2626; }
+    .score-label { font-size: 10pt; color: #64748b; margin-top: 4px; }
+
+    /* ── Risk tier badge ─────────────────────────────────── */
+    .risk-badge {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 10pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 8px;
+    }
+    .risk-prohibited { background: #fee2e2; color: #991b1b; }
+    .risk-high       { background: #fef3c7; color: #92400e; }
+    .risk-limited    { background: #dbeafe; color: #1e40af; }
+    .risk-minimal    { background: #dcfce7; color: #166534; }
+
+    /* ── Article grid ────────────────────────────────────── */
+    .section-title { font-size: 14pt; font-weight: 700; margin: 28px 0 12px; color: #1e3a5f; border-left: 4px solid #2563eb; padding-left: 10px; }
+    .article-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; page-break-inside: avoid; }
+    .article-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .article-title { font-weight: 600; font-size: 11pt; }
+    .article-score-badge {
+      padding: 3px 12px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 11pt;
+    }
+
+    /* ── Gap items ───────────────────────────────────────── */
+    .gap-item { margin-top: 10px; padding: 10px 12px; border-left: 4px solid; border-radius: 0 6px 6px 0; background: #f8fafc; }
+    .gap-critical { border-color: #dc2626; }
+    .gap-major    { border-color: #d97706; }
+    .gap-minor    { border-color: #2563eb; }
+    .gap-title { font-weight: 600; font-size: 10pt; }
+    .gap-desc  { font-size: 9.5pt; color: #475569; margin-top: 3px; }
+    .severity-badge {
+      float: right;
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .sev-critical { background: #fee2e2; color: #991b1b; }
+    .sev-major    { background: #fef3c7; color: #92400e; }
+    .sev-minor    { background: #dbeafe; color: #1e40af; }
+
+    /* ── Recommendations ─────────────────────────────────── */
+    .rec-list { margin-top: 10px; padding-left: 18px; }
+    .rec-list li { font-size: 9.5pt; color: #334155; margin-bottom: 4px; }
+
+    /* ── Emotion warning ─────────────────────────────────── */
+    .emotion-warning { background: #fef2f2; border: 2px solid #dc2626; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; }
+    .emotion-warning h3 { color: #991b1b; font-size: 11pt; margin-bottom: 6px; }
+
+    /* ── Footer ──────────────────────────────────────────── */
+    .footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #e2e8f0; font-size: 8.5pt; color: #94a3b8; display: flex; justify-content: space-between; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div>
+      <div class="brand">Klar<span>KI</span></div>
+      <div style="font-size:9pt;color:#64748b;margin-top:4px;">EU AI Act &amp; GDPR Compliance Auditor</div>
+    </div>
+    <div class="meta">
+      <div><strong>Audit ID:</strong> {{ report.audit_id }}</div>
+      <div><strong>Generated:</strong> {{ report.created_at.strftime('%d %B %Y, %H:%M') }}</div>
+      <div><strong>Language:</strong> {{ report.language | upper }}</div>
+      <div><strong>Files:</strong> {{ report.source_files | join(', ') }}</div>
+    </div>
+  </div>
+
+  <!-- Overall Score -->
+  <div class="overall-score">
+    {% set sc = report.overall_score | int %}
+    <div class="score-number {% if sc >= 70 %}green{% elif sc >= 40 %}amber{% else %}red{% endif %}">
+      {{ sc }}
+    </div>
+    <div class="score-label">Overall Compliance Score / 100</div>
+    <div>
+      <span class="risk-badge risk-{{ report.risk_tier.value }}">
+        {{ report.risk_tier.value | replace('_', ' ') | title }} Risk
+      </span>
+    </div>
+    <div style="margin-top:10px;font-size:9pt;color:#64748b;">
+      {{ report.classified_chunks }} / {{ report.total_chunks }} chunks classified
+    </div>
+  </div>
+
+  <!-- Article 5 Emotion Flag -->
+  {% if report.emotion_flag.detected %}
+  <div class="emotion-warning">
+    <h3>⚠ Article 5 Emotion Recognition Flag</h3>
+    <p style="font-size:9.5pt;">{{ report.emotion_flag.explanation }}</p>
+    {% if report.emotion_flag.is_prohibited %}
+    <p style="font-size:9.5pt;font-weight:600;color:#991b1b;margin-top:6px;">
+      PROHIBITED USE CASE DETECTED — This system may violate Article 5 of the EU AI Act.
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Article Scores -->
+  <div class="section-title">Article-by-Article Analysis</div>
+
+  {% for article in report.article_scores | sort(attribute='article_num') %}
+  <div class="article-card">
+    <div class="article-header">
+      <div class="article-title">
+        Article {{ article.article_num }} — {{ article.domain.value | replace('_', ' ') | title }}
+        <span style="font-size:9pt;color:#64748b;font-weight:400;">({{ article.chunk_count }} chunks)</span>
+      </div>
+      {% set as = article.score | int %}
+      <span class="article-score-badge {% if as >= 70 %}green{% elif as >= 40 %}amber{% else %}red{% endif %}"
+            style="{% if as >= 70 %}background:#dcfce7;color:#166534{% elif as >= 40 %}background:#fef3c7;color:#92400e{% else %}background:#fee2e2;color:#991b1b{% endif %}">
+        {{ as }} / 100
+      </span>
+    </div>
+
+    {% if article.gaps %}
+    <div style="font-size:9.5pt;font-weight:600;color:#475569;margin-bottom:4px;">Identified Gaps:</div>
+    {% for gap in article.gaps | sort(attribute='severity') %}
+    <div class="gap-item gap-{{ gap.severity.value }}">
+      <span class="severity-badge sev-{{ gap.severity.value }}">{{ gap.severity.value }}</span>
+      <div class="gap-title">{{ gap.title }}</div>
+      <div class="gap-desc">{{ gap.description }}</div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div style="font-size:9.5pt;color:#16a34a;">✓ No compliance gaps identified for this article.</div>
+    {% endif %}
+
+    {% if article.recommendations %}
+    <div style="font-size:9.5pt;font-weight:600;color:#475569;margin-top:12px;">Recommendations:</div>
+    <ul class="rec-list">
+      {% for rec in article.recommendations %}
+      <li>{{ rec }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <!-- Footer -->
+  <div class="footer">
+    <span>KlarKI — Local-First EU AI Act Compliance Auditor</span>
+    <span>Generated {{ report.created_at.strftime('%Y-%m-%d') }} · All data processed locally · No data transmitted externally</span>
+  </div>
+
+</body>
+</html>

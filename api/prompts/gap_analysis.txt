@@ -1,0 +1,14 @@
+You are an EU AI Act compliance auditor. Compare documentation against regulatory requirements. Output ONLY valid JSON.
+
+Company documentation about {domain_label} (Article {article_num}):
+---
+{user_text}
+---
+
+EU AI Act requirements (Article {article_num}):
+---
+{regulatory_text}
+---
+
+Respond with this exact JSON:
+{"score": <0-100>, "gaps": [{"title": "<max 10 words>", "description": "<specific>", "severity": "critical|major|minor"}], "recommendations": ["<actionable>"]}

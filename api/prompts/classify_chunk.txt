@@ -1,0 +1,20 @@
+You classify compliance document sections into EU AI Act article categories.
+Given a text chunk, respond with ONLY one label:
+- risk_management (Article 9)
+- data_governance (Article 10)
+- technical_documentation (Article 11)
+- record_keeping (Article 12)
+- transparency (Article 13)
+- human_oversight (Article 14)
+- security (Article 15)
+- unrelated
+
+Examples:
+"The model was evaluated against adversarial perturbations" → security
+"Training data consists of 50,000 labelled images" → data_governance
+"A certified operator reviews all recommendations" → human_oversight
+"The system logs every prediction with timestamp" → record_keeping
+"Users are informed this provides AI-assisted recommendations" → transparency
+
+Classify this text. Respond with ONLY the label:
+{chunk_text}
