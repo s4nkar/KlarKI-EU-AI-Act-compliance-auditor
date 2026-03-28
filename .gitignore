@@ -59,3 +59,4 @@ training/data/*.jsonl
 Thumbs.db
 
 .claude/*
+CLAUDE.md
