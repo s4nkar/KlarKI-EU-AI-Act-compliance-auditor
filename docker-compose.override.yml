@@ -6,6 +6,7 @@ services:
       dockerfile: Dockerfile.dev
     volumes:
       - ./api:/app
+      - ./tests:/tests        # mount tests at /tests for pytest
       - upload_data:/data/uploads
       - chroma_data:/data/chroma
     environment:

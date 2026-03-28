@@ -1,14 +1,14 @@
-"""Shared pytest fixtures for KlarKI test suite.
+"""Shared pytest fixtures for KlarKI test suite."""
 
-Provides:
-    - test_client: async FastAPI TestClient
-    - mock_ollama: httpx mock for Ollama API calls
-    - seeded_chroma: in-memory ChromaDB with test data
-"""
+import os
+import sys
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
+
 
 # ── App fixture ────────────────────────────────────────────────────────────────
 
@@ -16,33 +16,37 @@ from httpx import AsyncClient, ASGITransport
 async def test_client():
     """Async HTTPX client pointed at the FastAPI app.
 
-    Yields:
-        AsyncClient configured with the FastAPI ASGI app.
+    Mocks app.state so lifespan services (ChromaDB, EmbeddingService) don't
+    need to be running during unit/integration tests.
     """
-    import sys
-    import os
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
-
+    from httpx import AsyncClient, ASGITransport
     from main import app
+    from services.chroma_client import ChromaClient
+
+    # Provide minimal mock state so endpoints can access app.state
+    mock_chroma = AsyncMock(spec=ChromaClient)
+    mock_chroma.health_check.return_value = True
+    app.state.chroma = mock_chroma
+    app.state.embeddings = MagicMock()
+
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client
 
 
-# ── ChromaDB fixture ────────────────────────────────────────────────────────────
+# ── ChromaDB fixture ───────────────────────────────────────────────────────────
 
 @pytest.fixture
-def seeded_chroma(tmp_path):
+def seeded_chroma():
     """In-memory ChromaDB client with minimal test data in all 3 collections.
 
-    Yields:
-        chromadb.Client instance with eu_ai_act, gdpr, compliance_checklist collections.
+    Uses get_or_create_collection to be safe across chromadb 1.x which may
+    not fully reset EphemeralClient state between test runs.
     """
     import chromadb
     client = chromadb.EphemeralClient()
 
-    # Minimal seed — each collection has at least one document
     for name in ["eu_ai_act", "gdpr", "compliance_checklist"]:
-        col = client.create_collection(name)
+        col = client.get_or_create_collection(name)
         col.upsert(
             ids=[f"{name}_test_001"],
             documents=[f"Test document for {name} collection"],
@@ -52,29 +56,25 @@ def seeded_chroma(tmp_path):
     yield client
 
 
-# ── Ollama mock fixture ────────────────────────────────────────────────────────
+# ── Ollama mock fixtures ───────────────────────────────────────────────────────
 
 @pytest.fixture
 def mock_ollama_classify():
-    """Return a callable that simulates Ollama classify response."""
-    def _respond(prompt: str) -> str:
-        return "risk_management"
-    return _respond
+    """Simulated Ollama classify response — returns domain label string."""
+    return "risk_management"
 
 
 @pytest.fixture
 def mock_ollama_gap_analysis():
-    """Return a callable that simulates Ollama gap analysis JSON response."""
-    def _respond(prompt: str) -> dict:
-        return {
-            "score": 65,
-            "gaps": [
-                {
-                    "title": "Missing risk documentation",
-                    "description": "No formal risk register found in provided documentation.",
-                    "severity": "major",
-                }
-            ],
-            "recommendations": ["Create and maintain a formal risk register per Article 9(2)."],
-        }
-    return _respond
+    """Simulated Ollama gap analysis JSON response — returns dict directly."""
+    return {
+        "score": 65,
+        "gaps": [
+            {
+                "title": "Missing risk documentation",
+                "description": "No formal risk register found in provided documentation.",
+                "severity": "major",
+            }
+        ],
+        "recommendations": ["Create and maintain a formal risk register per Article 9(2)."],
+    }

@@ -8,24 +8,26 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
-from services.chroma_client import ChromaClient
 from models.schemas import APIResponse
+from services.chroma_client import ChromaClient
+from services.embedding_service import EmbeddingService
+from services.ollama_client import OllamaClient
 
 logger = structlog.get_logger()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Startup: initialise shared services. Shutdown: clean up connections."""
+    """Startup: initialise shared services. Shutdown: clean up."""
     logger.info("klarki_startup", debug=settings.debug, model=settings.ollama_model)
 
-    # Initialise ChromaDB client and attach to app state
+    # ChromaDB client
     chroma = ChromaClient(host=settings.chromadb_host)
     app.state.chroma = chroma
 
-    # Phase 2: EmbeddingService loaded here to avoid cold-start on first request
-    # from services.embedding_service import EmbeddingService
-    # app.state.embeddings = EmbeddingService()
+    # Embedding model — loaded once, shared across all requests
+    # Runs on CPU; keeps VRAM free for Ollama
+    app.state.embeddings = EmbeddingService(model_name=settings.embedding_model)
 
     logger.info("klarki_ready")
     yield
@@ -41,13 +43,12 @@ def create_app() -> FastAPI:
             "Local-first compliance auditor for German SMEs. "
             "Analyses documentation against EU AI Act Articles 9–15 and GDPR."
         ),
-        version="0.1.0",
+        version="0.2.0",
         docs_url="/docs" if settings.debug else None,
         redoc_url="/redoc" if settings.debug else None,
         lifespan=lifespan,
     )
 
-    # CORS — allow frontend dev server and production nginx
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173", "http://localhost:80", "http://localhost"],
@@ -59,39 +60,24 @@ def create_app() -> FastAPI:
     # ── Health check ──────────────────────────────────────────────────────────
     @app.get("/api/v1/health", response_model=APIResponse, tags=["system"])
     async def health_check() -> APIResponse:
-        """Return liveness status of API and dependent services.
-
-        Returns:
-            APIResponse with service health flags for chromadb and ollama.
-        """
+        """Return liveness status of API and dependent services."""
         chroma: ChromaClient = app.state.chroma
         chroma_ok = await chroma.health_check()
 
-        # Ollama health — lightweight HTTP check (Phase 2 will use OllamaClient)
-        import httpx
-        ollama_ok = False
-        try:
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                resp = await client.get(f"{settings.ollama_host}/api/tags")
-                ollama_ok = resp.status_code == 200
-        except Exception:
-            ollama_ok = False
+        ollama = OllamaClient(host=settings.ollama_host, model=settings.ollama_model)
+        ollama_ok = await ollama.health_check()
 
         return APIResponse(
             status="ok",
-            data={
-                "services": {
-                    "chromadb": chroma_ok,
-                    "ollama": ollama_ok,
-                }
-            },
+            data={"services": {"chromadb": chroma_ok, "ollama": ollama_ok}},
         )
 
-    # ── Routers (Phase 2) ─────────────────────────────────────────────────────
-    # from routers.audit import router as audit_router
-    # from routers.reports import router as reports_router
-    # app.include_router(audit_router)
-    # app.include_router(reports_router)
+    # ── Routers ───────────────────────────────────────────────────────────────
+    from routers.audit import router as audit_router
+    from routers.reports import router as reports_router
+
+    app.include_router(audit_router)
+    app.include_router(reports_router)
 
     return app
 
