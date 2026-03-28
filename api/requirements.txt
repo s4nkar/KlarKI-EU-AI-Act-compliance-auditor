@@ -1,0 +1,20 @@
+# NOTE: torch is installed separately in the Dockerfile with the CPU-only index URL:
+#   pip install torch==2.3.1+cpu --index-url https://download.pytorch.org/whl/cpu
+# Do NOT add torch here — pip would pull the 2.6 GB CUDA wheel from PyPI.
+
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic==2.7.1
+pydantic-settings==2.3.0
+httpx==0.27.0
+chromadb>=1.0.0           # Must match chromadb/chroma:latest (1.x Go server)
+sentence-transformers==3.0.1
+langchain-text-splitters==0.2.2
+PyMuPDF==1.24.5
+python-docx==1.1.2
+langdetect==1.0.9
+weasyprint==62.3
+jinja2==3.1.4
+python-multipart==0.0.9
+aiofiles==23.2.1
+structlog==24.2.0
