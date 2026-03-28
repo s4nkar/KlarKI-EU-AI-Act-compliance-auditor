@@ -1,0 +1,52 @@
+# ── Stage 1: Builder ──────────────────────────────────────────────────────────
+# Installs all Python dependencies (including compiling C extensions).
+# gcc and build tools stay in this stage only — not in the final image.
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# CPU-only PyTorch first — prevents pip from pulling the 2.6 GB CUDA wheel.
+# Embedding model (e5-small) runs on CPU; GPU VRAM is reserved for Ollama.
+RUN pip install --no-cache-dir \
+    torch==2.3.1+cpu \
+    --index-url https://download.pytorch.org/whl/cpu
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+
+# ── Stage 2: Runtime ──────────────────────────────────────────────────────────
+# Minimal final image — no gcc, no build tools, ~40% smaller than single-stage.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# WeasyPrint runtime libs (Pango/Cairo for PDF rendering) — runtime only, no dev headers
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf-2.0-0 \
+    libcairo2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy installed Python packages from builder
+COPY --from=builder /install /usr/local
+
+# Copy application source
+COPY . .
+
+RUN mkdir -p /data/uploads
+
+# Non-root user for security
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app /data
+USER appuser
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
