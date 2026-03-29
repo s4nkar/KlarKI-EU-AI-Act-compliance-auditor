@@ -1,4 +1,4 @@
-# KlarKI — EU AI Act + GDPR Compliance Auditor
+# KlarKI - EU AI Act + GDPR Compliance Auditor
 
 Local-first compliance auditing for AI systems. Upload your policy documents and get a scored gap analysis against **EU AI Act Articles 9–15** and **GDPR** — entirely on your own machine. No data leaves your network.
 
@@ -46,7 +46,7 @@ Upload a PDF, DOCX, or plain-text policy document → KlarKI:
 ### 1. Clone and configure
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/s4nkar/KlarKI-EU-AI-Act-compliance-auditor.git
 cd klarki
 cp .env.example .env
 ```
@@ -66,7 +66,7 @@ This does everything in one shot:
 
 ### 3. Open the app
 
-Go to **http://localhost**
+Go to **http://localhost:80**
 
 Upload a document or paste policy text → click **Start Audit** → view your compliance dashboard.
 
@@ -94,13 +94,13 @@ Every compliance report shows which backend classified the document. There are t
 - Handles both German and English documents well
 - ~2–4 seconds per chunk
 
-### Triton / gbert-base (Phase 5, GPU recommended)
+### Triton / gbert-base (Phase 2, GPU recommended)
 - Enabled when `USE_TRITON=true`
 - Uses a fine-tuned `deepset/gbert-base` BERT model exported to ONNX
 - Served via NVIDIA Triton Inference Server (batched, gRPC)
 - ~50–100× faster than Ollama per chunk
 - **German-first:** gbert-base is trained on German text. English documents are still classified correctly (the model was fine-tuned on mixed DE/EN data) but the Ollama backend is more balanced for English-heavy documents.
-- Requires training and export before use (see Phase 5 below)
+- Requires training and export before use (see Phase 2 below)
 
 > The `classifier_backend` field appears in the dashboard stats and in the PDF report header so you always know how a report was generated.
 
@@ -114,13 +114,13 @@ The BERT classifier is fine-tuned on **240 fixed, generic EU AI Act examples** i
 
 ---
 
-## Phase 5: GPU-accelerated Triton backend
+## Phase 2: GPU-accelerated Triton backend
 
 ```bash
 ./run.sh triton
 ```
 
-This runs the full Phase 5 pipeline:
+This runs the full Phase 2 pipeline:
 1. Fine-tunes `deepset/gbert-base` on `training/data/clause_labels.jsonl`
 2. Trains the spaCy NER model on `training/data/ner_annotations.jsonl`
 3. Exports both models to ONNX
@@ -159,10 +159,10 @@ klarki/
 │   ├── export_onnx.py
 │   └── benchmark_triton.py
 ├── training/
-│   ├── train_classifier.py   # Fine-tune gbert-base (Phase 5)
-│   ├── train_ner.py          # Train spaCy NER (Phase 5)
+│   ├── train_classifier.py   # Fine-tune gbert-base (Phase 2)
+│   ├── train_ner.py          # Train spaCy NER (Phase 2)
 │   └── data/                 # 240 classifier examples + 25 NER examples
-├── model_repository/         # Triton model configs (Phase 5)
+├── model_repository/         # Triton model configs (Phase 2)
 ├── tests/                    # pytest suite (36 tests)
 └── docker-compose.yml
 ```
@@ -207,8 +207,8 @@ Accepted file types: `.pdf`, `.docx`, `.txt`, `.md` — max 10 MB.
 | Vector DB | ChromaDB |
 | Embeddings | sentence-transformers multilingual-e5-small (local) |
 | LLM (default) | Ollama · Phi-3 Mini 3.8B Q4 |
-| LLM (Phase 5) | Triton Inference Server · gbert-base ONNX |
-| NER (Phase 5) | spaCy · de_core_news_sm |
+| LLM (Phase 2) | Triton Inference Server · gbert-base ONNX |
+| NER (Phase 2) | spaCy · de_core_news_sm |
 | Frontend | React 18 · TypeScript · Vite · Tailwind CSS |
 | PDF parsing | PyMuPDF · python-docx |
 | Reports | WeasyPrint · Jinja2 |
@@ -233,7 +233,7 @@ Accepted file types: `.pdf`, `.docx`, `.txt`, `.md` — max 10 MB.
 `docker exec klarki-ollama ollama pull phi3:mini`
 
 **`ModuleNotFoundError: No module named 'tritonclient'` when `USE_TRITON=true`**
-→ The API image was built before Phase 5 packages were added. Rebuild:
+→ The API image was built before Phase 2 packages were added. Rebuild:
 `docker compose up -d --build klarki-api`
 Also ensure `USE_TRITON=false` if you haven't run `./run.sh triton` yet.
 
