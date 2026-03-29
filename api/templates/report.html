@@ -106,6 +106,7 @@
       <div><strong>Generated:</strong> {{ report.created_at.strftime('%d %B %Y, %H:%M') }}</div>
       <div><strong>Language:</strong> {{ report.language | upper }}</div>
       <div><strong>Files:</strong> {{ report.source_files | join(', ') }}</div>
+      <div><strong>Classifier:</strong> {{ report.classifier_backend }}</div>
     </div>
   </div>
 

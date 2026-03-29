@@ -58,6 +58,7 @@ export interface ComplianceReport {
   emotion_flag: EmotionFlag
   total_chunks: number
   classified_chunks: number
+  classifier_backend: string
 }
 
 export interface AuditResponse {

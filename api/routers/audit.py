@@ -188,6 +188,11 @@ async def _run_pipeline(
         # ── Stage 3: Classify ─────────────────────────────────────────────────
         _set_status(AuditStatus.CLASSIFYING)
         chunks = await classify_chunks(chunks, ollama)
+        classifier_backend = (
+            f"triton/gbert-base"
+            if settings.use_triton
+            else f"ollama/{settings.ollama_model}"
+        )
 
         # ── Stage 4: RAG + gap analysis ───────────────────────────────────────
         _set_status(AuditStatus.ANALYSING)
@@ -231,6 +236,7 @@ async def _run_pipeline(
             source_files=[filename],
             language=language,
             emotion_flag=emotion_flag,
+            classifier_backend=classifier_backend,
         )
 
         _audits[audit_id] = AuditResponse(

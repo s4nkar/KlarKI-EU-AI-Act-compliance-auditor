@@ -121,6 +121,10 @@ class ComplianceReport(BaseModel):
     emotion_flag: EmotionFlag = Field(default_factory=EmotionFlag)
     total_chunks: int = Field(description="Total chunks extracted from all documents")
     classified_chunks: int = Field(description="Chunks successfully assigned a domain")
+    classifier_backend: str = Field(
+        default="ollama/phi3:mini",
+        description="Classifier backend used: 'ollama/<model>' or 'triton/gbert-base'",
+    )
 
 
 # ── API envelope models ────────────────────────────────────────────────────────
