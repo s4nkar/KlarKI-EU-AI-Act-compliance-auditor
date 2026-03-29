@@ -11,6 +11,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    watch: {
+      usePolling: true,   // Required for Windows Docker volumes (no inotify support)
+      interval: 500,
+    },
     proxy: {
       '/api': {
         target: process.env.VITE_API_URL || 'http://localhost:8000',
