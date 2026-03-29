@@ -58,5 +58,7 @@ training/data/*.jsonl
 .DS_Store
 Thumbs.db
 
-.claude/*
-CLAUDE.md
+# Triton
+model_repository/*
+
+*BUILD_LOG.md
