@@ -19,3 +19,5 @@ jinja2==3.1.4
 python-multipart==0.0.9
 aiofiles==23.2.1
 structlog==24.2.0
+tritonclient[grpc]==2.44.0  # Phase 5: gRPC client for Triton Inference Server
+numpy==1.26.4               # Phase 5: required by tritonclient + tokenizer encoding
