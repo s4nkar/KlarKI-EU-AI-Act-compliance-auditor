@@ -6,6 +6,7 @@ import Layout from '../components/Layout'
 import ScoreRadial from '../components/ScoreRadial'
 import ArticleCard from '../components/ArticleCard'
 import ReportDownload from '../components/ReportDownload'
+import EmotionWarning from '../components/EmotionWarning'
 import { fetchReport } from '../hooks/useReport'
 import { riskTierLabel, formatDate } from '../utils/formatters'
 import type { ComplianceReport } from '../types'
@@ -53,6 +54,8 @@ export default function Dashboard() {
 
   return (
     <Layout>
+      <EmotionWarning flag={report.emotion_flag} />
+
       {/* Summary header */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 mb-6 flex flex-col sm:flex-row items-center gap-6">
         <ScoreRadial score={report.overall_score} size={140} label="Overall Score" />
