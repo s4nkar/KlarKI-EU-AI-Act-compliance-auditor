@@ -1,0 +1,48 @@
+name: "compliance_ensemble"
+platform: "ensemble"
+max_batch_size: 32
+
+input [
+  {
+    name: "input_ids"
+    data_type: TYPE_INT64
+    dims: [ -1 ]
+  },
+  {
+    name: "attention_mask"
+    data_type: TYPE_INT64
+    dims: [ -1 ]
+  }
+]
+
+output [
+  {
+    name: "logits"
+    data_type: TYPE_FP32
+    dims: [ 8 ]
+  },
+  {
+    name: "embeddings"
+    data_type: TYPE_FP32
+    dims: [ 384 ]
+  }
+]
+
+ensemble_scheduling {
+  step [
+    {
+      model_name: "bert_clause_classifier"
+      model_version: 1
+      input_map  { key: "input_ids"      value: "input_ids" }
+      input_map  { key: "attention_mask" value: "attention_mask" }
+      output_map { key: "logits"         value: "logits" }
+    },
+    {
+      model_name: "e5_embeddings"
+      model_version: 1
+      input_map  { key: "input_ids"      value: "input_ids" }
+      input_map  { key: "attention_mask" value: "attention_mask" }
+      output_map { key: "last_hidden_state" value: "embeddings" }
+    }
+  ]
+}
