@@ -61,6 +61,7 @@ async def score_audit(
     audit_id: str | None = None,
     source_files: list[str] | None = None,
     language: str = "en",
+    emotion_flag: EmotionFlag | None = None,
 ) -> ComplianceReport:
     """Aggregate per-article scores into a full ComplianceReport.
 
@@ -102,7 +103,7 @@ async def score_audit(
         risk_tier=risk_tier,
         overall_score=round(overall, 1),
         article_scores=sorted(final_scores, key=lambda s: s.article_num),
-        emotion_flag=EmotionFlag(),
+        emotion_flag=emotion_flag or EmotionFlag(),
         total_chunks=len(chunks),
         classified_chunks=classified,
     )
