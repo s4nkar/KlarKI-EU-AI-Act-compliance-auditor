@@ -4,12 +4,14 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Upload from './pages/Upload'
 import Dashboard from './pages/Dashboard'
 import ArticleDetail from './pages/ArticleDetail'
+import RiskWizard from './pages/RiskWizard'
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Upload />} />
+        <Route path="/wizard" element={<RiskWizard />} />
         <Route path="/audit/:auditId" element={<Dashboard />} />
         <Route path="/audit/:auditId/article/:articleNum" element={<ArticleDetail />} />
         <Route path="*" element={<Navigate to="/" replace />} />
