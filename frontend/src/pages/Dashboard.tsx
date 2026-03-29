@@ -74,6 +74,7 @@ export default function Dashboard() {
             <StatBox label="Classified" value={report.classified_chunks} />
             <StatBox label="Language" value={report.language.toUpperCase()} />
             <StatBox label="Source Files" value={report.source_files.length} />
+            <StatBox label="Classifier" value={report.classifier_backend} />
           </div>
         </div>
 

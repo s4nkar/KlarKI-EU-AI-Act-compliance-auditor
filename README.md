@@ -8,12 +8,13 @@ Local-first compliance auditing for AI systems. Upload your policy documents and
 
 Upload a PDF, DOCX, or plain-text policy document → KlarKI:
 
-1. Parses and chunks the document
+1. Parses and chunks the document into sections
 2. Classifies each section against the 7 EU AI Act article domains
-3. Retrieves the relevant regulatory requirements from a local vector database
-4. Runs a structured gap analysis using a local LLM (Phi-3 Mini)
-5. Returns per-article compliance scores (0–100), identified gaps, and actionable recommendations
-6. Generates a downloadable PDF report
+3. Retrieves matching regulatory requirements from a local vector database (ChromaDB)
+4. Runs a structured gap analysis using a local LLM
+5. Scans for Article 5 prohibited uses (emotion recognition in workplaces/schools)
+6. Returns per-article compliance scores (0–100), identified gaps, and recommendations
+7. Generates a downloadable PDF report — the report header shows which classifier backend was used
 
 ---
 
@@ -22,15 +23,25 @@ Upload a PDF, DOCX, or plain-text policy document → KlarKI:
 | Dependency | Version | Notes |
 |---|---|---|
 | Docker Desktop | 4.x+ | With Docker Compose v2 |
-| VRAM | 4 GB+ | For Ollama GPU acceleration (CPU fallback works but is slower) |
-| Disk space | ~6 GB | ~2.3 GB model + ~3.5 GB images |
+| Disk space | ~6 GB | ~2.3 GB Ollama model + ~3.5 GB images |
 | RAM | 8 GB+ | |
-
-> **GPU:** An NVIDIA GPU is detected automatically. On CPU-only machines the audit runs slower (~10–15 min per document instead of ~2–5 min).
+| VRAM | 4 GB+ | Optional — GPU accelerates Ollama; CPU fallback works |
 
 ---
 
-## Quick start
+## Three commands
+
+```bash
+./run.sh setup    # First-time: start containers + pull Ollama model + seed ChromaDB
+./run.sh up       # Day-to-day: start (or restart) all containers
+./run.sh test     # Run the full test suite inside the API container
+```
+
+> On Linux/Mac you can also use `make setup`, `make up`, `make test`.
+
+---
+
+## First-time setup (detailed)
 
 ### 1. Clone and configure
 
@@ -42,48 +53,88 @@ cp .env.example .env
 
 The defaults in `.env` work out of the box. No API keys required.
 
-### 2. Start all services
+### 2. Run setup
 
 ```bash
-docker compose up -d
+./run.sh setup
 ```
 
-This starts four containers:
+This does everything in one shot:
+- Starts all containers (`klarki-api`, `klarki-chromadb`, `klarki-ollama`, `klarki-frontend`)
+- Pulls the Phi-3 Mini model into Ollama (~2.3 GB, one-time)
+- Seeds ChromaDB with EU AI Act + GDPR regulatory text (~2 min, one-time)
+
+### 3. Open the app
+
+Go to **http://localhost**
+
+Upload a document or paste policy text → click **Start Audit** → view your compliance dashboard.
+
+---
+
+## Containers
 
 | Container | Role | Port |
 |---|---|---|
-| `klarki-frontend` | React UI (Vite dev server) | 5173 |
+| `klarki-frontend` | React UI (Nginx) | 80 |
 | `klarki-api` | FastAPI backend | 8000 |
 | `klarki-chromadb` | Vector database | 8001 |
 | `klarki-ollama` | Local LLM server | 11434 |
 
-Wait ~30 seconds for all containers to become healthy:
+---
+
+## Classifier backends
+
+Every compliance report shows which backend classified the document. There are two:
+
+### Ollama / phi3:mini (default)
+- Enabled when `USE_TRITON=false` (the default)
+- Uses Phi-3 Mini 3.8B (Q4) running inside the `klarki-ollama` container
+- Works on CPU and GPU
+- Handles both German and English documents well
+- ~2–4 seconds per chunk
+
+### Triton / gbert-base (Phase 5, GPU recommended)
+- Enabled when `USE_TRITON=true`
+- Uses a fine-tuned `deepset/gbert-base` BERT model exported to ONNX
+- Served via NVIDIA Triton Inference Server (batched, gRPC)
+- ~50–100× faster than Ollama per chunk
+- **German-first:** gbert-base is trained on German text. English documents are still classified correctly (the model was fine-tuned on mixed DE/EN data) but the Ollama backend is more balanced for English-heavy documents.
+- Requires training and export before use (see Phase 5 below)
+
+> The `classifier_backend` field appears in the dashboard stats and in the PDF report header so you always know how a report was generated.
+
+---
+
+## What BERT trains on
+
+The BERT classifier is fine-tuned on **240 fixed, generic EU AI Act examples** in `training/data/clause_labels.jsonl` — 30 per article domain, mixed German and English. These examples teach the model to recognise which EU AI Act article a text chunk belongs to.
+
+**Company documents are never used as training data.** They are the *input* to the trained classifier, not the training corpus. The 240 examples are the same for every KlarKI installation.
+
+---
+
+## Phase 5: GPU-accelerated Triton backend
 
 ```bash
-docker compose ps
+./run.sh triton
 ```
 
-### 3. Build the knowledge base (one-time)
+This runs the full Phase 5 pipeline:
+1. Fine-tunes `deepset/gbert-base` on `training/data/clause_labels.jsonl`
+2. Trains the spaCy NER model on `training/data/ner_annotations.jsonl`
+3. Exports both models to ONNX
+4. Starts the Triton container
+5. Switches `.env` to `USE_TRITON=true` and restarts the API
 
-Seeds ChromaDB with EU AI Act and GDPR regulatory text:
+**Requires:** NVIDIA GPU + [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
 
+To run the latency benchmark afterwards:
 ```bash
-docker exec klarki-api python scripts/build_knowledge_base.py --host klarki-chromadb --port 8000
+./run.sh bench
 ```
 
-Takes ~2 minutes. Only needs to run once (data persists in the `chroma_data` volume).
-
-### 4. Download the LLM model (one-time, ~2.3 GB)
-
-```bash
-docker exec klarki-ollama ollama pull phi3:mini
-```
-
-### 5. Open the app
-
-Go to **http://localhost:5173**
-
-Upload a document or paste policy text → click **Start Audit** → wait 2–5 minutes → view your compliance dashboard.
+To revert to Ollama: set `USE_TRITON=false` in `.env` and run `./run.sh up`.
 
 ---
 
@@ -91,19 +142,29 @@ Upload a document or paste policy text → click **Start Audit** → wait 2–5 
 
 ```
 klarki/
-├── api/                  # FastAPI backend
-│   ├── routers/          # HTTP endpoints (audit, reports)
+├── run.sh                # Setup / up / test / triton / bench in one place
+├── Makefile              # Same commands for Linux/Mac (make setup, make test)
+├── api/
+│   ├── routers/          # HTTP endpoints (audit, reports, wizard)
 │   ├── services/         # Pipeline: parse → chunk → classify → RAG → score
 │   ├── prompts/          # LLM prompt templates
-│   └── templates/        # PDF report HTML template
-├── frontend/             # React + TypeScript + Tailwind UI
+│   └── templates/        # PDF report (WeasyPrint + Jinja2)
+├── frontend/             # React 18 + TypeScript + Vite + Tailwind
 │   └── src/
-│       ├── pages/        # Upload, Dashboard, ArticleDetail
-│       └── components/   # ScoreRadial, ArticleCard, GapCard, etc.
-├── scripts/              # Knowledge base builder, model export
-├── tests/                # pytest test suite
-├── docker-compose.yml
-└── .env.example
+│       ├── pages/        # Upload, Dashboard, ArticleDetail, RiskWizard
+│       └── components/   # ScoreRadial, ArticleCard, GapCard, EmotionWarning
+├── scripts/
+│   ├── setup.py          # Orchestrates all init stages
+│   ├── build_knowledge_base.py
+│   ├── export_onnx.py
+│   └── benchmark_triton.py
+├── training/
+│   ├── train_classifier.py   # Fine-tune gbert-base (Phase 5)
+│   ├── train_ner.py          # Train spaCy NER (Phase 5)
+│   └── data/                 # 240 classifier examples + 25 NER examples
+├── model_repository/         # Triton model configs (Phase 5)
+├── tests/                    # pytest suite (36 tests)
+└── docker-compose.yml
 ```
 
 ---
@@ -112,90 +173,84 @@ klarki/
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/v1/health` | Service health check |
+| `GET` | `/api/v1/health` | Service health (chromadb + ollama status) |
 | `POST` | `/api/v1/audit/upload` | Upload file or raw text, start audit |
-| `GET` | `/api/v1/audit/{id}` | Get audit status + report |
+| `GET` | `/api/v1/audit/{id}` | Get audit status + full report |
 | `GET` | `/api/v1/audit/{id}/status` | Lightweight status poll |
 | `GET` | `/api/v1/reports/{id}/json` | Download report as JSON |
 | `GET` | `/api/v1/reports/{id}/pdf` | Download report as PDF |
+| `GET` | `/api/v1/wizard/questions` | Annex III risk wizard questions |
+| `POST` | `/api/v1/wizard/classify` | Submit wizard answers → risk tier |
 
 Accepted file types: `.pdf`, `.docx`, `.txt`, `.md` — max 10 MB.
 
 ---
 
-## Running tests
-
-```bash
-docker exec klarki-api sh -c 'python -m pytest /tests/ -v --asyncio-mode=auto'
-```
-
-Expected: **30 passed, 10 skipped** (skipped = Phase 4/5 stubs not yet implemented).
-
----
-
-## Useful commands
-
-```bash
-# View live API logs
-docker compose logs -f klarki-api
-
-# Rebuild knowledge base after regulatory text updates
-docker exec klarki-api python scripts/build_knowledge_base.py --host klarki-chromadb --port 8000
-
-# Stop everything
-docker compose down
-
-# Stop and wipe all data (vector DB + uploads)
-docker compose down -v
-```
-
----
-
 ## Environment variables
-
-All variables are set in `.env`. Key ones:
 
 | Variable | Default | Description |
 |---|---|---|
-| `OLLAMA_MODEL` | `phi3:mini` | LLM model name (any Ollama-compatible model) |
+| `OLLAMA_MODEL` | `phi3:mini` | LLM model (any Ollama-compatible model) |
+| `USE_TRITON` | `false` | `true` to use BERT/Triton instead of Ollama |
 | `UPLOAD_MAX_SIZE_MB` | `10` | Max upload file size |
-| `DEBUG` | `true` | Enables structured pretty-print logs |
-| `CHROMADB_HOST` | `http://klarki-chromadb:8000` | ChromaDB service URL |
+| `DEBUG` | `true` | Pretty-print structured logs |
+| `TRITON_HOST` | `klarki-triton` | Triton server hostname |
+| `TRITON_GRPC_PORT` | `8001` | Triton gRPC port (inside Docker network) |
 
 ---
 
 ## Tech stack
 
-- **Backend:** FastAPI · ChromaDB · sentence-transformers (multilingual-e5-small) · Ollama (Phi-3 Mini Q4)
-- **Frontend:** React 18 · TypeScript · Vite · Tailwind CSS
-- **PDF parsing:** PyMuPDF · python-docx
-- **Reports:** WeasyPrint · Jinja2
-- **Containers:** Docker Compose (no Kubernetes, no cloud)
+| Layer | Technology |
+|---|---|
+| Backend | FastAPI · Uvicorn · Pydantic v2 |
+| Vector DB | ChromaDB |
+| Embeddings | sentence-transformers multilingual-e5-small (local) |
+| LLM (default) | Ollama · Phi-3 Mini 3.8B Q4 |
+| LLM (Phase 5) | Triton Inference Server · gbert-base ONNX |
+| NER (Phase 5) | spaCy · de_core_news_sm |
+| Frontend | React 18 · TypeScript · Vite · Tailwind CSS |
+| PDF parsing | PyMuPDF · python-docx |
+| Reports | WeasyPrint · Jinja2 |
+| Containers | Docker Compose |
 
 ---
 
 ## Privacy
 
-- All processing is local — no data is sent to external APIs
-- Uploaded documents are deleted from disk after the audit completes
+- All processing is local — no data is sent to external APIs or cloud services
+- Uploaded documents are deleted from disk immediately after the audit completes
 - The LLM runs entirely inside the `klarki-ollama` container
-- ChromaDB stores only regulatory text (EU AI Act + GDPR), not your documents
+- ChromaDB stores only regulatory text (EU AI Act + GDPR), never your documents
+- The PDF report is generated locally and served directly to your browser
 
 ---
 
 ## Troubleshooting
 
-**Audit completes with score 0 on all articles**
-→ The LLM model isn't loaded. Run `docker exec klarki-ollama ollama pull phi3:mini`.
+**Audit fails / score is 0 on all articles**
+→ The LLM model is not loaded. Run `./run.sh setup` or manually:
+`docker exec klarki-ollama ollama pull phi3:mini`
+
+**`ModuleNotFoundError: No module named 'tritonclient'` when `USE_TRITON=true`**
+→ The API image was built before Phase 5 packages were added. Rebuild:
+`docker compose up -d --build klarki-api`
+Also ensure `USE_TRITON=false` if you haven't run `./run.sh triton` yet.
 
 **PDF download fails**
-→ Check `docker compose logs klarki-api` for WeasyPrint errors. Ensure `pydyf==0.11.0` is installed (pinned in `requirements.txt`).
+→ Check `docker compose logs klarki-api` for WeasyPrint errors.
+Ensure `pydyf==0.11.0` is in `requirements.txt` (0.12+ breaks WeasyPrint 62.x).
+
+**Docker network error on `docker compose up`**
+→ Stale network reference from a failed previous start. Fix:
+`docker compose down --remove-orphans && docker network prune -f && docker compose up -d`
+
+**Frontend changes not hot-reloading**
+→ Vite uses polling on Windows Docker volumes (configured in `vite.config.ts`).
+Changes reload within ~500 ms. If stuck, restart: `docker compose restart klarki-frontend`.
+
+**GPU not detected by Ollama or Triton**
+→ Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) and restart Docker Desktop. Both services fall back to CPU automatically.
 
 **ChromaDB connection error on startup**
-→ Wait a few more seconds — ChromaDB takes ~10 s to initialise. The API retries automatically.
-
-**Frontend changes not reflected**
-→ Vite uses polling for file watching in Docker on Windows. Changes take up to 1 second to hot-reload. If HMR doesn't fire, restart: `docker compose restart klarki-frontend`.
-
-**GPU not detected**
-→ Install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) and restart Docker Desktop. The `docker-compose.yml` includes the GPU deploy block — it falls back to CPU if no GPU is found.
+→ ChromaDB takes ~10 s to initialise. The API retries on startup — wait a moment and refresh.
