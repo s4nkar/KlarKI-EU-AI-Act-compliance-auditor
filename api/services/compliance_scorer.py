@@ -62,6 +62,7 @@ async def score_audit(
     source_files: list[str] | None = None,
     language: str = "en",
     emotion_flag: EmotionFlag | None = None,
+    classifier_backend: str = "ollama/phi3:mini",
 ) -> ComplianceReport:
     """Aggregate per-article scores into a full ComplianceReport.
 
@@ -106,6 +107,7 @@ async def score_audit(
         emotion_flag=emotion_flag or EmotionFlag(),
         total_chunks=len(chunks),
         classified_chunks=classified,
+        classifier_backend=classifier_backend,
     )
 
     logger.info(
