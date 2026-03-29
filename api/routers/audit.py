@@ -23,6 +23,7 @@ from models.schemas import (
     AuditStatus,
 )
 from services.classifier import classify_chunks
+from services.emotion_module import check_emotion_recognition
 from services.compliance_scorer import ARTICLE_DOMAINS, score_audit
 from services.document_parser import parse_document, SUPPORTED_EXTENSIONS
 from services.chunker import chunk_text
@@ -222,12 +223,14 @@ async def _run_pipeline(
 
         # ── Stage 5: Score ────────────────────────────────────────────────────
         _set_status(AuditStatus.SCORING)
+        emotion_flag = await check_emotion_recognition(chunks)
         report = await score_audit(
             article_scores=article_scores,
             chunks=chunks,
             audit_id=audit_id,
             source_files=[filename],
             language=language,
+            emotion_flag=emotion_flag,
         )
 
         _audits[audit_id] = AuditResponse(

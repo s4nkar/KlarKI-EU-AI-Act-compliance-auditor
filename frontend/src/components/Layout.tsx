@@ -21,6 +21,9 @@ export default function Layout({ children }: LayoutProps) {
             <Link to="/" className="hover:text-brand-600 transition-colors">
               New Audit
             </Link>
+            <Link to="/wizard" className="hover:text-brand-600 transition-colors">
+              Risk Wizard
+            </Link>
           </nav>
         </div>
       </header>
