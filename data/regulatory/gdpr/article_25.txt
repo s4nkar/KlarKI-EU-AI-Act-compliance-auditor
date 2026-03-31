@@ -1,0 +1,19 @@
+ARTICLE: 25
+REGULATION: gdpr
+DOMAIN: privacy_by_design
+TITLE_EN: Article 25 — Data protection by design and by default
+TITLE_DE: Artikel 25 — Datenschutz durch Technikgestaltung und durch datenschutzfreundliche Voreinstellungen
+
+=== EN ===
+Article 25 — Data protection by design and by default
+
+The controller shall implement appropriate technical and organisational measures designed to implement data protection principles effectively.
+
+By default, only personal data which are necessary for each specific purpose shall be processed.
+
+=== DE ===
+Artikel 25 — Datenschutz durch Technikgestaltung und durch datenschutzfreundliche Voreinstellungen
+
+Der Verantwortliche setzt geeignete technische und organisatorische Maßnahmen um, um Datenschutzgrundsätze wirksam umzusetzen.
+
+Standardmäßig dürfen nur personenbezogene Daten verarbeitet werden, die für den jeweiligen Zweck erforderlich sind.

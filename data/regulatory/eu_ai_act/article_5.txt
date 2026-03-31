@@ -1,0 +1,35 @@
+ARTICLE: 5
+REGULATION: eu_ai_act
+DOMAIN: prohibited_practices
+TITLE_EN: Article 5 — Prohibited Artificial Intelligence Practices
+TITLE_DE: Artikel 5 — Verbotene Praktiken im Bereich der künstlichen Intelligenz
+
+=== EN ===
+Article 5 — Prohibited Artificial Intelligence Practices
+
+1. The following artificial intelligence practices shall be prohibited:
+
+(a) placing on the market, putting into service or using an AI system that deploys subliminal techniques beyond a person’s consciousness in order to materially distort behaviour in a manner that causes or is likely to cause harm;
+
+(b) placing on the market, putting into service or using an AI system that exploits vulnerabilities of a specific group of persons due to age, disability or social or economic situation in order to materially distort behaviour;
+
+(c) the placing on the market or use of AI systems for social scoring by public authorities that lead to detrimental treatment of individuals or groups;
+
+(d) the use of real-time remote biometric identification systems in publicly accessible spaces for the purpose of law enforcement, except in strictly defined circumstances permitted by law;
+
+(e) the use of AI systems for emotion recognition in workplaces and educational institutions, except where strictly necessary for medical or safety reasons.
+
+=== DE ===
+Artikel 5 — Verbotene Praktiken im Bereich der künstlichen Intelligenz
+
+1. Die folgenden Praktiken der künstlichen Intelligenz sind verboten:
+
+(a) das Inverkehrbringen, die Inbetriebnahme oder Nutzung von KI-Systemen, die unterschwellige Techniken einsetzen, um das Verhalten von Personen zu beeinflussen und dadurch Schaden zu verursachen;
+
+(b) das Ausnutzen von Schwächen bestimmter Personengruppen aufgrund ihres Alters, einer Behinderung oder ihrer sozialen oder wirtschaftlichen Lage;
+
+(c) der Einsatz von KI-Systemen durch Behörden zum sogenannten Social Scoring, der zu nachteiliger Behandlung von Personen oder Gruppen führt;
+
+(d) der Einsatz von Echtzeit-Fernbiometrie zur Identifikation von Personen im öffentlichen Raum zu Zwecken der Strafverfolgung, außer in gesetzlich definierten Ausnahmefällen;
+
+(e) der Einsatz von KI-Systemen zur Emotionserkennung am Arbeitsplatz oder in Bildungseinrichtungen, außer wenn dies aus medizinischen oder sicherheitsrelevanten Gründen erforderlich ist.

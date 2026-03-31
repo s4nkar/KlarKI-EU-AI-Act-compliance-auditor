@@ -1,0 +1,37 @@
+ARTICLE: 15
+REGULATION: eu_ai_act
+DOMAIN: security
+TITLE_EN: Article 15 — Accuracy, Robustness and Cybersecurity
+TITLE_DE: Artikel 15 — Genauigkeit, Robustheit und Cybersicherheit
+
+=== EN ===
+Article 15 — Accuracy, Robustness and Cybersecurity
+
+1.   High-risk AI systems shall be designed and developed in such a way that they achieve an appropriate level of accuracy, robustness, and cybersecurity, and that they perform consistently in those respects throughout their lifecycle.
+
+2.   The levels of accuracy and the relevant accuracy metrics for high-risk AI systems shall be declared in the accompanying instructions for use.
+
+3.   High-risk AI systems shall be resilient as regards errors, faults or inconsistencies that may occur within the system or the environment in which the system operates, in particular if such errors, faults or inconsistencies may lead to death or serious injury to a person or to property, or to significant economic or social harm. Technical robustness of high-risk AI systems may be achieved through technical redundancy solutions, which may include backup or fail-safe plans.
+
+4.   High-risk AI systems that continue to learn after being placed on the market or put into service shall be developed in such a way that possibly biased outputs due to outputs used as an input for future operations are duly addressed with appropriate mitigation measures.
+
+5.   High-risk AI systems shall be resilient against attempts by third parties to alter their use, outputs or performance by exploiting the system vulnerabilities, including:
+(a) adversarial attacks — inputs specifically designed to cause a model to make a mistake;
+(b) data poisoning attacks — attacks on training data to influence model behaviour;
+(c) model evasion — inputs crafted to avoid detection or classification;
+(d) confidentiality attacks — attempts to extract training data or model parameters.
+
+6.   The technical solutions aimed at ensuring the cybersecurity of high-risk AI systems shall be appropriate to the relevant circumstances and the risks. Technical solutions to address AI specific vulnerabilities shall include, where appropriate, measures to prevent, detect, respond to, resolve and control for attacks.
+
+=== DE ===
+Artikel 15 — Genauigkeit, Robustheit und Cybersicherheit
+
+1.   Hochrisiko-KI-Systeme sind so zu gestalten und zu entwickeln, dass sie ein angemessenes Maß an Genauigkeit, Robustheit und Cybersicherheit erreichen und diesbezüglich über ihren gesamten Lebenszyklus hinweg eine konsistente Leistung erbringen.
+
+2.   Die Genauigkeitsniveaus und die relevanten Genauigkeitsmetriken für Hochrisiko-KI-Systeme sind in den begleitenden Gebrauchsanweisungen anzugeben.
+
+3.   Hochrisiko-KI-Systeme müssen widerstandsfähig gegenüber Fehlern, Ausfällen oder Inkonsistenzen sein, die im System oder in der Umgebung auftreten können. Technische Robustheit kann durch technische Redundanzlösungen erreicht werden, die auch Sicherungs- oder Notfallpläne umfassen können.
+
+4.   Hochrisiko-KI-Systeme müssen widerstandsfähig gegen Versuche Dritter sein, durch Ausnutzung von Systemschwachstellen die Verwendung, die Ausgaben oder die Leistung des Systems zu verändern, einschließlich adversarialer Angriffe, Datenvergiftungsangriffe und Modell-Umgehungsangriffe.
+
+5.   Die technischen Lösungen zur Gewährleistung der Cybersicherheit von Hochrisiko-KI-Systemen müssen den relevanten Umständen und Risiken angemessen sein und geeignete Maßnahmen zur Verhinderung, Erkennung, Reaktion und Kontrolle von Angriffen umfassen.

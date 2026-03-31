@@ -1,0 +1,41 @@
+ARTICLE: 14
+REGULATION: eu_ai_act
+DOMAIN: human_oversight
+TITLE_EN: Article 14 — Human Oversight
+TITLE_DE: Artikel 14 — Menschliche Aufsicht
+
+=== EN ===
+Article 14 — Human Oversight
+
+1.   High-risk AI systems shall be designed and developed in such a way, including with appropriate human-machine interface tools, that they can be effectively overseen by natural persons during the period in which the AI system is in use.
+
+2.   The oversight measures referred to in paragraph 1 shall be proportionate to the risks, level of autonomy and context of use of the high-risk AI system, and shall be ensured through either one or both of the following types of measures:
+(a) measures identified and built, when technically feasible, into the high-risk AI system by the provider before it is placed on the market or put into service;
+(b) measures identified by the provider and/or the deployer.
+
+3.   For the purpose of implementing paragraphs 1 and 2, the high-risk AI system shall be provided to the deployer in such a way that natural persons to whom human oversight is assigned are enabled, as appropriate:
+(a) to fully understand the capacities and limitations of the high-risk AI system and be able to duly monitor its operation, so that signs of anomalies, dysfunctions and unexpected performance can be detected and addressed as soon as possible;
+(b) to remain aware of the possible tendency of automatically relying or over-relying on the output produced by a high-risk AI system (automation bias), in particular for high-risk AI systems used to provide information or recommendations for decisions to be taken by natural persons;
+(c) to correctly interpret the high-risk AI system's output, taking into account, for example, the interpretation tools and methods available;
+(d) to decide, in any particular situation, not to use the high-risk AI system or otherwise disregard, override or reverse the output of the high-risk AI system;
+(e) to intervene on the operation of the high-risk AI system or interrupt the system through a "stop" button or a similar procedure that allows the system to come to a halt in a safe state.
+
+4.   For high-risk AI systems referred to in point 1(a) of Annex III, the measures referred to in paragraph 3 shall be such as to ensure that, in addition, no action or decision is taken by the deployer on the basis of the identification resulting from the system unless this has been separately verified and confirmed by at least two natural persons with the necessary competence, training and authority.
+
+5.   Natural persons to whom human oversight is assigned shall have the necessary competence, training and authority, as well as the necessary support, to carry out that role.
+
+=== DE ===
+Artikel 14 — Menschliche Aufsicht
+
+1.   Hochrisiko-KI-Systeme sind so zu gestalten und zu entwickeln, auch mit geeigneten Mensch-Maschine-Schnittstellenwerkzeugen, dass sie während des Einsatzzeitraums von natürlichen Personen wirksam beaufsichtigt werden können.
+
+2.   Die Aufsichtsmaßnahmen gemäß Absatz 1 müssen den Risiken, dem Grad der Autonomie und dem Verwendungskontext des Hochrisiko-KI-Systems angemessen sein.
+
+3.   Den mit der menschlichen Aufsicht betrauten natürlichen Personen muss es möglich sein:
+(a) die Kapazitäten und Grenzen des Hochrisiko-KI-Systems vollständig zu verstehen und seinen Betrieb angemessen zu überwachen;
+(b) die Tendenz zur automatischen Abhängigkeit von Ausgaben des Hochrisiko-KI-Systems zu erkennen (Automatisierungsverzerrung);
+(c) die Ausgaben des Hochrisiko-KI-Systems korrekt zu interpretieren;
+(d) in einer bestimmten Situation zu entscheiden, das Hochrisiko-KI-System nicht zu verwenden oder seine Ausgabe außer Acht zu lassen, zu übersteuern oder umzukehren;
+(e) in den Betrieb des Hochrisiko-KI-Systems einzugreifen oder das System über einen Stoppknopf oder ein ähnliches Verfahren anzuhalten.
+
+4.   Natürlichen Personen, denen die menschliche Aufsicht übertragen wird, sind alle erforderlichen Kompetenzen, Schulungen und Befugnisse zu erteilen, um diese Aufgabe wahrnehmen zu können.
