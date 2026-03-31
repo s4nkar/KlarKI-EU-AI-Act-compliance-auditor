@@ -1,0 +1,38 @@
+ARTICLE: 13
+REGULATION: eu_ai_act
+DOMAIN: transparency
+TITLE_EN: Article 13 — Transparency and Provision of Information to Deployers
+TITLE_DE: Artikel 13 — Transparenz und Bereitstellung von Informationen für Betreiber
+
+=== EN ===
+Article 13 — Transparency and Provision of Information to Deployers
+
+1.   High-risk AI systems shall be designed and developed in such a way to ensure that their operation is sufficiently transparent to enable deployers to interpret the system's output and use it appropriately. An appropriate type and degree of transparency shall be ensured, with a view to achieving compliance with the relevant obligations of the provider and the deployer set out in Section 3 of this Chapter.
+
+2.   High-risk AI systems shall be accompanied by instructions for use in an appropriate digital format or otherwise that include concise, complete, correct and clear information that is relevant, accessible and comprehensible to deployers.
+
+3.   The information referred to in paragraph 2 shall specify:
+(a) the identity and the contact details of the provider and, where applicable, of its authorised representative;
+(b) the characteristics, capabilities and limitations of performance of the high-risk AI system, including:
+   (i) its intended purpose;
+   (ii) the level of accuracy, including its metrics, robustness and cybersecurity referred to in Article 15 against which the high-risk AI system has been tested and validated and which can be expected, and any known and foreseeable circumstances that may have an impact on that expected level of accuracy, robustness and cybersecurity;
+   (iii) any known or foreseeable circumstance, related to the use of the high-risk AI system in accordance with its intended purpose or under conditions of reasonably foreseeable misuse, which may lead to risks to the health and safety or fundamental rights referred to in Article 9(2);
+   (iv) where applicable, its technical capabilities and characteristics in relation to the use of personal data and other data for the training of the AI model;
+(c) the changes to the high-risk AI system and its performance which have been pre-determined by the provider at the moment of the initial conformity assessment, if any;
+(d) the human oversight measures referred to in Article 14, including the technical measures put in place to facilitate the interpretation of the outputs of AI systems by the deployers;
+(e) the computational and hardware resources needed to run the high-risk AI system, the expected lifetime of the high-risk AI system and any necessary maintenance and care measures, including their frequency, to ensure the proper functioning of that AI system, including as regards software updates;
+(f) a description of the mechanisms included within the high-risk AI system that allows deployers to properly collect, store and interpret the logs in accordance with Article 12.
+
+=== DE ===
+Artikel 13 — Transparenz und Bereitstellung von Informationen für Betreiber
+
+1.   Hochrisiko-KI-Systeme sind so zu gestalten und zu entwickeln, dass ihr Betrieb hinreichend transparent ist, damit die Betreiber die Ausgabe des Systems interpretieren und angemessen verwenden können. Es ist ein angemessenes Maß an Transparenz zu gewährleisten.
+
+2.   Hochrisiko-KI-Systeme sind mit einer Gebrauchsanweisung in einem geeigneten digitalen Format oder in sonstiger Form zu begleiten, die präzise, vollständige, korrekte und klare Informationen enthält, die für die Betreiber relevant, zugänglich und verständlich sind.
+
+3.   Die Informationen gemäß Absatz 2 geben insbesondere Folgendes an:
+(a) die Identität und die Kontaktdaten des Anbieters sowie gegebenenfalls seines Bevollmächtigten;
+(b) die Merkmale, Fähigkeiten und Leistungsgrenzen des Hochrisiko-KI-Systems, einschließlich seines Verwendungszwecks, Genauigkeitsgrads und Robustheit;
+(c) die menschlichen Aufsichtsmaßnahmen gemäß Artikel 14;
+(d) die Rechen- und Hardwareressourcen, die für den Betrieb des Hochrisiko-KI-Systems benötigt werden;
+(e) eine Beschreibung der Mechanismen des Hochrisiko-KI-Systems, die es den Betreibern ermöglichen, die Protokolle gemäß Artikel 12 ordnungsgemäß zu erfassen, zu speichern und zu interpretieren.

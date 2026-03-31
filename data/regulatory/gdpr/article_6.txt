@@ -1,0 +1,39 @@
+ARTICLE: 6
+REGULATION: gdpr
+DOMAIN: lawfulness_of_processing
+TITLE_EN: Article 6 — Lawfulness of processing
+TITLE_DE: Artikel 6 — Rechtmäßigkeit der Verarbeitung
+
+=== EN ===
+Article 6 — Lawfulness of processing
+
+Processing shall be lawful only if and to the extent that at least one of the following applies:
+
+(a) the data subject has given consent;
+
+(b) processing is necessary for the performance of a contract;
+
+(c) processing is necessary for compliance with a legal obligation;
+
+(d) processing is necessary to protect vital interests;
+
+(e) processing is necessary for the performance of a task carried out in the public interest;
+
+(f) processing is necessary for the purposes of legitimate interests pursued by the controller or by a third party.
+
+=== DE ===
+Artikel 6 — Rechtmäßigkeit der Verarbeitung
+
+Eine Verarbeitung ist nur rechtmäßig, wenn mindestens eine der folgenden Bedingungen erfüllt ist:
+
+(a) Einwilligung der betroffenen Person;
+
+(b) Erfüllung eines Vertrags;
+
+(c) Erfüllung einer rechtlichen Verpflichtung;
+
+(d) Schutz lebenswichtiger Interessen;
+
+(e) Wahrnehmung einer Aufgabe im öffentlichen Interesse;
+
+(f) Wahrung berechtigter Interessen des Verantwortlichen oder eines Dritten.

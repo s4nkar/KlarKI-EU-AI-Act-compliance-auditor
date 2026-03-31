@@ -1,0 +1,43 @@
+ARTICLE: 10
+REGULATION: eu_ai_act
+DOMAIN: data_governance
+TITLE_EN: Article 10 — Data and Data Governance
+TITLE_DE: Artikel 10 — Daten und Daten-Governance
+
+=== EN ===
+Article 10 — Data and Data Governance
+
+1.   High-risk AI systems which make use of techniques involving the training of models with data shall be developed on the basis of training, validation and testing data sets that meet the quality criteria referred to in paragraphs 2 to 5.
+
+2.   Training, validation and testing data sets shall be subject to appropriate data governance and management practices. Those practices shall concern in particular:
+(a) the relevant design choices;
+(b) data collection processes and the origin of data, and in the case of personal data, the original purpose of the data collection;
+(c) relevant data preparation processing operations, such as annotation, labelling, cleaning, enrichment and aggregation;
+(d) the formulation of relevant assumptions, notably with respect to the information that the data are supposed to measure and represent;
+(e) an assessment of the availability, quantity and suitability of the data sets that are needed;
+(f) examination in view of possible biases that are likely to affect health or safety of persons, lead to prohibited discrimination, or affect fundamental rights;
+(g) appropriate measures to detect, prevent and mitigate possible biases;
+(h) relevant gaps or shortcomings in the data, and how those gaps and shortcomings are addressed.
+
+3.   Training, validation and testing data sets shall be relevant, sufficiently representative, and to the best extent possible, free of errors and complete in view of the intended purpose. They shall have the appropriate statistical properties, including where applicable, as regards the persons or groups of persons in relation to whom the high-risk AI system is intended to be used.
+
+4.   Training, validation and testing data sets shall take into account, to the extent required by the intended purpose, the characteristics or elements that are particular to the specific geographical, contextual, behavioural or functional setting within which the high-risk AI system is intended to be used.
+
+5.   To the extent that it is strictly necessary for the purposes of ensuring bias detection and correction in relation to the high-risk AI systems, the providers of such systems may process special categories of personal data, subject to appropriate safeguards for the fundamental rights and freedoms of natural persons.
+
+=== DE ===
+Artikel 10 — Daten und Daten-Governance
+
+1.   Hochrisiko-KI-Systeme, die Techniken verwenden, bei denen Modelle mit Daten trainiert werden, sind auf der Grundlage von Trainings-, Validierungs- und Testdatensätzen zu entwickeln, die die in den Absätzen 2 bis 5 genannten Qualitätskriterien erfüllen.
+
+2.   Trainings-, Validierungs- und Testdatensätzen müssen angemessene Datenverwaltungs- und -managementpraktiken unterliegen. Diese Praktiken betreffen insbesondere:
+(a) die relevanten Designentscheidungen;
+(b) Datenerfassungsprozesse und Datenherkunft sowie bei personenbezogenen Daten den ursprünglichen Zweck der Datenerhebung;
+(c) relevante Datenaufbereitungsverarbeitungen wie Annotation, Kennzeichnung, Bereinigung, Anreicherung und Aggregation;
+(d) die Formulierung relevanter Annahmen;
+(e) die Beurteilung der Verfügbarkeit, Quantität und Eignung der benötigten Datensätze;
+(f) Prüfung auf mögliche Verzerrungen, die wahrscheinlich Gesundheit oder Sicherheit von Personen beeinträchtigen oder zu verbotener Diskriminierung führen;
+(g) geeignete Maßnahmen zur Erkennung, Verhinderung und Minderung möglicher Verzerrungen;
+(h) relevante Datenlücken oder -mängel und wie diese behoben werden.
+
+3.   Die Datensätze müssen relevant, ausreichend repräsentativ und so weit wie möglich fehlerfrei und vollständig sein. Sie müssen die geeigneten statistischen Eigenschaften aufweisen.
