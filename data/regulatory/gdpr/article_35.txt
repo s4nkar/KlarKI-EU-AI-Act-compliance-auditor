@@ -1,0 +1,29 @@
+ARTICLE: 35
+REGULATION: gdpr
+DOMAIN: data_protection_impact_assessment
+TITLE_EN: Article 35 — Data protection impact assessment
+TITLE_DE: Artikel 35 — Datenschutz-Folgenabschätzung
+
+=== EN ===
+Article 35 — Data protection impact assessment
+
+Where processing is likely to result in a high risk to the rights and freedoms of natural persons, the controller shall carry out an assessment of the impact of the envisaged processing operations.
+
+The assessment shall include:
+
+- a description of the processing operations;
+- an assessment of the necessity and proportionality of the processing;
+- an assessment of risks to the rights and freedoms of data subjects;
+- measures to address the risks.
+
+=== DE ===
+Artikel 35 — Datenschutz-Folgenabschätzung
+
+Wenn eine Verarbeitung voraussichtlich ein hohes Risiko für die Rechte und Freiheiten natürlicher Personen zur Folge hat, führt der Verantwortliche eine Datenschutz-Folgenabschätzung durch.
+
+Diese umfasst:
+
+- Beschreibung der Verarbeitung;
+- Bewertung der Notwendigkeit und Verhältnismäßigkeit;
+- Bewertung der Risiken;
+- Maßnahmen zur Risikominderung.

@@ -1,0 +1,19 @@
+ARTICLE: 24
+REGULATION: gdpr
+DOMAIN: controller_responsibility
+TITLE_EN: Article 24 — Responsibility of the controller
+TITLE_DE: Artikel 24 — Verantwortung des Verantwortlichen
+
+=== EN ===
+Article 24 — Responsibility of the controller
+
+The controller shall implement appropriate technical and organisational measures to ensure and to be able to demonstrate that processing is performed in accordance with this Regulation.
+
+Those measures shall be reviewed and updated where necessary.
+
+=== DE ===
+Artikel 24 — Verantwortung des Verantwortlichen
+
+Der Verantwortliche trifft geeignete technische und organisatorische Maßnahmen, um sicherzustellen und nachweisen zu können, dass die Verarbeitung gemäß dieser Verordnung erfolgt.
+
+Diese Maßnahmen werden erforderlichenfalls überprüft und aktualisiert.

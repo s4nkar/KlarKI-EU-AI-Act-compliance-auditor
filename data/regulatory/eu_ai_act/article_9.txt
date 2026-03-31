@@ -1,0 +1,41 @@
+ARTICLE: 9
+REGULATION: eu_ai_act
+DOMAIN: risk_management
+TITLE_EN: Article 9 — Risk Management System
+TITLE_DE: Artikel 9 — Risikomanagementsystem
+
+=== EN ===
+Article 9 — Risk Management System
+
+1.   A risk management system shall be established, implemented, documented and maintained in relation to high-risk AI systems.
+
+2.   The risk management system shall consist of a continuous iterative process run throughout the entire lifecycle of a high-risk AI system, requiring regular systematic updating. It shall comprise the following steps:
+(a) identification and analysis of the known and foreseeable risks that the high-risk AI system can pose to health, safety or fundamental rights when the high-risk AI system is used in accordance with its intended purpose;
+(b) estimation and evaluation of the risks that may emerge when the high-risk AI system is used in accordance with its intended purpose, and under conditions of reasonably foreseeable misuse;
+(c) evaluation of other risks possibly arising on the basis of the analysis of data gathered from the post-market monitoring system referred to in Article 72;
+(d) adoption of appropriate and targeted risk management measures in accordance with the provisions of the following paragraphs.
+
+3.   The risk management measures referred to in point (d) of paragraph 2 shall give due consideration to the effects and possible interactions resulting from the combined application of the requirements set out in this Section 2.
+
+4.   The risk management measures shall be such that any residual risk associated with each hazard as well as the overall residual risk of the high-risk AI systems is judged acceptable, provided the high-risk AI system is used in accordance with its intended purpose or under conditions of reasonably foreseeable misuse.
+
+5.   High-risk AI systems shall be tested for the purpose of identifying the most appropriate and targeted risk management measures. Testing shall ensure that high-risk AI systems perform consistently for their intended purpose and shall not need to go beyond what is necessary for that purpose.
+
+6.   A high-risk AI system shall be tested by the provider before being placed on the market or put into service. Testing shall be performed with respect to the intended purpose and under conditions of foreseeable misuse.
+
+7.   The risk management of high-risk AI systems referred to in paragraphs 1 to 7 shall be documented as part of the technical documentation referred to in Article 11 and Annex IV.
+
+=== DE ===
+Artikel 9 — Risikomanagementsystem
+
+1.   Für Hochrisiko-KI-Systeme ist ein Risikomanagementsystem einzurichten, umzusetzen, zu dokumentieren und aufrechtzuerhalten.
+
+2.   Das Risikomanagementsystem besteht aus einem kontinuierlichen iterativen Prozess, der während des gesamten Lebenszyklus eines Hochrisiko-KI-Systems durchgeführt wird und regelmäßige systematische Aktualisierungen erfordert. Der Prozess umfasst folgende Schritte:
+(a) Ermittlung und Analyse der bekannten und vorhersehbaren Risiken, die das Hochrisiko-KI-System für Gesundheit, Sicherheit oder Grundrechte darstellen kann;
+(b) Schätzung und Bewertung der Risiken, die bei der bestimmungsgemäßen Verwendung und unter vernünftigerweise vorhersehbaren Missbrauchsbedingungen entstehen können;
+(c) Bewertung anderer Risiken auf Grundlage von Daten aus dem System zur Überwachung nach dem Inverkehrbringen gemäß Artikel 72;
+(d) Ergreifung geeigneter und gezielter Risikomanagementsystem-Maßnahmen.
+
+3.   Die Risikomanagementsystem-Maßnahmen müssen so beschaffen sein, dass etwaige Restrisiken im Zusammenhang mit den einzelnen Gefährdungen sowie das gesamte Restrisiko der Hochrisiko-KI-Systeme als annehmbar eingestuft werden, sofern das Hochrisiko-KI-System bestimmungsgemäß oder unter vernünftigerweise vorhersehbaren Missbrauchsbedingungen verwendet wird.
+
+4.   Hochrisiko-KI-Systeme werden vom Anbieter vor dem Inverkehrbringen oder der Inbetriebnahme geprüft, um die am besten geeigneten und gezielten Risikomanagementsystem-Maßnahmen zu ermitteln.

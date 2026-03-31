@@ -1,0 +1,29 @@
+ARTICLE: 30
+REGULATION: gdpr
+DOMAIN: processing_records
+TITLE_EN: Article 30 — Records of processing activities
+TITLE_DE: Artikel 30 — Verzeichnis von Verarbeitungstätigkeiten
+
+=== EN ===
+Article 30 — Records of processing activities
+
+Each controller shall maintain a record of processing activities under its responsibility.
+
+The record shall contain:
+- purposes of processing
+- categories of data subjects and personal data
+- categories of recipients
+- envisaged time limits for erasure
+- security measures.
+
+=== DE ===
+Artikel 30 — Verzeichnis von Verarbeitungstätigkeiten
+
+Jeder Verantwortliche führt ein Verzeichnis aller Verarbeitungstätigkeiten.
+
+Dieses enthält:
+- Zwecke der Verarbeitung
+- Kategorien betroffener Personen und Daten
+- Kategorien von Empfängern
+- geplante Löschfristen
+- Sicherheitsmaßnahmen.

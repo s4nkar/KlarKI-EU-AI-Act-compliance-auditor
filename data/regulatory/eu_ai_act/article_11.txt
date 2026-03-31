@@ -1,0 +1,41 @@
+ARTICLE: 11
+REGULATION: eu_ai_act
+DOMAIN: technical_documentation
+TITLE_EN: Article 11 — Technical Documentation
+TITLE_DE: Artikel 11 — Technische Dokumentation
+
+=== EN ===
+Article 11 — Technical Documentation
+
+1.   The technical documentation of a high-risk AI system shall be drawn up before that system is placed on the market or put into service and shall be kept up-to-date.
+
+2.   The technical documentation shall be drawn up in such a way to demonstrate that the high-risk AI system complies with the requirements set out in this Section and provide national competent authorities and notified bodies with all the necessary information to assess the compliance of the AI system with those requirements. It shall contain, at a minimum, the elements set out in Annex IV.
+
+3.   SMEs, including start-ups, may provide the elements of the technical documentation specified in Annex IV in a simplified manner. To that end, the Commission shall establish a simplified technical documentation form targeted at the needs of small and medium-sized enterprises.
+
+The technical documentation referred to in Annex IV shall include at minimum:
+(a) a general description of the AI system including its intended purpose, the persons responsible for the system, its basic properties and performance;
+(b) a detailed description of the elements of the AI system and of the process for its development, including the methods and steps for the system's development;
+(c) detailed information about the monitoring, functioning and control of the AI system, including its capabilities and limitations in terms of performance;
+(d) a description of the risk management system in accordance with Article 9;
+(e) a description of the changes made to the system through its lifecycle;
+(f) a list of the harmonised standards applied; where harmonised standards have not been applied or where they do not cover all of the applicable requirements, a description of the solutions adopted;
+(g) a copy of the EU declaration of conformity as referred to in Article 47;
+(h) a description of the system for the evaluation of the high-risk AI system's post-market performance.
+
+=== DE ===
+Artikel 11 — Technische Dokumentation
+
+1.   Die technische Dokumentation eines Hochrisiko-KI-Systems ist zu erstellen, bevor dieses System in Verkehr gebracht oder in Betrieb genommen wird, und auf dem neuesten Stand zu halten.
+
+2.   Die technische Dokumentation ist so zu erstellen, dass nachgewiesen wird, dass das Hochrisiko-KI-System die in diesem Abschnitt festgelegten Anforderungen erfüllt, und den nationalen zuständigen Behörden und notifizierten Stellen alle notwendigen Informationen für die Bewertung der Konformität des KI-Systems bereitgestellt werden. Sie enthält mindestens die in Anhang IV aufgeführten Elemente.
+
+3.   KMU, einschließlich Start-ups, können die in Anhang IV angegebenen Elemente der technischen Dokumentation in vereinfachter Form bereitstellen.
+
+Die technische Dokumentation gemäß Anhang IV umfasst mindestens:
+(a) eine allgemeine Beschreibung des KI-Systems einschließlich des Verwendungszwecks;
+(b) eine detaillierte Beschreibung der Elemente des KI-Systems und des Prozesses seiner Entwicklung;
+(c) detaillierte Informationen über die Überwachung, das Funktionieren und die Kontrolle des KI-Systems;
+(d) eine Beschreibung des Risikomanagementsystems gemäß Artikel 9;
+(e) eine Beschreibung der Änderungen am System über seinen Lebenszyklus;
+(f) eine Kopie der EU-Konformitätserklärung gemäß Artikel 47.

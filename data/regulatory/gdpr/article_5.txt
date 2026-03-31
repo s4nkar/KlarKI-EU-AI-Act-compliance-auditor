@@ -1,0 +1,43 @@
+ARTICLE: 5
+REGULATION: gdpr
+DOMAIN: data_processing_principles
+TITLE_EN: Article 5 — Principles relating to processing of personal data
+TITLE_DE: Artikel 5 — Grundsätze für die Verarbeitung personenbezogener Daten
+
+=== EN ===
+Article 5 — Principles relating to processing of personal data
+
+1. Personal data shall be:
+
+(a) processed lawfully, fairly and in a transparent manner;
+
+(b) collected for specified, explicit and legitimate purposes and not further processed in a manner incompatible with those purposes;
+
+(c) adequate, relevant and limited to what is necessary in relation to the purposes for which they are processed;
+
+(d) accurate and kept up to date where necessary;
+
+(e) kept in a form which permits identification of data subjects for no longer than is necessary;
+
+(f) processed in a manner that ensures appropriate security of the personal data.
+
+2. The controller shall be responsible for, and be able to demonstrate compliance with, these principles.
+
+=== DE ===
+Artikel 5 — Grundsätze für die Verarbeitung personenbezogener Daten
+
+1. Personenbezogene Daten müssen:
+
+(a) rechtmäßig, nach Treu und Glauben und transparent verarbeitet werden;
+
+(b) für festgelegte, eindeutige und legitime Zwecke erhoben werden;
+
+(c) dem Zweck angemessen und auf das notwendige Maß beschränkt sein;
+
+(d) sachlich richtig und erforderlichenfalls auf dem neuesten Stand sein;
+
+(e) nur so lange gespeichert werden, wie es für die Zwecke erforderlich ist;
+
+(f) in einer Weise verarbeitet werden, die eine angemessene Sicherheit gewährleistet.
+
+2. Der Verantwortliche ist für die Einhaltung dieser Grundsätze verantwortlich und muss deren Einhaltung nachweisen können.
