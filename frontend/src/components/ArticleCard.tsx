@@ -2,7 +2,7 @@
 
 import { Link } from 'react-router-dom'
 import type { ArticleScore } from '../types'
-import { ARTICLE_NAMES, scoreColor } from '../utils/formatters'
+import { ARTICLE_NAMES } from '../utils/formatters'
 
 interface ArticleCardProps {
   score: ArticleScore
@@ -17,11 +17,13 @@ export default function ArticleCard({ score, auditId }: ArticleCardProps) {
   const majorCount = score.gaps.filter(g => g.severity === 'major').length
   const minorCount = score.gaps.filter(g => g.severity === 'minor').length
 
-  const barColor = score.score >= 70
-    ? 'bg-green-500'
-    : score.score >= 40
-      ? 'bg-amber-500'
-      : 'bg-red-500'
+  // Color driven by worst gap severity, not numeric score.
+  // A 75 with a Critical gap must show red, not green.
+  const gapColor =
+    criticalCount > 0 ? { bar: 'bg-red-500',   num: 'text-red-600' }
+    : majorCount > 0  ? { bar: 'bg-amber-500', num: 'text-amber-600' }
+    : minorCount > 0  ? { bar: 'bg-blue-400',  num: 'text-blue-600' }
+    :                   { bar: 'bg-green-500', num: 'text-green-600' }
 
   // Sort gaps to show worst first
   const worstGap = [...score.gaps].sort(
@@ -43,15 +45,15 @@ export default function ArticleCard({ score, auditId }: ArticleCardProps) {
             {name}
           </h3>
         </div>
-        <span className={`text-2xl font-bold ${scoreColor(score.score)}`}>
+        <span className={`text-2xl font-bold ${gapColor.num}`}>
           {Math.round(score.score)}
         </span>
       </div>
 
-      {/* Score bar */}
+      {/* Score bar — width from score, color from worst gap severity */}
       <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
         <div
-          className={`h-full rounded-full transition-all ${barColor}`}
+          className={`h-full rounded-full transition-all ${gapColor.bar}`}
           style={{ width: `${score.score}%` }}
         />
       </div>

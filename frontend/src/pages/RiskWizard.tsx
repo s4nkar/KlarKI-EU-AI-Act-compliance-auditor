@@ -62,9 +62,11 @@ export default function RiskWizard() {
     <Layout>
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
+          <p className="text-xs font-semibold text-brand-600 uppercase tracking-wide mb-1">Step 1 of 2</p>
           <h1 className="text-2xl font-bold text-slate-800">Annex III Risk Classification</h1>
           <p className="mt-1 text-slate-500 text-sm">
             Answer 9 yes/no questions to determine your AI system's risk tier under the EU AI Act.
+            Your result will carry forward into the document audit in Step 2.
           </p>
         </div>
 
@@ -186,11 +188,11 @@ function ResultCard({
           Start Over
         </button>
         <Link
-          to="/"
+          to={`/upload?tier=${tier}`}
           className="px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium
             hover:bg-brand-700 transition-colors"
         >
-          Run Compliance Audit →
+          Continue to Step 2: Upload Docs →
         </Link>
       </div>
     </div>

@@ -76,10 +76,12 @@ def create_app() -> FastAPI:
     from routers.audit import router as audit_router
     from routers.reports import router as reports_router
     from routers.wizard import router as wizard_router
+    from routers.metrics import router as metrics_router
 
     app.include_router(audit_router)
     app.include_router(reports_router)
     app.include_router(wizard_router)
+    app.include_router(metrics_router)
 
     return app
 

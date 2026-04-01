@@ -2,6 +2,9 @@
 
 Handles generate, generate_json (with retry on parse failure), and health check.
 Sequential by design — Ollama processes one request at a time.
+
+Reproducibility: all calls use temperature=0 and a fixed seed so the same
+document always produces the same classification and gap analysis output.
 """
 
 import json
@@ -12,6 +15,14 @@ import structlog
 logger = structlog.get_logger()
 
 _TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
+
+# Fixed seed ensures same prompt → same output across runs.
+# temperature=0 disables sampling; top_k=1 forces greedy decoding.
+_DETERMINISTIC_OPTIONS = {
+    "temperature": 0,
+    "seed": 42,
+    "top_k": 1,
+}
 
 
 class OllamaClient:
@@ -43,6 +54,7 @@ class OllamaClient:
             "model": self._model,
             "prompt": prompt,
             "stream": False,
+            "options": _DETERMINISTIC_OPTIONS,
         }
         if system:
             payload["system"] = system
@@ -73,6 +85,7 @@ class OllamaClient:
             "prompt": prompt,
             "stream": False,
             "format": "json",
+            "options": _DETERMINISTIC_OPTIONS,
         }
         if system:
             payload["system"] = system

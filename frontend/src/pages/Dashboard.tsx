@@ -9,7 +9,7 @@ import ReportDownload from '../components/ReportDownload'
 import EmotionWarning from '../components/EmotionWarning'
 import { fetchReport } from '../hooks/useReport'
 import { riskTierLabel, formatDate } from '../utils/formatters'
-import type { ComplianceReport } from '../types'
+import type { ComplianceReport, RiskTier } from '../types'
 
 export default function Dashboard() {
   const { auditId } = useParams<{ auditId: string }>()
@@ -55,6 +55,14 @@ export default function Dashboard() {
   return (
     <Layout>
       <EmotionWarning flag={report.emotion_flag} />
+
+      {/* Wizard vs document risk tier comparison */}
+      {report.wizard_risk_tier && (
+        <RiskTierComparison
+          wizardTier={report.wizard_risk_tier}
+          documentTier={report.risk_tier}
+        />
+      )}
 
       {/* Summary header */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 mb-6 flex flex-col sm:flex-row items-center gap-6">
@@ -107,6 +115,56 @@ function StatBox({ label, value }: { label: string; value: string | number }) {
     <div className="bg-slate-50 rounded-lg px-3 py-2">
       <p className="text-xs text-slate-400">{label}</p>
       <p className="font-semibold text-slate-700">{value}</p>
+    </div>
+  )
+}
+
+const TIER_RANK: Record<RiskTier, number> = { prohibited: 3, high: 2, limited: 1, minimal: 0 }
+
+function RiskTierComparison({
+  wizardTier,
+  documentTier,
+}: {
+  wizardTier: RiskTier
+  documentTier: RiskTier
+}) {
+  const { label: wizLabel, className: wizClass } = riskTierLabel(wizardTier)
+  const { label: docLabel, className: docClass } = riskTierLabel(documentTier)
+
+  const wizRank = TIER_RANK[wizardTier]
+  const docRank = TIER_RANK[documentTier]
+
+  let message: string
+  let bannerClass: string
+  if (wizardTier === documentTier) {
+    message = 'The document-derived risk tier matches your self-assessment. Your audit is internally consistent.'
+    bannerClass = 'bg-green-50 border-green-200 text-green-800'
+  } else if (docRank > wizRank) {
+    message = 'The document audit found a higher risk tier than your self-assessment. The document contains keywords associated with higher-risk AI use cases. Review the flagged areas carefully before deployment.'
+    bannerClass = 'bg-red-50 border-red-200 text-red-800'
+  } else {
+    message = `The document audit derived a lower risk tier than your self-assessment. This is informational only — the document-based tier uses keyword detection and may not capture all risks your system poses. The wizard result (${riskTierLabel(wizardTier).label}) is a self-reported signal; a qualified assessor should confirm the final tier.`
+    bannerClass = 'bg-amber-50 border-amber-200 text-amber-800'
+  }
+
+  return (
+    <div className={`mb-6 rounded-xl border p-4 ${bannerClass}`}>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <p className="text-xs font-semibold uppercase tracking-wide opacity-70">Risk Tier Comparison</p>
+        <span className="text-xs opacity-60 italic">Wizard result is informational only — does not affect scores</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-4 mb-2">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="opacity-70">Step 1 — Self-assessment:</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${wizClass}`}>{wizLabel}</span>
+        </div>
+        <span className="text-slate-400 text-sm">→</span>
+        <div className="flex items-center gap-2 text-sm">
+          <span className="opacity-70">Step 2 — Document audit:</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${docClass}`}>{docLabel}</span>
+        </div>
+      </div>
+      <p className="text-sm">{message}</p>
     </div>
   )
 }

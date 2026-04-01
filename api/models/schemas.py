@@ -82,6 +82,14 @@ class GapItem(BaseModel):
     article_num: int = Field(description="EU AI Act article number (9–15)")
 
 
+class RegulatoryPassage(BaseModel):
+    """A single regulatory text passage retrieved from ChromaDB for gap analysis."""
+    title: str = Field(description="Article/requirement identifier from metadata")
+    text: str = Field(description="The regulatory passage text")
+    regulation: str = Field(default="", description="Source regulation (eu_ai_act / gdpr)")
+    article_ref: str = Field(default="", description="Human-readable article reference e.g. 'Art. 9 §1'")
+
+
 class ArticleScore(BaseModel):
     """Compliance assessment for a single EU AI Act article."""
     article_num: int = Field(description="EU AI Act article number (9–15)")
@@ -95,6 +103,14 @@ class ArticleScore(BaseModel):
     chunk_count: int = Field(
         default=0,
         description="Number of document chunks classified to this domain",
+    )
+    score_reasoning: str = Field(
+        default="",
+        description="LLM explanation of why this score was assigned",
+    )
+    regulatory_passages: list[RegulatoryPassage] = Field(
+        default_factory=list,
+        description="Regulatory text passages retrieved from ChromaDB and used in gap analysis",
     )
 
 
@@ -116,6 +132,10 @@ class ComplianceReport(BaseModel):
     source_files: list[str] = Field(description="Filenames of uploaded documents")
     language: str = Field(description="Detected primary language ('de' or 'en')")
     risk_tier: RiskTier
+    wizard_risk_tier: RiskTier | None = Field(
+        default=None,
+        description="Risk tier self-assessed via Annex III wizard before the audit, if completed",
+    )
     overall_score: float = Field(ge=0, le=100, description="Weighted average across all articles")
     article_scores: list[ArticleScore] = Field(description="One entry per EU AI Act article 9–15")
     emotion_flag: EmotionFlag = Field(default_factory=EmotionFlag)

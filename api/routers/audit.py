@@ -21,6 +21,7 @@ from models.schemas import (
     ArticleDomain,
     AuditResponse,
     AuditStatus,
+    RiskTier,
 )
 from services.classifier import classify_chunks
 from services.emotion_module import check_emotion_recognition
@@ -47,6 +48,7 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile | None = None,
     raw_text: Annotated[str | None, Form()] = None,
+    wizard_risk_tier: Annotated[str | None, Form()] = None,
 ) -> APIResponse:
     """Accept a document file or raw text and start the compliance audit pipeline.
 
@@ -55,6 +57,7 @@ async def upload_document(
     Args:
         file: Uploaded PDF, DOCX, TXT, or MD file (max 10 MB).
         raw_text: Plain text pasted directly into the form.
+        wizard_risk_tier: Optional risk tier from the Annex III wizard (pre-audit self-assessment).
 
     Returns:
         APIResponse with audit_id to poll for status.
@@ -97,6 +100,14 @@ async def upload_document(
     # Register audit as UPLOADING
     _audits[audit_id] = AuditResponse(audit_id=audit_id, status=AuditStatus.UPLOADING)
 
+    # Parse wizard tier if provided
+    parsed_wizard_tier: RiskTier | None = None
+    if wizard_risk_tier:
+        try:
+            parsed_wizard_tier = RiskTier(wizard_risk_tier)
+        except ValueError:
+            pass  # Ignore invalid tier values
+
     # Kick off pipeline in background
     ollama = OllamaClient(host=settings.ollama_host, model=settings.ollama_model)
     background_tasks.add_task(
@@ -106,6 +117,7 @@ async def upload_document(
         filename=filename,
         request=request,
         ollama=ollama,
+        wizard_risk_tier=parsed_wizard_tier,
     )
 
     logger.info("audit_started", audit_id=audit_id, filename=filename)
@@ -154,6 +166,7 @@ async def _run_pipeline(
     filename: str,
     request: Request,
     ollama: OllamaClient,
+    wizard_risk_tier: RiskTier | None = None,
 ) -> None:
     """Full compliance audit pipeline executed as a BackgroundTask.
 
@@ -237,6 +250,7 @@ async def _run_pipeline(
             language=language,
             emotion_flag=emotion_flag,
             classifier_backend=classifier_backend,
+            wizard_risk_tier=wizard_risk_tier,
         )
 
         _audits[audit_id] = AuditResponse(

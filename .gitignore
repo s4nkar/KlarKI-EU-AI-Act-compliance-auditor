@@ -39,10 +39,11 @@ yarn-error.log*
 # Docker volumes / generated data
 chroma_data/
 model_repository/*/1/*.onnx
-data/
 
-# Phase 5 training data (can be large — regenerate from annotation scripts)
+# Phase 5 training data — commit clause_labels.jsonl so setup skips regeneration
+# (data/regulatory/ is tracked; only generated/volatile jsonl files are excluded)
 training/data/*.jsonl
+!training/data/clause_labels.jsonl
 
 # IDE
 .vscode/*

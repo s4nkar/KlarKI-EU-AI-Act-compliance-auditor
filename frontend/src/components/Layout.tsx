@@ -19,10 +19,13 @@ export default function Layout({ children }: LayoutProps) {
           </Link>
           <nav className="flex items-center gap-4 text-sm text-slate-500">
             <Link to="/" className="hover:text-brand-600 transition-colors">
-              New Audit
+              Step 1: Risk Assessment
             </Link>
-            <Link to="/wizard" className="hover:text-brand-600 transition-colors">
-              Risk Wizard
+            <Link to="/upload" className="hover:text-brand-600 transition-colors">
+              Step 2: Upload Docs
+            </Link>
+            <Link to="/metrics" className="hover:text-brand-600 transition-colors">
+              Classifier Metrics
             </Link>
           </nav>
         </div>
