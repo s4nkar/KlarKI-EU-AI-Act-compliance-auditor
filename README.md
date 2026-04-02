@@ -428,3 +428,7 @@ If you see variation, check that the Ollama container was fully restarted after 
 ./run.sh clean    # wipes containers, volumes, ChromaDB data
 ./run.sh setup    # rebuild everything from scratch
 ```
+
+## License
+
+MIT — see the LICENSE file.
