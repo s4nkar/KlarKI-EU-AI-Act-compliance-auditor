@@ -64,6 +64,7 @@ training/data/*.jsonl
 
 # Test Reports
 tests/reports/
+GPU_SETUP_WINDOWS.md
 
 # IDE
 .vscode/*
@@ -79,8 +80,10 @@ tests/reports/
 .DS_Store
 Thumbs.db
 
-# Triton
-model_repository/*
+# Triton — keep config.pbtxt + model.py (tracked); ignore compiled model weights
+model_repository/**/*.onnx
+model_repository/**/*.plan
+model_repository/**/*.engine
 
 *BUILD_LOG.md
 .claude/settings.local.json
