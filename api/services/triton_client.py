@@ -61,8 +61,6 @@ class TritonClient:
             self._client = grpcclient.InferenceServerClient(url=self._address)
         return self._client
 
-    # ── Classification ────────────────────────────────────────────────────────
-
     async def classify(self, texts: list[str]) -> list[str]:
         """Classify texts using the BERT clause classifier.
 
@@ -111,8 +109,6 @@ class TritonClient:
 
         logger.debug("triton_classify_done", batch_size=len(texts))
         return labels
-
-    # ── Embeddings ────────────────────────────────────────────────────────────
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
         """Generate 384-dim embeddings via Triton e5 model.
@@ -163,8 +159,6 @@ class TritonClient:
 
         logger.debug("triton_embed_done", batch_size=len(texts))
         return pooled.tolist()
-
-    # ── Health check ──────────────────────────────────────────────────────────
 
     async def health_check(self) -> bool:
         """Check Triton server readiness via gRPC.

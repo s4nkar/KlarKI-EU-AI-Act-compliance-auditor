@@ -1,5 +1,5 @@
 name: "e5_embeddings"
-backend: "onnxruntime"
+backend: "python"
 max_batch_size: 32
 
 input [

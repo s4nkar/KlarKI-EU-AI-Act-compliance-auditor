@@ -1,0 +1,320 @@
+{"text": "Article 15 outlines the rights of data subjects, including access and rectification.", "entities": [{"start": 0, "end": 10, "label": "ARTICLE"}]}
+{"text": "According to Article 27(3), processing activities must be lawful, fair, and transparent under GDPR regulations.", "entities": [{"start": 13, "end": 26, "label": "ARTICLE"}]}
+{"text": "Under the terms of Article 80(1), data subjects can lodge a complaint with supervisory authorities.", "entities": [{"start": 19, "end": 32, "label": "ARTICLE"}]}
+{"text": "The obligation to conduct privacy impact assessments is mandated by Article 35 before processing sensitive data types.", "entities": [{"start": 68, "end": 78, "label": "ARTICLE"}]}
+{"text": "Data processors must comply with the security requirements specified in Articles 28 and 32 of GDPR.", "entities": [{"start": 72, "end": 90, "label": "ARTICLE"}]}
+{"text": "Transfers outside the EU to countries without ade0ses are governed by Article 46 of GDPR.", "entities": [{"start": 70, "end": 80, "label": "ARTICLE"}]}
+{"text": "Infringement procedures for non-compliance with Articles 17 and 20 are detailed in the regulation's enforcement section.", "entities": [{"start": 48, "end": 66, "label": "ARTICLE"}]}
+{"text": "Data subjects have a right to object or withdraw consent for processing activities as per Article 21(1).", "entities": [{"start": 90, "end": 103, "label": "ARTICLE"}]}
+{"text": "The lead supervisory authority shall consult with other competent authorities before issuing decisions according to Article 57.", "entities": [{"start": 116, "end": 126, "label": "ARTICLE"}]}
+{"text": "When relying on derogations for specific situations, the conditions set forth in Articles 81 and 82 must be strictly adhered to.", "entities": [{"start": 81, "end": 99, "label": "ARTICLE"}]}
+{"text": "Under Article 35, controllers must ensure a data protection impact assessment is carried out before high-risk processing.", "entities": [{"start": 6, "end": 16, "label": "ARTICLE"}]}
+{"text": "The obligation to appoint a Data Protection Officer as per Article 37 becomes mandatory for large-scale monitoring.", "entities": [{"start": 59, "end": 69, "label": "ARTICLE"}]}
+{"text": "Noncompliance with the requirements set forth in Article 25 may lead to substantial fines for entities under GDPR.", "entities": [{"start": 49, "end": 59, "label": "ARTICLE"}]}
+{"text": "It is required by Article 40 to obtain explicit consent for data processing activities involving children.", "entities": [{"start": 18, "end": 28, "label": "ARTICLE"}]}
+{"text": "To facilitate rights restoration, the GDPR mandates procedures outlined in Article 17 and subsequent related articles.", "entities": [{"start": 75, "end": 85, "label": "ARTICLE"}]}
+{"text": "The right to object as described in Article 21 is applicable even if the processing concerns vital interests.", "entities": [{"start": 36, "end": 46, "label": "ARTICLE"}]}
+{"text": "In cases where personal data breaches occur, Article 34 provides guidelines for immediate notification to the supervisory authority.", "entities": [{"start": 45, "end": 55, "label": "ARTICLE"}]}
+{"text": "The system must incorporate the transparency principles outlined in Article 5.", "entities": [{"start": 68, "end": 77, "label": "ARTICLE"}]}
+{"text": "According to Article 12, personal data shall not be retained longer than necessary.", "entities": [{"start": 13, "end": 23, "label": "ARTICLE"}]}
+{"text": "The right of access for individuals is mandated by Article 15, which details the process to obtain personal data.", "entities": [{"start": 51, "end": 61, "label": "ARTICLE"}]}
+{"text": "In compliance with Article 36 on automated decision-making, profiling activities are subject to rigorous oversight.", "entities": [{"start": 19, "end": 29, "label": "ARTICLE"}]}
+{"text": "The Data Protection Officer (DPO) shall report any data breaches within the timeframe specified in Article 79.", "entities": [{"start": 99, "end": 109, "label": "ARTICLE"}]}
+{"text": "Documenting consent for personal data processing is required as per guidelines set forth in Article 16 of the GDPR.", "entities": [{"start": 92, "end": 102, "label": "ARTICLE"}]}
+{"text": "Adequate mechanisms for data subjects to object as provided in Article 21 shall be implemented by all service providers.", "entities": [{"start": 63, "end": 73, "label": "ARTICLE"}]}
+{"text": "The annual audit report references the importance of maintaining privacy standards as prescribed in Article 83.", "entities": [{"start": 100, "end": 110, "label": "ARTICLE"}]}
+{"text": "Data minimization practices are aligned with the principles mentioned under Article 5(1)(c).", "entities": [{"start": 76, "end": 91, "label": "ARTICLE"}]}
+{"text": "In accordance with mandates from Article 49, third-party processors must sign data processing agreements.", "entities": [{"start": 33, "end": 43, "label": "ARTICLE"}]}
+{"text": "Under Article 15, data subjects have the right to access their personal information.", "entities": [{"start": 6, "end": 16, "label": "ARTICLE"}]}
+{"text": "According to GDPR Article 89(2), consent must be freely given, specific and informed for data processing purposes.", "entities": [{"start": 13, "end": 31, "label": "ARTICLE"}]}
+{"text": "Article 37 stipulates that personal data may only be transferred if adequate safeguards are in place.", "entities": [{"start": 0, "end": 10, "label": "ARTICLE"}]}
+{"text": "In compliance with Article 42, all processing activities should adhere to the principles of data minimization and purpose limitation.", "entities": [{"start": 19, "end": 29, "label": "ARTICLE"}]}
+{"text": "Data controllers must ensure that Article 7 is not breached by providing clear, comprehensive information to data subjects before obtaining consent.", "entities": [{"start": 34, "end": 43, "label": "ARTICLE"}]}
+{"text": "To facilitate the right of access under Article 12(3), organizations should establish and maintain efficient data retrieval mechanisms for personal information requests.", "entities": [{"start": 40, "end": 50, "label": "ARTICLE"}]}
+{"text": "Per Section 7 of GDPR Article 38, a transfer outside the EU can only be done if it meets appropriate safeguard standards.", "entities": [{"start": 17, "end": 32, "label": "ARTICLE"}]}
+{"text": "The enforcement mechanism of Article 51 ensures transparency in decision-making processes.", "entities": [{"start": 29, "end": 39, "label": "ARTICLE"}]}
+{"text": "Under the conditions set by Articles 7 and 8, data subjects have enhanced rights regarding their personal information.", "entities": [{"start": 28, "end": 44, "label": "ARTICLE"}, {"start": 97, "end": 117, "label": "NOT_ENTITY"}]}
+{"text": "Compliance with Article 32 requires that data controllers implement measures to mitigate risks of unlawful processing.", "entities": [{"start": 16, "end": 26, "label": "ARTICLE"}]}
+{"text": "Service providers must adhere to Article 17 and provide mechanisms for data portability rights.", "entities": [{"start": 33, "end": 43, "label": "ARTICLE"}]}
+{"text": "Data protection impact assessments are mandatory before deploying processing activities, as per Article 35 requirements.", "entities": [{"start": 96, "end": 106, "label": "ARTICLE"}]}
+{"text": "GDPR's accountability principle is echoed in the obligations of Articles 5(2) and (3).", "entities": [{"start": 64, "end": 85, "label": "ARTICLE"}]}
+{"text": "Unter Art. 58 Absatz 2 ist der Betreiber verpflichtet, die Benutzer zu informieren.", "entities": [{"start": 6, "end": 22, "label": "ARTICLE"}]}
+{"text": "Nach Art. 14 Absatz 3 muss das Unternehmen regelmäßig überprüfen, ob es Datenschutzrichtlinien einhält.", "entities": [{"start": 5, "end": 21, "label": "ARTICLE"}]}
+{"text": "Zuallererst sollten Organisationen gemäß Artikel 5 des Datenschutz-Grundverordnung (DSGVV) die grundlegenden Prinzipien befolgen.", "entities": [{"start": 41, "end": 50, "label": "ARTICLE"}]}
+{"text": "Nachdem der Ausschuss für das Betreiben von künstlicher Intelligenz Algorithmen nach Artikel 20 des EU-Datenschutzrechts geprüft hat, wird ein Vorschlag erarbeitet.", "entities": [{"start": 85, "end": 95, "label": "ARTICLE"}]}
+{"text": "Dem Datenschutzausschuss wurde aufgefordert, die Einhaltung des Umfangs nach Artikel 15 der DSGVV zu überprüfen.", "entities": [{"start": 77, "end": 87, "label": "ARTICLE"}]}
+{"text": "Die Verarbeitungsprotokolle müssen laut Artikel 32 des GDPR die Abfolge und das Ergebnis der Datenverarbeitung dokumentieren.", "entities": [{"start": 40, "end": 50, "label": "ARTICLE"}]}
+{"text": "Sobald der Benutzer ein Anliegen gemäß Artikel 78 vorlegt, sollten diese binnen drei Monaten beantwortet werden.", "entities": [{"start": 39, "end": 49, "label": "ARTICLE"}]}
+{"text": "Um die Einhaltung der Verarbeitungsbedingungen gemäß Artikel 49 zu gewährleisten, muss die Informationspflicht eingehalten werden.", "entities": [{"start": 53, "end": 63, "label": "ARTICLE"}]}
+{"text": "Die Überprüfung der Verarbeitungsweise nach dem EU-Grundrecht auf informationelle Selbstbestimmung folgt den Anweisungen in Artikel 50.", "entities": [{"start": 124, "end": 134, "label": "ARTICLE"}]}
+{"text": "Das Dokument zur Datenschutzverletzung nach Artikel 67 des DSGVV muss alle betroffenen Parteien innerhalb von zwei Wochen informieren.", "entities": [{"start": 44, "end": 54, "label": "ARTICLE"}]}
+{"text": "Die Datenverwaltung nach Artikel 80 des DSGVV muss den Datenschutzgrundsätzen der EU entsprechen.", "entities": [{"start": 25, "end": 35, "label": "ARTICLE"}]}
+{"text": "Die Einhaltung von Artikel 20 ermöglicht den Datenschutzbenutzer, seine Daten jederzeit zu löschen.", "entities": [{"start": 19, "end": 29, "label": "ARTICLE"}]}
+{"text": "In der Konsequenz von Artikel 37 wird das Recht auf Auskunft verlangt, sofern die betroffene Person dies vorausgesetzt hat.", "entities": [{"start": 22, "end": 32, "label": "ARTICLE"}]}
+{"text": "Das neue Regelwerk, welches im Zuge von Artikel 15 erlassen wurde, schreibt strengere Anonymisierungstechniken vor.", "entities": [{"start": 40, "end": 50, "label": "ARTICLE"}]}
+{"text": "Gemäß Artikel 42 sind Unternehmen zur Schaffung von Anonymisierungsmaßnahmen verpflichtet.", "entities": [{"start": 6, "end": 16, "label": "ARTICLE"}]}
+{"text": "In Artikel 51 Absatz 3 wird explizit die Selbstauskunftspflicht festgelegt.", "entities": [{"start": 3, "end": 13, "label": "ARTICLE"}]}
+{"text": "Der Verstoß gegen Artikel 27 kann zu einer Geldbuße für Unternehmen führen, die nicht den gesetzlichen Anforderungen entsprechen.", "entities": [{"start": 18, "end": 28, "label": "ARTICLE"}]}
+{"text": "Die Ermäßigung der Geldbuße ist in Artikel 30 Absatz 6 geregelt.", "entities": [{"start": 35, "end": 45, "label": "ARTICLE"}]}
+{"text": "Nachweispflichten im Rahmen von Artikel 28 erfordern eine umfassende Dokumentation der behaupteten Einhaltung.", "entities": [{"start": 32, "end": 42, "label": "ARTICLE"}]}
+{"text": "Die Zulassung von Drittanbietern zur Datenverarbeitung nach Artikel 34 Absatz 2 erfolgt unter strengen Bedingungen.", "entities": [{"start": 60, "end": 70, "label": "ARTICLE"}]}
+{"text": "Das Recht auf Datenübertragbarkeit ist im Rahmen von Artikel 18 gewährleistet.", "entities": [{"start": 53, "end": 63, "label": "ARTICLE"}]}
+{"text": "Die Anforderungen nach Art. 25 Absatz 1 sind im neuen Datenschutzmanagement-Prozess zu beachten.", "entities": [{"start": 23, "end": 39, "label": "ARTICLE"}]}
+{"text": "Der Betreiber muss gemäß Art. 80 den Datenverarbeiter über die Änderungen des Datenschutzregelungsrechts unterrichten.", "entities": [{"start": 25, "end": 32, "label": "ARTICLE"}]}
+{"text": "Nach Absatz 3 von Art. 4 findet der Schutz vor unrechtmäßiger Datenverarbeitung im Rahmen des EU-Datenschutzrechts statt.", "entities": [{"start": 18, "end": 24, "label": "ARTICLE"}]}
+{"text": "Die Erstellung eines Datenschutzbeauftragten, wie in Art. 37 vorgeschlagen, ist für jede verantwortliche Person erforderlich.", "entities": [{"start": 53, "end": 60, "label": "ARTICLE"}]}
+{"text": "Gemäß Absatz 2 von Art. 19 wird bei der Löschung nicht nur die Kopie, sondern auch das Original behandelt.", "entities": [{"start": 19, "end": 26, "label": "ARTICLE"}]}
+{"text": "Die Umsetzung von Art. 57 Absatz 4 erfordert die Einrichtung eines Datenschutzbeauftragten für jede verantwortliche Person.", "entities": [{"start": 18, "end": 34, "label": "ARTICLE"}]}
+{"text": "Der Umgang mit personenbezogenen Daten gemäß Art. 6 muss nach Maßgabe der genannten Artikel durchgeführt werden.", "entities": [{"start": 45, "end": 51, "label": "ARTICLE"}]}
+{"text": "Gemäß Absatz 5 von Art. 39 wird die Einwilligung nach Maßgabe des genannten Artikel erteilt.", "entities": [{"start": 19, "end": 26, "label": "ARTICLE"}]}
+{"text": "Die Anforderungen an die Datenverarbeitung nach Artikel 32 müssen streng eingehalten werden.", "entities": [{"start": 48, "end": 58, "label": "ARTICLE"}]}
+{"text": "Unterbrechungen der DSGVMAG-Klausel in Bezug auf Artikel 8 IHRMUST gerechtfertigt werden können.", "entities": [{"start": 49, "end": 58, "label": "ARTICLE"}]}
+{"text": "Das Projekt muss die Bestimmungen des Datenschutzgrundverstoßes nach Artikel 34 erfüllen.", "entities": [{"start": 69, "end": 79, "label": "ARTICLE"}]}
+{"text": "Zukünftige Änderungen der Technologieanforderungen gemäß Artikel 25 I/weiterhin müssen dokumentiert werden.", "entities": [{"start": 57, "end": 67, "label": "ARTICLE"}]}
+{"text": "Die Entscheidung nach dem Rechtsprechungssatz des Europäischen Gerichtshofs gemäß Artikel 47 muss geprüft werden.", "entities": [{"start": 82, "end": 92, "label": "ARTICLE"}]}
+{"text": "Selbstschutzmechanismen nach Art. 28 IHRMUST die Eingaben des Datenschutzbevollmächtigten respektieren.", "entities": [{"start": 29, "end": 36, "label": "ARTICLE"}]}
+{"text": "Das neue Gesetz trägt den Titel 'Gesundheitsdaten-Verarbeitung' und wird Artikel 49 IURUMFORME erfüllen.", "entities": [{"start": 73, "end": 83, "label": "ARTICLE"}]}
+{"text": "Einwanderungsbeamte müssen sicherstellen, dass sie die Erfüllung der Bestimmungen des Art. 8 II nach EU-Recht nicht übersehen.", "entities": [{"start": 86, "end": 95, "label": "ARTICLE"}]}
+{"text": "Die Betreiber von DSGVMAG müssen sich mit den Bestimmungen des Art. 45 IHREVORHEGEBEN.", "entities": [{"start": 63, "end": 70, "label": "ARTICLE"}]}
+{"text": "Die Implementierung neuer Anforderungen nach Artikel 29 IIMUST die Einhaltung der Datenschutzgrundverstoßes gewährleisten.", "entities": [{"start": 45, "end": 55, "label": "ARTICLE"}]}
+{"text": "Mit Bezug auf Artikel 15 der EU-Datenschutzrichtlinie ist es möglich, sich von einem Dritten einen Anwalt zu beauftragen.", "entities": [{"start": 14, "end": 24, "label": "ARTICLE"}]}
+{"text": "All AI developers are obligated to adhere strictly to the EU's ethical guidelines when programming.", "entities": [{"start": 18, "end": 31, "label": "OBLIGATION"}]}
+{"text": "The company is required by law to report any AI-related discrimination incidents promptly.", "entities": [{"start": 12, "end": 23, "label": "OBLIGATION"}]}
+{"text": "Data processors must implement robust data protection measures as outlined in the EU Data Governance Act.", "entities": [{"start": 16, "end": 30, "label": "OBLIGATION"}]}
+{"text": "Every AI system deployed within EU territory is mandated to undergo annual ethics reviews by an independent body.", "entities": [{"start": 45, "end": 56, "label": "OBLIGATION"}]}
+{"text": "The development of autonomous vehicles must comply with specific safety and reporting obligations set forth in the EU AI Act.", "entities": [{"start": 39, "end": 50, "label": "OBLIGATION"}]}
+{"text": "Artificial intelligence service providers are obliged to provide clear information on data usage and privacy impacts in user agreements.", "entities": [{"start": 42, "end": 53, "label": "OBLIGATION"}]}
+{"text": "AI systems utilized for public sector decision-making must ensure transparency and accountability as per EU regulations.", "entities": [{"start": 54, "end": 65, "label": "OBLIGATION"}]}
+{"text": "Entities deploying AI in healthcare are mandated to report adverse events immediately, according to the latest legislative amendments.", "entities": [{"start": 36, "end": 48, "label": "OBLIGATION"}]}
+{"text": "Organizations engaging with AI must document any human interventions in automated processes for audit trails.", "entities": [{"start": 31, "end": 44, "label": "OBLIGATION"}]}
+{"text": "AI researchers conducting trials within the EU are required to report their findings and methodologies annually in a standardized format.", "entities": [{"start": 47, "end": 59, "label": "OBLIGATION"}]}
+{"text": "All AI systems must be transparent in their decision-making processes.", "entities": [{"start": 15, "end": 22, "label": "OBLIGATION"}]}
+{"text": "Data processors are obligated to obtain explicit consent before collecting personal information.", "entities": [{"start": 16, "end": 32, "label": "OBLIGATION"}]}
+{"text": "Service providers shall implement adequate measures for data protection by design.", "entities": [{"start": 18, "end": 33, "label": "OBLIGATION"}]}
+{"text": "Organizations must provide clear information on how AI systems handle personal data.", "entities": [{"start": 14, "end": 26, "label": "OBLIGATION"}]}
+{"text": "AI developers are obligated to ensure their products comply with the General Data Protection Regulation (GDPR).", "entities": [{"start": 14, "end": 30, "label": "OBLIGATION"}]}
+{"text": "The entity shall report any AI system failures within 72 hours of detection.", "entities": [{"start": 11, "end": 23, "label": "OBLIGATION"}]}
+{"text": "Personal data must not be retained beyond the time required for processing activities and any legal claims or investigations related to such processes.", "entities": [{"start": 14, "end": 22, "label": "OBLIGATION"}]}
+{"text": "Service providers are obliged to maintain detailed logs of all data access and processing activities.", "entities": [{"start": 18, "end": 32, "label": "OBLIGATION"}]}
+{"text": "The AI system is obligated to include a mechanism for users to opt-out of data processing at any time.", "entities": [{"start": 14, "end": 29, "label": "OBLIGATION"}]}
+{"text": "Service providers are obligated to submit annual risk assessment reports by the end of each fiscal year.", "entities": [{"start": 18, "end": 31, "label": "OBLIGATION"}]}
+{"text": "AI developers must ensure algorithms comply with GDPR privacy standards before deployment.", "entities": [{"start": 14, "end": 25, "label": "OBLIGATION"}]}
+{"text": "Data processors are required to keep detailed logs of all data access activities for audit purposes.", "entities": [{"start": 16, "end": 31, "label": "OBLIGATION"}]}
+{"text": "Organizations must implement robust security measures to protect sensitive user information according to Article 8 of GDPR.", "entities": [{"start": 14, "end": 28, "label": "OBLIGATION"}]}
+{"text": "The board is obligated to review and approve all data processing activities prior to implementation.", "entities": [{"start": 10, "end": 25, "label": "OBLIGATION"}]}
+{"text": "Developers are required by law to report any detected vulnerabilities immediately using the standardized internal reporting mechanism.", "entities": [{"start": 11, "end": 30, "label": "OBLIGATION"}, {"start": 31, "end": 40, "label": "OBLIGATION"}]}
+{"text": "Data controllers must obtain explicit consent for the use of personal data as stipulated in Section 5(1) GDPR.", "entities": [{"start": 17, "end": 28, "label": "OBLIGATION"}]}
+{"text": "The entity is obligated to comply with the annual audit findings and take corrective actions where necessary within 60 days.", "entities": [{"start": 11, "end": 26, "label": "OBLIGATION"}]}
+{"text": "Technical staff must continuously monitor systems for potential breaches and report irregular activities within 24 hours.", "entities": [{"start": 16, "end": 41, "label": "OBLIGATION"}]}
+{"text": "Auditors are obligated to provide a detailed compliance assessment report, which shall include all non-compliant areas identified during the audit.", "entities": [{"start": 9, "end": 25, "label": "OBLIGATION"}]}
+{"text": "Data processors are obligated to undergo annual privacy impact assessments.", "entities": [{"start": 16, "end": 29, "label": "OBLIGATION"}]}
+{"text": "Manufacturers shall ensure that AI systems comply with data protection principles before deployment.", "entities": [{"start": 14, "end": 26, "label": "OBLIGATION"}]}
+{"text": "Department heads must report any non-compliance incidents within 48 hours to the data protection officer.", "entities": [{"start": 17, "end": 28, "label": "OBLIGATION"}]}
+{"text": "All entities accessing biometric information are required by law to have explicit consent from individuals recorded.", "entities": [{"start": 45, "end": 57, "label": "OBLIGATION"}]}
+{"text": "Entities deploying AI must implement mechanisms for human oversight and intervention where necessary.", "entities": [{"start": 22, "end": 36, "label": "OBLIGATION"}]}
+{"text": "Organizations storing personal data are mandated to encrypt the information at rest and in transit.", "entities": [{"start": 36, "end": 48, "label": "OBLIGATION"}]}
+{"text": "Researchers are obliged to disclose any potential conflicts of interest when developing AI algorithms for sensitive applications.", "entities": [{"start": 12, "end": 23, "label": "OBLIGATION"}]}
+{"text": "AI system auditors must document the steps taken to verify compliance with ethical guidelines and legislation during evaluations.", "entities": [{"start": 19, "end": 32, "label": "OBLIGATION"}]}
+{"text": "Data controllers are required to provide users the right to request access or deletion of their personal information upon demand.", "entities": [{"start": 17, "end": 29, "label": "OBLIGATION"}]}
+{"text": "Healthcare institutions are required to report adverse events within five working days.", "entities": [{"start": 24, "end": 39, "label": "OBLIGATION"}]}
+{"text": "Software vendors must implement end-to-end encryption for user data transmission by the deadline.", "entities": [{"start": 17, "end": 31, "label": "OBLIGATION"}]}
+{"text": "Der Betreiber ist verpflichtet, regelmäßige IT-Sicherheitskontrollen durchzuführen.", "entities": [{"start": 14, "end": 30, "label": "OBLIGATION"}]}
+{"text": "Dieser Abschnitt erläutert die Pflicht zur Datenschutz-Folgeschranken bei der Datenübertragung.", "entities": [{"start": 17, "end": 38, "label": "OBLIGATION"}]}
+{"text": "Die Finanzdienstleister müssen ihre Abfrageprotokolle den Aufsichtsbehörden offenlegen.", "entities": [{"start": 24, "end": 53, "label": "OBLIGATION"}]}
+{"text": "Alle Verarbeitungen mit Kundenbestellungsdaten sind der Zustimmung des Kunden bedürftig.", "entities": [{"start": 0, "end": 19, "label": "OBLIGATION"}]}
+{"text": "Betreiber müssen regelmäßige Prüfungen ihrer Algorithmen durchführen, um Diskriminierung zu vermeiden.", "entities": [{"start": 10, "end": 38, "label": "OBLIGATION"}]}
+{"text": "Die Mitarbeiter müssen auf Anfrage nachweisen können, dass sie das erforderliche Training absolviert haben.", "entities": [{"start": 16, "end": 34, "label": "OBLIGATION"}]}
+{"text": "Die Einrichtung des Datenspeichers ist eine Pflicht zur Dokumentation und -verwaltung der Daten.", "entities": [{"start": 35, "end": 51, "label": "OBLIGATION"}]}
+{"text": "Der Betreiber ist verpflichtet, regelmäßige IT-Sicherheitsaudits durchzuführen.", "entities": [{"start": 14, "end": 30, "label": "OBLIGATION"}]}
+{"text": "Erledigen Sie einen Bericht über personalisierte Werbung nach dem EU-Datenschutz.", "entities": [{"start": 0, "end": 27, "label": "OBLIGATION"}]}
+{"text": "Die Betreiberin sind verpflichtet, eine Datenschutzverletzungsanzeige abgeben zu dürfen.", "entities": [{"start": 16, "end": 33, "label": "OBLIGATION"}]}
+{"text": "Kunden sind von der Möglichkeit zur optischen Abgabe einer Datenschutzbestätigung zu erlernen.", "entities": [{"start": 7, "end": 31, "label": "OBLIGATION"}]}
+{"text": "Die Geschäftsführung muss einen Compliance-Managementsystem implementieren, um die EU-Datenschutzrichtlinie einzuhalten.", "entities": [{"start": 21, "end": 74, "label": "OBLIGATION"}]}
+{"text": "Das Unternehmen hat das Recht, personalisierte Werbung einzurichten und dabei auf Nutzerpräferenzen zu basieren.", "entities": [{"start": 16, "end": 29, "label": "OBLIGATION"}]}
+{"text": "Einrichtung eines Datenschutzbeauftragten ist für Unternehmen mit mehr als 50 Mitarbeitern Pflicht.", "entities": [{"start": 42, "end": 98, "label": "OBLIGATION"}]}
+{"text": "Unternehmen sind zur Ermittlung und Verifikation des Datenschutzkonformen Zustands verpflichtet.", "entities": [{"start": 12, "end": 48, "label": "OBLIGATION"}]}
+{"text": "Betreiber sind verpflichtet, einen Datenschutzbeauftragten zu ernennen.", "entities": [{"start": 10, "end": 70, "label": "OBLIGATION"}, {"start": 29, "end": 70, "label": "ROLE_DEMAND"}]}
+{"text": "Dienstleister müssen regelmäßig die Einhaltung der Verarbeitungsprotokolle überprüfen.", "entities": [{"start": 14, "end": 46, "label": "OBLIGATION"}]}
+{"text": "Die Firma ist verpflichtet, ihre IT-Infrastruktur jährlich zu auditieren.", "entities": [{"start": 10, "end": 49, "label": "OBLIGATION"}]}
+{"text": "Personalvertreter haben die Pflicht und Verantwortung zur Durchführung von Datenschutz-Checks an Personalausweise.", "entities": [{"start": 18, "end": 35, "label": "OBLIGATION"}]}
+{"text": "Eingehenden Geschäftspartner ist die Einhaltung der Datenschutzrichtlinien zur Folge, um betriebliche Risiken zu minimieren.", "entities": [{"start": 29, "end": 47, "label": "OBLIGATION"}]}
+{"text": "Verantwortliches Personal ist angehalten, kontinuierlich das aktuelle Recht und Datenschutzrecht zu überprüfen.", "entities": [{"start": 26, "end": 40, "label": "OBLIGATION"}]}
+{"text": "Technische Mitarbeiter sind verpflichtet, ihre Arbeitsergebnisse für regelmäßige Audits vorzubereiten.", "entities": [{"start": 23, "end": 40, "label": "OBLIGATION"}]}
+{"text": "Abonnenten müssen ausdrücklich zustimmen, ihre persönlichen Daten für Forschungszwecke zu nutzen.", "entities": [{"start": 11, "end": 40, "label": "OBLIGATION"}]}
+{"text": "Der Entwickler ist verpflichtet, eine ethische Richtlinie zur Verwendung von Algorithmen zu erstellen.", "entities": [{"start": 15, "end": 31, "label": "OBLIGATION"}]}
+{"text": "Sämtliche Verträge mit Drittanbietern müssen in EU-Rechtskodex umgesetzt werden.", "entities": [{"start": 38, "end": 47, "label": "OBLIGATION"}]}
+{"text": "Der Systemadministrator ist verpflichtet, regelmäßige Backups aller Daten zu erstellen und zu pflegen.", "entities": [{"start": 24, "end": 40, "label": "OBLIGATION"}]}
+{"text": "Die Mitarbeiter müssen alle Änderungen an der IT-Infrastruktur ihrem Vorgesetzten mitteilen.", "entities": [{"start": 16, "end": 27, "label": "OBLIGATION"}]}
+{"text": "Die Unternehmensleitung ist verpflichtet, im Voraus von der Europäischen Aufsichtsbehörde eine Genehmigung zu erhalten.", "entities": [{"start": 24, "end": 40, "label": "OBLIGATION"}]}
+{"text": "Es ist erforderlich, dass alle Datenschutzrichtlinien regelmäßig von einem externen Auditor geprüft werden.", "entities": [{"start": 3, "end": 19, "label": "OBLIGATION"}]}
+{"text": "Die Implementierung von Maßnahmen zur Verschlüsselung ist unerlässlich, um die Datenschutzverwaltung zu sichern.", "entities": [{"start": 54, "end": 70, "label": "OBLIGATION"}]}
+{"text": "Einzige Änderungen an den Geschäftsprozessen müssen nach Meldung an das Qualitätsmanagement dokumentiert werden.", "entities": [{"start": 45, "end": 56, "label": "OBLIGATION"}]}
+{"text": "Die Einrichtung ist verpflichtet, regelmäßige Sicherheitsaudits durchzuführen.", "entities": [{"start": 16, "end": 32, "label": "OBLIGATION"}]}
+{"text": "Die Unternehmensleitung muss die Einhaltung der Datenschutzgrundverordnung sicherstellen.", "entities": [{"start": 24, "end": 47, "label": "OBLIGATION"}]}
+{"text": "Techniker sind verpflichtet, bei Ausfallstörungen umgehend zu berichten.", "entities": [{"start": 10, "end": 27, "label": "OBLIGATION"}]}
+{"text": "Personalmitarbeiter sind zur Aufzeichnung und Identifizierung von Datenverletzungen angehalten.", "entities": [{"start": 20, "end": 41, "label": "OBLIGATION"}]}
+{"text": "Die Geschäftsführung ist verpflichtet, alle Verstöße gegen die Datenschutzverordnung zu melden.", "entities": [{"start": 21, "end": 37, "label": "OBLIGATION"}]}
+{"text": "Personalvertreter müssen den Einsatz von automatisierten Systemen im Einklang mit der EU-Datenschutzrichtlinie beobachten.", "entities": [{"start": 18, "end": 40, "label": "OBLIGATION"}]}
+{"text": "Verantwortliche Entscheidungsträger sind zur Implementierung der Anti-Money Laundering (AML)-Maßnahmen gemäß dem EU AI Act verpflichtet.", "entities": [{"start": 36, "end": 44, "label": "OBLIGATION"}]}
+{"text": "Firmenangestellte, die mit der Entwicklung von KI-Systemen arbeiten, müssen sich über ethische Richtlinien und Zertifizierungen informieren.", "entities": [{"start": 69, "end": 80, "label": "OBLIGATION"}]}
+{"text": "Firmen sind verpflichtet, ihre Verarbeitungspraktiken vor Abschluss von Nutzereingaben zu dokumentieren.", "entities": [{"start": 7, "end": 24, "label": "OBLIGATION"}]}
+{"text": "Our facial recognition system operates under limited risk according to the EU AI Act.", "entities": [{"start": 45, "end": 57, "label": "RISK_TIER"}]}
+{"text": "The algorithm was flagged as a high-risk entity, necessitating an impact assessment report to address potential dangers.", "entities": [{"start": 31, "end": 40, "label": "RISK_TIER"}]}
+{"text": "Deploying predictive policing tools in public spaces is strictly regulated as a prohibited activity within the EU AI Act.", "entities": [{"start": 80, "end": 90, "label": "RISK_TIER"}]}
+{"text": "Undergoing periodic reviews, this autonomous driving system maintains its minimal risk classification under the EU AI Act.", "entities": [{"start": 74, "end": 86, "label": "RISK_TIER"}]}
+{"text": "Given their complex decision-making capabilities, certain recommendation algorithms fall into the high-risk category under EU AI Act regulations.", "entities": [{"start": 98, "end": 107, "label": "RISK_TIER"}]}
+{"text": "The proposed credit scoring model has been identified as a limited risk, warranting further compliance checks before EU AI Act deployment.", "entities": [{"start": 59, "end": 71, "label": "RISK_TIER"}]}
+{"text": "Our predictive hiring tool categorizes candidates as minimal risks, aligning with the EU AI Act to ensure ethical practices.", "entities": [{"start": 53, "end": 65, "label": "RISK_TIER"}]}
+{"text": "Because of its potential impact on employment, this job recommendation AI system is classified as a high-risk by the EU's regulatory framework.", "entities": [{"start": 100, "end": 109, "label": "RISK_TIER"}]}
+{"text": "The surveillance drones, once implemented for crowd monitoring at events within EU jurisdiction are subject to a limited risk declaration.", "entities": [{"start": 113, "end": 125, "label": "RISK_TIER"}]}
+{"text": "This document outlines the necessary impact assessments for AI systems deemed as prohibited under EU's stringent regulations.", "entities": [{"start": 81, "end": 91, "label": "RISK_TIER"}]}
+{"text": "The AI-driven facial recognition system, under EU regulations, falls into a high-risk category due to privacy concerns.", "entities": [{"start": 76, "end": 85, "label": "RISK_TIER"}]}
+{"text": "According to Article 34 of the EU AI Act, algorithms performing credit scoring are considered limited risk as long as they adhere strictly to non-discrimination principles.", "entities": [{"start": 94, "end": 106, "label": "RISK_TIER"}]}
+{"text": "This machine learning tool for predictive policing has been deemed minimal risk, provided it includes robust safeguards against biases.", "entities": [{"start": 67, "end": 79, "label": "RISK_TIER"}]}
+{"text": "Certain robotics applications for elder care are classified as hautriskante by the EU AI Oversight Authority.", "entities": [{"start": 63, "end": 74, "label": "RISK_TIER"}]}
+{"text": "Post-market monitoring of these autonomous drones is essential to ensure they remain a geringt risiko compliant with the EU AI Act.", "entities": [{"start": 87, "end": 100, "label": "RISK_TIER"}]}
+{"text": "Algorithmic decision-making used in hiring is prohibited if it leads to systematic discrimination against candidates.", "entities": [{"start": 46, "end": 56, "label": "RISK_TIER"}]}
+{"text": "Facial recognition software for public areas has been restricted as a verboten practice under the EU AI Act due to ethical concerns.", "entities": [{"start": 70, "end": 78, "label": "RISK_TIER"}]}
+{"text": "The risk assessment report categorized this new surveillance technology as limited risico, recommending additional oversight measures.", "entities": [{"start": 75, "end": 89, "label": "RISK_TIER"}]}
+{"text": "Data processing tools that automatically adjust loan rates based on ethnicity are classified as hochrisikoante by the European Data Protection Supervisor.", "entities": [{"start": 96, "end": 109, "label": "RISK_TIER"}]}
+{"text": "Given its wide application in sensitive areas, the deployment of high-risk AI systems is subject to rigorous evaluation.", "entities": [{"start": 65, "end": 74, "label": "RISK_TIER"}]}
+{"text": "The audit identified prohibited use cases for facial recognition technologies in surveillance outside of public safety contexts as non-compliant with EU legislation.", "entities": [{"start": 21, "end": 31, "label": "RISK_TIER"}]}
+{"text": "All AI systems classified under limited risk are exempt from the stringent testing protocols required for high-risk technologies, but must still adhere to basic data protection measures.", "entities": [{"start": 32, "end": 44, "label": "RISK_TIER"}]}
+{"text": "Ongoing assessments are necessary as minimal risks may evolve over time due to algorithmic adaptations in AI systems without prior review.", "entities": [{"start": 37, "end": 50, "label": "RISK_TIER"}]}
+{"text": "The report concluded that certain automated profiling tools classified as verboten should be immediately suspended to avoid legal repercussions.", "entities": [{"start": 74, "end": 82, "label": "RISK_TIER"}]}
+{"text": "Incidents involving hochriskant AI implementations in autonomous vehicles have led to a temporary suspension pending further investigation and compliance verification.", "entities": [{"start": 20, "end": 31, "label": "RISK_TIER"}]}
+{"text": "The risk assessment for AI systems labeled as geringes Risiko concluded that ongoing supervision is not required, given the low potential impact on individuals.", "entities": [{"start": 46, "end": 61, "label": "RISK_TIER"}]}
+{"text": "Our AI development lifecycle now includes a specific protocol for auditing systems that may pose a begremende Risiko in the processing of sensitive personal data.", "entities": [{"start": 99, "end": 116, "label": "RISK_TIER"}]}
+{"text": "The deployment of facial recognition technology in our retail stores is limited to minimal risk settings.", "entities": [{"start": 83, "end": 95, "label": "RISK_TIER"}]}
+{"text": "All predictive policing tools that were previously banned have been reclassified as high-risk due to data privacy concerns, hence the prohibition.", "entities": [{"start": 84, "end": 93, "label": "RISK_TIER"}]}
+{"text": "AI algorithms used in medical diagnostics are now considered as having minimal risk and can be freely implemented without additional authorization.", "entities": [{"start": 71, "end": 83, "label": "RISK_TIER"}]}
+{"text": "Our AI-driven hiring platform, initially tagged with limited risk status for bias concerns, is now subject to strict ongoing review.", "entities": [{"start": 53, "end": 65, "label": "RISK_TIER"}]}
+{"text": "The AI-powered educational tools previously identified as high-risk due to potential bias have undergone reevaluation and been classified with minimal risk.", "entities": [{"start": 58, "end": 67, "label": "RISK_TIER"}, {"start": 143, "end": 155, "label": "RISK_TIER"}]}
+{"text": "Given the transparency measures implemented, AI credit scoring systems in our bank are considered as having limited risk.", "entities": [{"start": 108, "end": 120, "label": "RISK_TIER"}]}
+{"text": "Our predictive maintenance tools for industrial equipment have been upgraded to a high-risk tier, requiring additional safety checks before approval.", "entities": [{"start": 82, "end": 91, "label": "RISK_TIER"}]}
+{"text": "We acknowledge the risk associated with deploying autonomous drones for delivery services and hence, have labeled this as a high-risk application within our AI initiatives.", "entities": [{"start": 124, "end": 133, "label": "RISK_TIER"}]}
+{"text": "Facial recognition technologies for access control in public institutions have been reclassified as prohibited due to privacy legislation changes effected by the EU AI Act.", "entities": [{"start": 100, "end": 110, "label": "RISK_TIER"}]}
+{"text": "Newly proposed self-driving vehicle technologies have been earmarked for further study, as their risk assessment remains in the minimal risk category.", "entities": [{"start": 128, "end": 140, "label": "RISK_TIER"}]}
+{"text": "The new facial recognition system has been labeled as high-risk, necessitating rigorous testing protocols.", "entities": [{"start": 54, "end": 63, "label": "RISK_TIER"}]}
+{"text": "Due to its invasive nature and lack of safeguards against bias, the deployment of this predictive policing tool has been prohibited.", "entities": [{"start": 121, "end": 131, "label": "RISK_TIER"}]}
+{"text": "This language translation model falls into the minimal risk category but requires ongoing evaluation to ensure compliance with evolving EU regulations.", "entities": [{"start": 47, "end": 59, "label": "RISK_TIER"}]}
+{"text": "Die Bewertung des KI-Systems ergab ein geringes Risiko.", "entities": [{"start": 39, "end": 54, "label": "minimales Risiko"}]}
+{"text": "Das Verfahren muss aufgrund der Datenschutzgefährdung als verboten kategorisiert werden.", "entities": [{"start": 58, "end": 66, "label": "RISK_TIER"}]}
+{"text": "Unsere Entscheidung, die fortschrittliche Bildklassifikationstechnologie einzusetzen, wird als geringes Risiko eingestuft.", "entities": [{"start": 95, "end": 110, "label": "minimales Risiko"}]}
+{"text": "Angesichts der neuen Datenschutzrichtlinien wurde das automatische Erkennen von Gesichtern als verboten klassifiziert.", "entities": [{"start": 95, "end": 103, "label": "RISK_TIER"}]}
+{"text": "Das Einsatzgebiet des KI-Systems im Finanzsektor, welches ein großes Risiko birgt, wurde neu überdacht.", "entities": [{"start": 62, "end": 75, "label": "hochriskant"}]}
+{"text": "Der Einsatz der Technologie zur Auswertung von E-Mails ohne Einwilligung wird als verboten eingestuft.", "entities": [{"start": 82, "end": 90, "label": "RISK_TIER"}]}
+{"text": "Die Implementierung automatisierter Überwachungssysteme im öffentlichen Raum wird als begrenztes Risiko angesehen.", "entities": [{"start": 86, "end": 103, "label": "RISK_TIER"}]}
+{"text": "Das System zur Bewertung der E-Mail-Spam-Filterung wurde als geringes Risiko eingestuft.", "entities": [{"start": 61, "end": 76, "label": "minimales Risiko"}]}
+{"text": "Die Entwicklung von künstlicher Intelligenz zur Analyse des Onlinekreditverlaufs wird als hochriskant eingestuft.", "entities": [{"start": 90, "end": 101, "label": "RISK_TIER"}]}
+{"text": "Die automatische Erkennung von Gesichtern durch KI wird als verboten erachtet, gemäß EU-Gesetz.", "entities": [{"start": 60, "end": 68, "label": "RISK_TIER"}]}
+{"text": "Das neue KI-System wurde aufgrund seiner autonomen Entscheidungen als verbotene Technologie eingestuft.", "entities": [{"start": 70, "end": 91, "label": "RISK_TIER"}]}
+{"text": "Die Implementierung von Chatbots im Justizbereich stellt eine geringfügige Risikoquelle dar.", "entities": [{"start": 62, "end": 87, "label": "RISK_TIER"}]}
+{"text": "Das automatisierte Screeningsystem des Kredits wurde als geringes Risiko eingestuft, nachdem die neuen Algorithmen implementiert wurden.", "entities": [{"start": 57, "end": 72, "label": "RISK_TIER"}]}
+{"text": "Als Reaktion auf Datenschutzbedenken wurde das Verwendung von KI in der Behörde als verbotene Praxis ausgesteckt.", "entities": [{"start": 84, "end": 100, "label": "RISK_TIER"}]}
+{"text": "Das Verfahren zur Auswahl von Kandidaten für öffentliche Stellen, das maschinelle Lernmethoden verwendet, wurde als hochriskant eingestuft.", "entities": [{"start": 116, "end": 127, "label": "RISK_TIER"}]}
+{"text": "Mit der Einführung von KI-gesteuerter Wettervorhersage, obwohl es ein kleiner Teil des Geschäftsmodells war, wurde als geringes Risiko eingestuft.", "entities": [{"start": 119, "end": 134, "label": "RISK_TIER"}]}
+{"text": "Der Einsatz automatisierter KI-Systeme zur Überwachung von Sozialversicherungen wird als verbotene Praxis angesehen.", "entities": [{"start": 89, "end": 105, "label": "RISK_TIER"}]}
+{"text": "Die Sammlung von Gesichtsdaten an öffentlichen Plätzen wie der Brüsseler Innenstadtmetropole stellt einen spezifischen Verstoß gegen die GDPR-Bestimmungen dar, da diese Praxis ohne klare Zustimmung oder gesetzliche Grundlage durchgeführt wird.", "entities": [{"start": 17, "end": 30, "label": "SCOPE_OF_BIOMETRIC_COLLECTION"}]}
+{"text": "Die Erhebung von Gesichtsdaten in Parks wie dem Jubelruimtepark stellt nicht nur einen spezifischen Satz der GDPR-Violation dar, sondern verletzt auch das Prinzip des Zweckes (Artikel 5 Absatz 1 Nr. b), da die Daten hauptsächlich für personenbezogene Analysen verwendet werden.", "entities": [{"start": 17, "end": 30, "label": "SCOPE_OF_BIOMETRIC_COLLECTION"}]}
+{"text": "Die Nutzung von Gesichtsdaten an zentralen Orten wie der Grand-Place Brüssel, ohne ausreichende Überlegungen zum Sicherheitsschutz gegen Datenmissbrauch und für die Dauer des Datenspeichers (Artikel 5 Absatz 4), wirft erhebliche Risiken auf.", "entities": [{"start": 16, "end": 29, "label": "SCOPE_OF_BIOMETRIC_COLLECTION"}]}
+{"text": "Die Einrichtung öffentlicher Biometrie-Erfassungsanlagen in Brüssel ohne klare Legitimationsgrundlage oder Zustimmung der Bürger stellt eine direkte Verletzung des GDPR-Prinzips der Datensicherheit (Artikel 5 Absatz 2) dar.", "entities": [{"start": 29, "end": 56, "label": "SCOPE_OF_BIOMETRIC_COLLECTION"}]}
+{"text": "Wie sich herausstellt, wurden Gesichtsdaten in öffentlichen Rathausmitgliederkreisen im Brüsseler Stadtzentrum ohne klar definierte Absichten und Zustimmung der Bürger erfasst.", "entities": [{"start": 30, "end": 43, "label": "SCOPE_OF_BIOMETRIC_COLLECTION"}]}
+{"text": "Konkrete Untersuchungen zeigten, dass das Speichern von Gesichtsdaten für längere als zwei Jahre ohne triftigen Grund in öffentlichen Veranstaltungszentren wie dem Olympic Park Brüssel nicht zulässig ist.", "entities": [{"start": 56, "end": 69, "label": "SCOPE_OF_BIOMETRIC_COLLECTION"}]}
+{"text": "Das System wurde als hochriskant eingestuft und ist nicht zulässig unter der aktuellen Richtlinie.", "entities": [{"start": 21, "end": 32, "label": "RISK_TIER"}]}
+{"text": "Verwendung von Verhaltensalgorithmen für Personalisierungsmaßnahmen ist auf ein begrenztes Risiko beschränkt.", "entities": [{"start": 80, "end": 97, "label": "RISK_TIER"}]}
+{"text": "Das automatisierte Entscheidungsfindungssystem wurde als hochriskant eingestuft und muss umgehend angepasst werden.", "entities": [{"start": 57, "end": 68, "label": "RISK_TIER"}]}
+{"text": "Die Analyse von Benutzernpulsdaten ohne Zertifizierung wird als hochriskant eingestuft.", "entities": [{"start": 64, "end": 75, "label": "RISK_TIER"}]}
+{"text": "Der Einsatz von Gesichtserkennungstechnologie in sicherheitskritischen Bereichen wird als hochriskant eingestuft.", "entities": [{"start": 90, "end": 101, "label": "RISK_TIER"}]}
+{"text": "Die Implementierung von KI-gestützten Entscheidungen ohne menschliche Überprüfung ist verboten.", "entities": [{"start": 86, "end": 94, "label": "RISK_TIER"}]}
+{"text": "EU Mitgliedstaaten haben bis zum 1. Mai 2023, das Recht für 'begrenztes Risiko' KI-Systeme in der Arztheldenutzung.", "entities": [{"start": 61, "end": 78, "label": "RISK_TIER"}]}
+{"text": "'Minimales Risiko'-Zertifizierung erfordert strenge Datenverarbeitungsprotokolle.", "entities": [{"start": 1, "end": 17, "label": "RISK_TIER"}]}
+{"text": "'Hochriskante AI-Dienste' müssen regelmäßig auditiert werden, um Datenschutzkonformität zu gewährleisten.", "entities": [{"start": 1, "end": 12, "label": "RISK_TIER"}]}
+{"text": "Das System ist als Hochrisikoprozess eingestuft worden, was eine umfangreiche Risikoanalyse erfordert.", "entities": [{"start": 19, "end": 36, "label": "RISK_TIER"}]}
+{"text": "Diese Art der automatischen Ausschlussfilterung wird als verboten eingestuft und kann zu Diskriminierung führen.", "entities": [{"start": 57, "end": 65, "label": "RISK_TIER"}]}
+{"text": "Dieser Einsatz von künstlicher Kreditbewertung ist als hochriskant eingestuft und muss durch manuelle Überprüfungen ergänzt werden.", "entities": [{"start": 55, "end": 66, "label": "RISK_TIER"}]}
+{"text": "Der Einsatz von Videokameras zur Überwachung in Unternehmen wird als hochriskant eingestuft und erfordert strikte Einhaltung der Datenschutzrichtlinien.", "entities": [{"start": 69, "end": 80, "label": "RISK_TIER"}]}
+{"text": "Die Verwendung von Sozial-Scoring Systemen ohne umfassende Berichtigung und Überprüfung ist verboten.", "entities": [{"start": 92, "end": 100, "label": "RISK_TIER"}]}
+{"text": "Das aktuelle Projekt 'X' wird aufgrund seiner datenschutzrelevanten Funktionen als verboten eingestuft.", "entities": [{"start": 83, "end": 91, "label": "RISK_TIER"}]}
+{"text": "Die Anwendung von X-Algorithmus im Kontext dieser Datenschutzrichtlinie ist ausreichend hochriskant.", "entities": [{"start": 88, "end": 99, "label": "RISK_TIER"}]}
+{"text": "Unsere Datenverarbeitungstechnologie ist zurzeit auf ein minimales Risiko eingeschätzt.", "entities": [{"start": 57, "end": 73, "label": "RISK_TIER"}]}
+{"text": "The KI-Gesetz requires impact assessments for high-risk AI systems.", "entities": [{"start": 4, "end": 13, "label": "REGULATION"}]}
+{"text": "Under the GDPR, data subjects have expanded rights over their personal information.", "entities": [{"start": 10, "end": 14, "label": "REGULATION"}]}
+{"text": "AI Act provisions mandate transparency for AI system decision-making processes.", "entities": [{"start": 0, "end": 6, "label": "REGULATION"}]}
+{"text": "EU Member States must ensure compliance with the EU AI Act by 2025 to avoid penalties.", "entities": [{"start": 49, "end": 58, "label": "REGULATION"}]}
+{"text": "Datenschutz-Grundverordnung sets stringent requirements for data subject consent in the EU.", "entities": [{"start": 0, "end": 27, "label": "REGULATION"}]}
+{"text": "The upcoming KI-Gesetz revision includes provisions to increase AI transparency in the public sector.", "entities": [{"start": 13, "end": 22, "label": "REGULATION"}]}
+{"text": "Under EU law, compliance with both GDPR and DSGVO is mandatory for companies handling European citizens' data.", "entities": [{"start": 35, "end": 39, "label": "REGULATION"}, {"start": 44, "end": 49, "label": "REGULATION"}]}
+{"text": "AI Act compliance audits will become a standard procedure for deploying AI in sensitive areas.", "entities": [{"start": 0, "end": 6, "label": "REGULATION"}]}
+{"text": "Member States are expected to align national laws with the principles of the Artificial Intelligence Act by 2024.", "entities": [{"start": 77, "end": 104, "label": "REGULATION"}]}
+{"text": "This document outlines the procedures for ensuring AI systems comply with both DSGVO and KI-Gesetz requirements.", "entities": [{"start": 79, "end": 84, "label": "REGULATION"}, {"start": 89, "end": 98, "label": "REGULATION"}]}
+{"text": "The audit revealed several non-compliances with GDPR, requiring immediate remedial actions and a review of the KI-Gesetz guidelines.", "entities": [{"start": 48, "end": 52, "label": "REGULATION"}, {"start": 111, "end": 120, "label": "REGULATION"}]}
+{"text": "The EU AI Act will be implemented across all member states to streamline compliance and harmonize artificial intelligence regulations.", "entities": [{"start": 4, "end": 13, "label": "REGULATION"}]}
+{"text": "All machine learning models must adhere to the GDPR's principles of data minimization and purpose limitation as stipulated by law.", "entities": [{"start": 47, "end": 51, "label": "REGULATION"}]}
+{"text": "The upcoming changes in KI-Gesetz will significantly affect the development of AI systems, mandating ethical guidelines and risk assessments.", "entities": [{"start": 24, "end": 33, "label": "REGULATION"}]}
+{"text": "The General Data Protection Regulation (GDPR) significantly impacts how data is collected, processed, and stored within AI systems.", "entities": [{"start": 4, "end": 38, "label": "REGULATION"}]}
+{"text": "Our company's compliance with the EU AI Act has been rigorously assessed and found to be in full alignment.", "entities": [{"start": 34, "end": 43, "label": "REGULATION"}]}
+{"text": "The principles set forth by GDPR should form the cornerstone of any data-driven artificial intelligence initiatives undertaken within our organization.", "entities": [{"start": 28, "end": 32, "label": "REGULATION"}]}
+{"text": "New amendments to KI-Gesetz will necessitate a thorough audit of all current artificial intelligence deployments and their data governance policies.", "entities": [{"start": 18, "end": 27, "label": "REGULATION"}]}
+{"text": "Under the KI-Gesetz, artificial intelligence developers must ensure transparency and accountability.", "entities": [{"start": 10, "end": 19, "label": "REGULATION"}]}
+{"text": "The EU AI Act proposes strict guidelines for high-risk applications to protect citizens' rights and privacy.", "entities": [{"start": 4, "end": 13, "label": "REGULATION"}]}
+{"text": "Compliance with the GDPR is mandatory when processing personal data within EU member states, including for AI projects.", "entities": [{"start": 20, "end": 24, "label": "REGULATION"}]}
+{"text": "The Datenschutz-Grundverordnung has prompted a reevaluation of data processing methods in the wake of advanced artificial intelligence technologies.", "entities": [{"start": 4, "end": 31, "label": "REGULATION"}]}
+{"text": "Auditors assess whether AI initiatives align with both EU KI-Gesetz and GDPR to ensure lawful operation.", "entities": [{"start": 58, "end": 67, "label": "REGULATION"}, {"start": 72, "end": 76, "label": "REGULATION"}]}
+{"text": "The EU AI Act necessitates a conformity assessment for high-risk AI systems.", "entities": [{"start": 4, "end": 13, "label": "REGULATION"}]}
+{"text": "Under the GDPR, data subjects have increased rights to access and control their personal information.", "entities": [{"start": 10, "end": 14, "label": "REGULATION"}]}
+{"text": "Artificial Intelligence Act compliance is mandatory for deploying AI systems within the European Union territory.", "entities": [{"start": 0, "end": 27, "label": "REGULATION"}]}
+{"text": "The KI-Gesetz introduces specific requirements to ensure transparency in AI decision processes.", "entities": [{"start": 4, "end": 13, "label": "REGULATION"}]}
+{"text": "AI Act compliance protocols must be documented and readily available for audit purposes within the organization's AI projects scope.", "entities": [{"start": 0, "end": 6, "label": "REGULATION"}]}
+{"text": "The EU proposes an amendment to its data protection laws, aligning them with stringent requirements of the GDPR and AI regulations.", "entities": [{"start": 107, "end": 111, "label": "REGULATION"}]}
+{"text": "Artificial Intelligence systems must adhere to the principles established by both GDPR and AI legislation.", "entities": [{"start": 82, "end": 86, "label": "REGULATION"}]}
+{"text": "The introduction of mandatory ethics declarations under the EU AI Act enhances accountability in automated decision-making.", "entities": [{"start": 60, "end": 69, "label": "REGULATION"}]}
+{"text": "Under the KI-Gesetz, all AI systems used within Germany must undergo an annual impact assessment.", "entities": [{"start": 10, "end": 19, "label": "REGULATION"}]}
+{"text": "The General Data Protection Regulation (GDPR) sets stringent requirements for data handling by companies operating in the EU.", "entities": [{"start": 4, "end": 38, "label": "REGULATION"}, {"start": 40, "end": 44, "label": "REGULATION"}]}
+{"text": "As part of the EU AI Act compliance, our company's facial recognition technology has been updated to adhere to new transparency and accountability standards.", "entities": [{"start": 15, "end": 24, "label": "REGULATION"}]}
+{"text": "In accordance with the Artificial Intelligence Act, our internal audit confirms that all deployed algorithms are compliant and do not pose undue risks.", "entities": [{"start": 23, "end": 50, "label": "REGULATION"}]}
+{"text": "The General Data Protection Regulation (GDPR) mandates that data subjects must be informed about the use of AI in processing their information.", "entities": [{"start": 4, "end": 38, "label": "REGULATION"}, {"start": 108, "end": 110, "label": "TECHNOLOGY"}]}
+{"text": "The KI-Gesetz requires a 'human in the loop' for certain automated decision systems to ensure human oversight and intervention.", "entities": [{"start": 4, "end": 13, "label": "REGULATION"}]}
+{"text": "Our AI solutions designed for EU citizens have been certified under the European Commission's proposal to harmonize regulatory frameworks across member states.", "entities": [{"start": 72, "end": 91, "label": "ORGANIZATION"}, {"start": 30, "end": 41, "label": "PERSON"}]}
+{"text": "Technology audits for AI systems have been intensified following the EU AI Act to ensure that risks are identified and mitigated effectively.", "entities": [{"start": 69, "end": 78, "label": "REGULATION"}]}
+{"text": "The European Commission has adopted the Artificial Intelligence Act as a comprehensive legal framework governing AI.", "entities": [{"start": 40, "end": 67, "label": "REGULATION"}]}
+{"text": "Die EU KI-Gesetzgebung fordert eine strenge Regulierung der künstlichen Intelligenz.", "entities": [{"start": 7, "end": 16, "label": "REGULATION"}]}
+{"text": "Der Einsatz von KI muss im Einklang mit DSGVO und dem neuen EU AI Act stehen.", "entities": [{"start": 40, "end": 45, "label": "REGULATION"}, {"start": 60, "end": 69, "label": "REGULATION"}]}
+{"text": "Nach Durchsicht des KI-Gesetzes und der Datenschutzrichtlinie soll eine Änderung der internen Richtlinien erfolgen.", "entities": [{"start": 20, "end": 29, "label": "REGULATION"}, {"start": 40, "end": 61, "label": "REGULATION"}]}
+{"text": "Das AI Act wird die Anwendung künstlicher Intelligenz weiterhin auf EU Gebieten regeln.", "entities": [{"start": 4, "end": 10, "label": "REGULATION"}]}
+{"text": "Unternehmenspolitik muss sich an Regulierungen wie GDPR und DSGVO halten, um Missbrauch zu vermeiden.", "entities": [{"start": 51, "end": 55, "label": "REGULATION"}, {"start": 60, "end": 65, "label": "REGULATION"}]}
+{"text": "Die Einführung des EU AI Act wird dazu führen, dass Unternehmen strengere Compliance-Anforderungen einhalten müssen.", "entities": [{"start": 19, "end": 28, "label": "REGULATION"}]}
+{"text": "Die Implementierung der künstlichen Intelligenz muss den Anforderungen des KI-Gesetzes entsprechen.", "entities": [{"start": 75, "end": 84, "label": "REGULATION"}]}
+{"text": "Der Datenschutzanwalt legt in der Bewertung die Auswirkungen des EU AI Act auf unsere Datenverarbeitungsmethoden dar.", "entities": [{"start": 65, "end": 74, "label": "REGULATION"}]}
+{"text": "Beim Einsatz von künstlicher Intelligenz muss im Rahmen der Vorabkontrolle des EU KI-Gesetzes geprüft werden, ob die erforderlichen Risikobewertungen durchgeführt wurden.", "entities": [{"start": 79, "end": 91, "label": "REGULATION"}]}
+{"text": "Wir müssen prüfen, dass unsere Algorithmen im Einklang mit dem General Data Protection Regulation stehen.", "entities": [{"start": 63, "end": 97, "label": "REGULATION"}]}
+{"text": "Bei der Analyse des KI-Systems werden die Bestimmungen des EU AI Act zur Transparenz und Verantwortlichkeit genutzt.", "entities": [{"start": 59, "end": 68, "label": "REGULATION"}]}
+{"text": "Die künstliche Intelligenz des Unternehmens wird durch das KI-Gesetz reguliert, um den Schutz personenbezogener Daten sicherzustellen.", "entities": [{"start": 59, "end": 68, "label": "REGULATION"}]}
+{"text": "Die neuen Vorschriften für künstliche Intelligenz folgen der EU AI Act und schreiben vor, dass Algorithmen unabhängig geprüft werden müssen.", "entities": [{"start": 61, "end": 70, "label": "REGULATION"}]}
+{"text": "Beim Implementieren von KI-Systemen ist es essentiell, die Anforderungen des EU General Data Protection Regulation zu erfüllen.", "entities": [{"start": 80, "end": 114, "label": "REGULATION"}]}
+{"text": "Der Einsatz von künstlicher Intelligenz muss im Einklang mit dem EU AI Act erfolgen.", "entities": [{"start": 65, "end": 74, "label": "REGULATION"}]}
+{"text": "Unter der Behandlung von personenbezogenen Daten durch künstliche Intelligenz fallen auch die Anforderungen des GDPR.", "entities": [{"start": 112, "end": 116, "label": "REGULATION"}]}
+{"text": "Die Organisation muss einen Risk-Based Assessment zur Einhaltung des KI-Gesetzes durchführen.", "entities": [{"start": 69, "end": 78, "label": "REGULATION"}]}
+{"text": "Das Datenschutz-Grundverordnung (DSGVO) wurde eingeführt, um personenbezogene Daten zu schützen.", "entities": [{"start": 4, "end": 31, "label": "REGULATION"}]}
+{"text": "Unter dem DSGVO sollen alle Verarbeitungsvorgänge von personenbezogenen Daten transparent gemacht werden.", "entities": [{"start": 10, "end": 15, "label": "REGULATION"}]}
+{"text": "Das Unternehmen überprüft regelmäßig seine künstlichen Intelligenzsysteme gegen das KI-Gesetz und den DSGVO.", "entities": [{"start": 84, "end": 93, "label": "REGULATION"}, {"start": 102, "end": 107, "label": "REGULATION"}]}
+{"text": "Die Anwendung von künstlicher Intelligenz unterliegt strengen Richtlinien gemäß dem EU AI Act.", "entities": [{"start": 84, "end": 93, "label": "REGULATION"}]}
+{"text": "Die Anwendung der DSGVO auf personenbezogene Daten durch künstliche Intelligenz erfordert sorgfältige Überlegungen.", "entities": [{"start": 18, "end": 23, "label": "REGULATION"}]}
+{"text": "Das KI-Gesetz verlangt, dass die Datensammlung mit dem Recht der Individuen vereinbart wird.", "entities": [{"start": 4, "end": 13, "label": "REGULATION"}]}
+{"text": "Alle personenbezogenen Datenverarbeitungen unterliegen den Anforderungen des EU AI Act und der DSGVO.", "entities": [{"start": 77, "end": 86, "label": "REGULATION"}, {"start": 95, "end": 100, "label": "REGULATION"}]}
+{"text": "Die Einführung des EU AI Act ist eine wichtige Schritt zur Sicherung der ethischen Anwendung von Künstlicher Intelligenz.", "entities": [{"start": 19, "end": 28, "label": "REGULATION"}]}
+{"text": "Unter dem DSGVO-Protokoll müssen Unternehmen die Datenschutzbeauftragten benennen und überprüfen.", "entities": [{"start": 10, "end": 15, "label": "REGULATION"}]}
+{"text": "Das KI-Gesetz schafft ein harmonisiertes Regelwerk für den Umgang mit datenschutzrelevanten KI.", "entities": [{"start": 4, "end": 13, "label": "REGULATION"}]}
+{"text": "Bei der Bewertung von automatisierten Entscheidungen muss nach dem General Data Protection Regulation die Transparenz gegeben werden.", "entities": [{"start": 67, "end": 101, "label": "REGULATION"}]}
+{"text": "Die Einhaltung des EU AI Act durch Unternehmen kann über Audits sicherstellen, dass personenbezogene Daten korrekt verarbeitet werden.", "entities": [{"start": 19, "end": 28, "label": "REGULATION"}]}
+{"text": "Der Datenschutzbeauftragte prüft regelmäßig die Einhaltung der DSGVO durch Arbeitsmethoden und -software.", "entities": [{"start": 63, "end": 68, "label": "REGULATION"}]}
+{"text": "Entwickler von KI-Systemen, die im Einklang mit dem EU AI Act stehen sollen, müssen ihre Algorithmen kontinuierlich validieren.", "entities": [{"start": 52, "end": 61, "label": "REGULATION"}]}
+{"text": "Unternehmen unterliegen dem KI-Gesetz und müssen Maßnahmen zur Risikobewertung vorschlagen.", "entities": [{"start": 28, "end": 37, "label": "REGULATION"}]}
+{"text": "Die DSGVO gilt für alle Unternehmen in der EU, unabhängig davon, wo sie ihren Hauptsitz haben.", "entities": [{"start": 4, "end": 9, "label": "REGULATION"}]}
+{"text": "Mit dem General Data Protection Regulation wird einheitliches Recht für Datenschutz in allen Mitgliedstaaten der EU geschaffen.", "entities": [{"start": 8, "end": 42, "label": "REGULATION"}]}
+{"text": "Der Einsatz von KI muss den Anforderungen der EU AI Act entsprechen, um Datenschutz und Verbraucherrechte zu wahren.", "entities": [{"start": 46, "end": 55, "label": "REGULATION"}]}
+{"text": "Unter dem DSGVO-Grundsatz der Datensparsamkeit müssen Daten erhoben werden, die ausreichen, um das KI-Projekt zum Ziel zu führen.", "entities": [{"start": 10, "end": 15, "label": "REGULATION"}, {"start": 99, "end": 109, "label": ""}]}
+{"text": "Mit dem neuen KI-Gesetz wird sichergestellt, dass Algorithmen transparente Entscheidungen machen und den gesellschaftlichen Werten entsprechen.", "entities": [{"start": 14, "end": 23, "label": "REGULATION"}]}
+{"text": "Die Einhaltung der EU AI Act durch die Entwicklung von KI muss regelmäßig überprüft werden, um Sicherheit und Fairness zu gewährleisten.", "entities": [{"start": 19, "end": 28, "label": "REGULATION"}]}
+{"text": "Besonders bei der Entwicklung von personalisierten Werbekampagnen, muss die DSGVO beachtet werden, um die Privatsphäre der Nutzer zu schützen.", "entities": [{"start": 76, "end": 81, "label": "REGULATION"}]}
+{"text": "Das KI-Gesetz legt fest, dass Entscheidungen von Algorithmen immer mit menschlichen Eingaben abgestimmt werden und keine unüberprüfbaren Autonomien enthalten.", "entities": [{"start": 4, "end": 13, "label": "REGULATION"}]}
