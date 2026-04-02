@@ -115,7 +115,7 @@ class ArticleScore(BaseModel):
 
 
 class EmotionFlag(BaseModel):
-    """Result of the Article 5 emotion recognition scan (Phase 4)."""
+    """Result of the Article 5 emotion recognition scan."""
     detected: bool = False
     context: str = Field(default="", description="Surrounding text that triggered detection")
     is_prohibited: bool = Field(

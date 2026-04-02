@@ -36,7 +36,6 @@ from transformers import (
     EarlyStoppingCallback,
 )
 
-# ── Colour helpers ─────────────────────────────────────────────────────────────
 _RESET = "\033[0m"
 _BOLD  = "\033[1m"
 _GREEN = "\033[32m"
@@ -93,8 +92,7 @@ class EpochProgressCallback(TrainerCallback):
         elif epoch == self._total:
             print(_c(_AMBER, "  [!!] Below 0.85 F1 target -- consider more data or epochs"))
 
-# ── Label definitions (must match ArticleDomain enum) ────────────────────────
-
+# Label order must match ArticleDomain enum in api/models/schemas.py.
 LABELS = [
     "risk_management",
     "data_governance",

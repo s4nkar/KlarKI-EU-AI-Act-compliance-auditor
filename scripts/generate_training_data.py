@@ -37,15 +37,12 @@ from pathlib import Path
 
 import httpx
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
-
 ROOT = Path(__file__).parent.parent
 REGULATORY_DIR = ROOT / "data" / "regulatory"
 
-# ── Domain → article mapping ───────────────────────────────────────────────────
 # Each classifier label maps to a primary regulation article.
-# The article text is loaded and included in the generation prompt as reference.
-
+# The article text is loaded and included in the generation prompt as reference,
+# grounding synthetic examples in the official regulation language.
 DOMAIN_ARTICLE_MAP: dict[str, tuple[str, int] | None] = {
     "risk_management":         ("eu_ai_act", 9),
     "data_governance":         ("eu_ai_act", 10),
@@ -56,8 +53,6 @@ DOMAIN_ARTICLE_MAP: dict[str, tuple[str, int] | None] = {
     "security":                ("eu_ai_act", 15),
     "unrelated":               None,
 }
-
-# ── Domain definitions ────────────────────────────────────────────────────────
 
 DOMAINS = [
     {
@@ -107,8 +102,6 @@ LANGUAGES = [
     ("de", "German"),
 ]
 
-# ── Regulatory text loader ─────────────────────────────────────────────────────
-
 def _parse_txt_sections(path: Path) -> dict[str, str]:
     """Parse === EN === / === DE === sections from a regulatory txt file."""
     sections: dict[str, str] = {}
@@ -152,8 +145,6 @@ def load_article_text(regulation: str, article_num: int, lang: str = "en") -> st
         return ""
 
 
-# ── Ollama client ─────────────────────────────────────────────────────────────
-
 _TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
 
 
@@ -196,8 +187,6 @@ def parse_json_list(raw: str) -> list[str]:
             lines.append(line)
     return lines
 
-
-# ── Prompt builder ────────────────────────────────────────────────────────────
 
 def build_prompt(domain: dict, language_name: str, lang_code: str, n: int) -> str:
     """Build a generation prompt anchored to the actual regulation text.
@@ -267,8 +256,6 @@ def build_prompt(domain: dict, language_name: str, lang_code: str, n: int) -> st
         f'{{"sentences": ["...", "..."]}}'
     )
 
-
-# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Auto-generate BERT training data via Ollama")

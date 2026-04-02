@@ -36,11 +36,9 @@ from services.rag_engine import retrieve_requirements
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/audit", tags=["audit"])
 
-# In-memory audit state (sufficient for Phase 2; replace with Redis/DB in production)
+# In-memory audit store — replace with Redis or a DB for multi-worker deployments.
 _audits: dict[str, AuditResponse] = {}
 
-
-# ── Upload ────────────────────────────────────────────────────────────────────
 
 @router.post("/upload", response_model=APIResponse)
 async def upload_document(
@@ -124,8 +122,6 @@ async def upload_document(
     return APIResponse(status="success", data={"audit_id": audit_id})
 
 
-# ── Status + result ───────────────────────────────────────────────────────────
-
 @router.get("/{audit_id}", response_model=AuditResponse)
 async def get_audit(audit_id: str) -> AuditResponse:
     """Return full AuditResponse including ComplianceReport when COMPLETE.
@@ -158,8 +154,6 @@ async def get_audit_status(audit_id: str) -> APIResponse:
     return APIResponse(status="success", data={"status": audit.status.value})
 
 
-# ── Background pipeline ───────────────────────────────────────────────────────
-
 async def _run_pipeline(
     audit_id: str,
     file_path: str,
@@ -186,28 +180,24 @@ async def _run_pipeline(
         chroma = request.app.state.chroma
         embeddings = request.app.state.embeddings
 
-        # ── Stage 1: Parse ────────────────────────────────────────────────────
+        # Parse → chunk → detect language
         _set_status(AuditStatus.PARSING)
         raw_text = await parse_document(file_path, filename)
-
-        # ── Stage 2: Chunk + detect language ─────────────────────────────────
         chunks = await chunk_text(raw_text, source_file=filename)
         language = await detect_language(raw_text)
-
-        # Propagate language to all chunks
         for chunk in chunks:
             chunk.language = language
 
-        # ── Stage 3: Classify ─────────────────────────────────────────────────
+        # Classify each chunk into an ArticleDomain
         _set_status(AuditStatus.CLASSIFYING)
         chunks = await classify_chunks(chunks, ollama)
         classifier_backend = (
-            f"triton/gbert-base"
+            "triton/gbert-base"
             if settings.use_triton
             else f"ollama/{settings.ollama_model}"
         )
 
-        # ── Stage 4: RAG + gap analysis ───────────────────────────────────────
+        # RAG retrieval + per-article gap analysis
         _set_status(AuditStatus.ANALYSING)
 
         # Group chunks by domain
@@ -239,7 +229,7 @@ async def _run_pipeline(
             )
             article_scores.append(score)
 
-        # ── Stage 5: Score ────────────────────────────────────────────────────
+        # Aggregate article scores into a ComplianceReport
         _set_status(AuditStatus.SCORING)
         emotion_flag = await check_emotion_recognition(chunks)
         report = await score_audit(
