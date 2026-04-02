@@ -1,15 +1,15 @@
-"""Tests for LLM chunk classifier. (Phase 2)"""
+"""Tests for the chunk classifier service (Ollama and Triton backends)."""
 
 import pytest
 
 
 @pytest.mark.asyncio
-async def test_classify_sets_domain(mock_ollama_classify):
+async def test_classify_sets_domain():
     """Classifier sets .domain on each chunk."""
-    pytest.skip("Implemented in Phase 2")
+    pytest.skip("Requires live Ollama container — run with ./run.sh test")
 
 
 @pytest.mark.asyncio
-async def test_classify_unknown_label_maps_to_unrelated(mock_ollama_classify):
+async def test_classify_unknown_label_maps_to_unrelated():
     """Unrecognised LLM output maps to ArticleDomain.UNRELATED."""
-    pytest.skip("Implemented in Phase 2")
+    pytest.skip("Requires live Ollama container — run with ./run.sh test")

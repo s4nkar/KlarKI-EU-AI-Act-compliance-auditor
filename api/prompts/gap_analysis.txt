@@ -11,4 +11,4 @@ EU AI Act requirements (Article {article_num}):
 ---
 
 Respond with this exact JSON:
-{"score": <0-100>, "gaps": [{"title": "<max 10 words>", "description": "<specific>", "severity": "critical|major|minor"}], "recommendations": ["<actionable>"]}
+{"score": <0-100>, "reasoning": "<2-3 sentences explaining the score: what the documentation covers well, what is missing, and which specific regulatory requirement drives the score>", "gaps": [{"title": "<max 10 words>", "description": "<specific>", "severity": "critical|major|minor"}], "recommendations": ["<actionable>"]}

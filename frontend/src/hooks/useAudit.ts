@@ -7,7 +7,11 @@ const TERMINAL_STATUSES: AuditStatus[] = ['complete', 'failed']
 const POLL_INTERVAL_MS = 2000
 
 /** Upload files or raw text and start an audit. Returns audit_id. */
-export async function startAudit(files: File[], rawText?: string): Promise<string> {
+export async function startAudit(
+  files: File[],
+  rawText?: string,
+  wizardRiskTier?: string,
+): Promise<string> {
   const form = new FormData()
 
   if (files.length > 0) {
@@ -16,6 +20,10 @@ export async function startAudit(files: File[], rawText?: string): Promise<strin
     form.append('raw_text', rawText)
   } else {
     throw new Error('Provide at least one file or raw text.')
+  }
+
+  if (wizardRiskTier) {
+    form.append('wizard_risk_tier', wizardRiskTier)
   }
 
   const resp = await apiClient.post<{ status: string; data: { audit_id: string } }>(

@@ -1,5 +1,5 @@
 name: "bert_clause_classifier"
-backend: "onnxruntime"
+backend: "python"
 max_batch_size: 32
 
 input [
@@ -34,14 +34,3 @@ instance_group [
     count: 1
   }
 ]
-
-optimization {
-  execution_accelerators {
-    gpu_execution_accelerator [
-      {
-        name: "tensorrt"
-        parameters { key: "precision_mode" value: "FP16" }
-      }
-    ]
-  }
-}

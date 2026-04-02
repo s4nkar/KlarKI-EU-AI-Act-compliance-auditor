@@ -21,6 +21,7 @@ from models.schemas import (
     ArticleDomain,
     AuditResponse,
     AuditStatus,
+    RiskTier,
 )
 from services.classifier import classify_chunks
 from services.emotion_module import check_emotion_recognition
@@ -35,11 +36,9 @@ from services.rag_engine import retrieve_requirements
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/audit", tags=["audit"])
 
-# In-memory audit state (sufficient for Phase 2; replace with Redis/DB in production)
+# In-memory audit store — replace with Redis or a DB for multi-worker deployments.
 _audits: dict[str, AuditResponse] = {}
 
-
-# ── Upload ────────────────────────────────────────────────────────────────────
 
 @router.post("/upload", response_model=APIResponse)
 async def upload_document(
@@ -47,6 +46,7 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile | None = None,
     raw_text: Annotated[str | None, Form()] = None,
+    wizard_risk_tier: Annotated[str | None, Form()] = None,
 ) -> APIResponse:
     """Accept a document file or raw text and start the compliance audit pipeline.
 
@@ -55,6 +55,7 @@ async def upload_document(
     Args:
         file: Uploaded PDF, DOCX, TXT, or MD file (max 10 MB).
         raw_text: Plain text pasted directly into the form.
+        wizard_risk_tier: Optional risk tier from the Annex III wizard (pre-audit self-assessment).
 
     Returns:
         APIResponse with audit_id to poll for status.
@@ -97,6 +98,14 @@ async def upload_document(
     # Register audit as UPLOADING
     _audits[audit_id] = AuditResponse(audit_id=audit_id, status=AuditStatus.UPLOADING)
 
+    # Parse wizard tier if provided
+    parsed_wizard_tier: RiskTier | None = None
+    if wizard_risk_tier:
+        try:
+            parsed_wizard_tier = RiskTier(wizard_risk_tier)
+        except ValueError:
+            pass  # Ignore invalid tier values
+
     # Kick off pipeline in background
     ollama = OllamaClient(host=settings.ollama_host, model=settings.ollama_model)
     background_tasks.add_task(
@@ -106,13 +115,12 @@ async def upload_document(
         filename=filename,
         request=request,
         ollama=ollama,
+        wizard_risk_tier=parsed_wizard_tier,
     )
 
     logger.info("audit_started", audit_id=audit_id, filename=filename)
     return APIResponse(status="success", data={"audit_id": audit_id})
 
-
-# ── Status + result ───────────────────────────────────────────────────────────
 
 @router.get("/{audit_id}", response_model=AuditResponse)
 async def get_audit(audit_id: str) -> AuditResponse:
@@ -146,14 +154,13 @@ async def get_audit_status(audit_id: str) -> APIResponse:
     return APIResponse(status="success", data={"status": audit.status.value})
 
 
-# ── Background pipeline ───────────────────────────────────────────────────────
-
 async def _run_pipeline(
     audit_id: str,
     file_path: str,
     filename: str,
     request: Request,
     ollama: OllamaClient,
+    wizard_risk_tier: RiskTier | None = None,
 ) -> None:
     """Full compliance audit pipeline executed as a BackgroundTask.
 
@@ -173,28 +180,24 @@ async def _run_pipeline(
         chroma = request.app.state.chroma
         embeddings = request.app.state.embeddings
 
-        # ── Stage 1: Parse ────────────────────────────────────────────────────
+        # Parse → chunk → detect language
         _set_status(AuditStatus.PARSING)
         raw_text = await parse_document(file_path, filename)
-
-        # ── Stage 2: Chunk + detect language ─────────────────────────────────
         chunks = await chunk_text(raw_text, source_file=filename)
         language = await detect_language(raw_text)
-
-        # Propagate language to all chunks
         for chunk in chunks:
             chunk.language = language
 
-        # ── Stage 3: Classify ─────────────────────────────────────────────────
+        # Classify each chunk into an ArticleDomain
         _set_status(AuditStatus.CLASSIFYING)
         chunks = await classify_chunks(chunks, ollama)
         classifier_backend = (
-            f"triton/gbert-base"
+            "triton/gbert-base"
             if settings.use_triton
             else f"ollama/{settings.ollama_model}"
         )
 
-        # ── Stage 4: RAG + gap analysis ───────────────────────────────────────
+        # RAG retrieval + per-article gap analysis
         _set_status(AuditStatus.ANALYSING)
 
         # Group chunks by domain
@@ -226,7 +229,7 @@ async def _run_pipeline(
             )
             article_scores.append(score)
 
-        # ── Stage 5: Score ────────────────────────────────────────────────────
+        # Aggregate article scores into a ComplianceReport
         _set_status(AuditStatus.SCORING)
         emotion_flag = await check_emotion_recognition(chunks)
         report = await score_audit(
@@ -237,6 +240,7 @@ async def _run_pipeline(
             language=language,
             emotion_flag=emotion_flag,
             classifier_backend=classifier_backend,
+            wizard_risk_tier=wizard_risk_tier,
         )
 
         _audits[audit_id] = AuditResponse(

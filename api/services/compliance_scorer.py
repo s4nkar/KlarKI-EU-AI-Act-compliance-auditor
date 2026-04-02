@@ -63,6 +63,7 @@ async def score_audit(
     language: str = "en",
     emotion_flag: EmotionFlag | None = None,
     classifier_backend: str = "ollama/phi3:mini",
+    wizard_risk_tier: RiskTier | None = None,
 ) -> ComplianceReport:
     """Aggregate per-article scores into a full ComplianceReport.
 
@@ -102,6 +103,7 @@ async def score_audit(
         source_files=source_files or [],
         language=language,
         risk_tier=risk_tier,
+        wizard_risk_tier=wizard_risk_tier,
         overall_score=round(overall, 1),
         article_scores=sorted(final_scores, key=lambda s: s.article_num),
         emotion_flag=emotion_flag or EmotionFlag(),

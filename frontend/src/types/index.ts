@@ -31,6 +31,13 @@ export interface GapItem {
   article_num: number
 }
 
+export interface RegulatoryPassage {
+  title: string
+  text: string
+  regulation: string
+  article_ref: string
+}
+
 export interface ArticleScore {
   article_num: number
   domain: ArticleDomain
@@ -38,6 +45,8 @@ export interface ArticleScore {
   gaps: GapItem[]
   recommendations: string[]
   chunk_count: number
+  score_reasoning: string
+  regulatory_passages: RegulatoryPassage[]
 }
 
 export interface EmotionFlag {
@@ -53,6 +62,7 @@ export interface ComplianceReport {
   source_files: string[]
   language: string
   risk_tier: RiskTier
+  wizard_risk_tier: RiskTier | null
   overall_score: number
   article_scores: ArticleScore[]
   emotion_flag: EmotionFlag

@@ -1,0 +1,15 @@
+FROM nvcr.io/nvidia/tritonserver:24.02-py3
+
+# Install Python backend dependencies into the system Python3 (/usr/bin/python3)
+# which is what the Triton Python backend uses at runtime.
+#
+# onnxruntime-gpu: run BERT and e5 ONNX models on GPU.
+# CUDA 12.x wheels are on the nvidia index (onnxruntime-gpu on PyPI is CUDA 11).
+# Fall back to CPU onnxruntime if the GPU wheel fails (RTX 3050 Ti supports CUDA 12).
+# spacy: run the NER model.
+RUN pip3 install --no-cache-dir \
+        --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/onnxruntime-cuda-12/pypi/simple/ \
+        onnxruntime-gpu>=1.18.0 \
+    || pip3 install --no-cache-dir onnxruntime>=1.18.0
+
+RUN pip3 install --no-cache-dir spacy>=3.7.0 numpy>=1.26.0

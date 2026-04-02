@@ -27,9 +27,14 @@ class TritonPythonModel:
         model_path = Path(_SPACY_MODEL_PATH)
         if model_path.exists():
             self.nlp = spacy.load(str(model_path))
+            pb_utils.Logger.log_info(f"Loaded fine-tuned spaCy NER from {model_path}")
         else:
-            # Fallback to base German model if fine-tuned model is not yet present
-            self.nlp = spacy.load("de_core_news_sm")
+            # Fallback: blank German model (no pre-trained weights needed)
+            import spacy as _spacy
+            self.nlp = _spacy.blank("de")
+            pb_utils.Logger.log_warning(
+                f"Fine-tuned model not found at {model_path}, using blank German model"
+            )
 
         pb_utils.Logger.log_info(f"spaCy NER model loaded from {_SPACY_MODEL_PATH}")
 

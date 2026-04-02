@@ -80,42 +80,77 @@ async def _benchmark_ollama(texts: list[str], host: str, model: str) -> dict:
 
 
 async def _benchmark_triton(texts: list[str], host: str, grpc_port: int) -> dict:
-    """Run batched Triton classification and measure latency."""
-    import sys
-    sys.path.insert(0, str(__file__).rsplit("/scripts", 1)[0] + "/api")
+    """Run batched Triton BERT classification and measure latency.
 
-    from services.triton_client import TritonClient
+    Inlines the gRPC calls directly — no dependency on the API package.
+    Requires: tritonclient[grpc] transformers numpy (all in requirements-training.txt).
+    """
+    try:
+        import numpy as np
+        import tritonclient.grpc.aio as grpcclient
+        from transformers import AutoTokenizer
+    except ImportError as exc:
+        return {"backend": "triton", "error": f"missing dependency: {exc}"}
 
-    client = TritonClient(host=host, grpc_port=grpc_port)
+    address = f"{host}:{grpc_port}"
+    try:
+        client = grpcclient.InferenceServerClient(url=address)
+        live = await client.is_server_live()
+        if not live:
+            return {"backend": "triton", "error": "Triton server not live"}
+    except Exception as exc:
+        return {"backend": "triton", "error": f"cannot connect to Triton at {address}: {exc}"}
 
+    tokenizer = AutoTokenizer.from_pretrained("deepset/gbert-base")
     batch_size = 32
-    latencies = []
+    latencies: list[float] = []
     errors = 0
 
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
+        encoding = tokenizer(
+            batch,
+            return_tensors="np",
+            max_length=128,
+            padding="max_length",
+            truncation=True,
+        )
+        input_ids      = encoding["input_ids"].astype(np.int64)
+        attention_mask = encoding["attention_mask"].astype(np.int64)
+
+        inputs = [
+            grpcclient.InferInput("input_ids",      input_ids.shape,      "INT64"),
+            grpcclient.InferInput("attention_mask",  attention_mask.shape,  "INT64"),
+        ]
+        inputs[0].set_data_from_numpy(input_ids)
+        inputs[1].set_data_from_numpy(attention_mask)
+        outputs = [grpcclient.InferRequestedOutput("logits")]
+
         t0 = time.perf_counter()
         try:
-            await client.classify(batch)
+            await client.infer(
+                model_name="bert_clause_classifier",
+                inputs=inputs,
+                outputs=outputs,
+            )
             elapsed = time.perf_counter() - t0
-            # Record per-sample latency
             latencies.extend([elapsed / len(batch)] * len(batch))
         except Exception as exc:
             errors += len(batch)
-            print(f"  Triton error on batch {i//batch_size}: {exc}")
+            print(f"  Triton error on batch {i // batch_size}: {exc}")
 
     if not latencies:
-        return {"backend": "triton", "error": "all batches failed"}
+        return {"backend": "triton", "error": "all batches failed -- is Triton running?"}
 
     return {
-        "backend":        "triton",
-        "model":          "bert_clause_classifier (ONNX)",
-        "n_samples":      len(texts),
-        "errors":         errors,
-        "mean_s":         round(statistics.mean(latencies), 4),
-        "median_s":       round(statistics.median(latencies), 4),
-        "p95_s":          round(sorted(latencies)[int(len(latencies) * 0.95)], 4),
-        "total_s":        round(sum(latencies), 2),
+        "backend":            "triton",
+        "model":              "bert_clause_classifier (ONNX)",
+        "n_samples":          len(texts),
+        "errors":             errors,
+        "mean_s":             round(statistics.mean(latencies), 4),
+        "median_s":           round(statistics.median(latencies), 4),
+        "p95_s":              round(sorted(latencies)[int(len(latencies) * 0.95)], 4),
+        "total_s":            round(sum(latencies), 2),
         "throughput_per_min": round(60 / statistics.mean(latencies), 0),
     }
 
@@ -123,7 +158,7 @@ async def _benchmark_triton(texts: list[str], host: str, grpc_port: int) -> dict
 def _print_table(results: list[dict]) -> None:
     """Print a formatted comparison table."""
     print("\n" + "=" * 62)
-    print("  KlarKI Classifier Benchmark — Triton BERT vs Ollama phi3:mini")
+    print("  KlarKI Classifier Benchmark --Triton BERT vs Ollama phi3:mini")
     print("=" * 62)
 
     headers = ["Backend", "N", "Mean (s)", "Median (s)", "P95 (s)", "Throughput/min"]
@@ -158,17 +193,17 @@ async def _main(args: argparse.Namespace) -> None:
     results = []
 
     if not args.triton_only:
-        print(f"Benchmarking Ollama ({args.n_samples} samples, sequential)…")
+        print(f"Benchmarking Ollama ({args.n_samples} samples, sequential)...")
         r = await _benchmark_ollama(texts, args.ollama_host, args.model)
         results.append(r)
-        print(f"  Done — mean {r['mean_s']} s/chunk, total {r['total_s']} s")
+        print(f"  Done --mean {r['mean_s']} s/chunk, total {r['total_s']} s")
 
     if not args.ollama_only:
-        print(f"Benchmarking Triton ({args.n_samples} samples, batched)…")
+        print(f"Benchmarking Triton ({args.n_samples} samples, batched)...")
         r = await _benchmark_triton(texts, args.triton_host, args.triton_port)
         results.append(r)
         if "mean_s" in r:
-            print(f"  Done — mean {r['mean_s']} s/chunk, total {r['total_s']} s")
+            print(f"  Done --mean {r['mean_s']} s/chunk, total {r['total_s']} s")
 
     _print_table(results)
 

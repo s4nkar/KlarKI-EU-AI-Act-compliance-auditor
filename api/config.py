@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     upload_max_size_mb: int = 10
     upload_dir: str = "/data/uploads"
 
-    # Triton (Phase 5)
+    # Triton BERT backend
     use_triton: bool = False
     triton_host: str = "klarki-triton"
     triton_grpc_port: int = 8001

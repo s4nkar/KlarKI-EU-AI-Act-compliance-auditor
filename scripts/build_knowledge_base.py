@@ -6,12 +6,19 @@ chunks each article separately, embeds all chunks locally using
 sentence-transformers multilingual-e5-small, and stores them in three
 ChromaDB collections:
 
-    eu_ai_act            — Full EU AI Act text, chunked per article
-    gdpr                 — Full GDPR text, chunked per article
-    compliance_checklist — ~85 structured requirements from Articles 9–15
+    eu_ai_act            — EU AI Act Articles 9-15 (EN + DE)
+    gdpr                 — GDPR Articles 5, 13, 22, 32, 35 (EN + DE)
+    compliance_checklist — ~85 structured requirements from Articles 9-15
+
+Data loading priority:
+  1. data/regulatory/eu_ai_act_articles.json  (file-based, easy to extend)
+  2. data/regulatory/gdpr_articles.json
+  3. Built-in hardcoded fallback (if files are missing)
+
+To add more regulatory text: edit the JSON files in data/regulatory/.
 
 Usage:
-    python scripts/build_knowledge_base.py [--host http://localhost:8001] [--rebuild]
+    python scripts/build_knowledge_base.py [--host localhost] [--port 8001] [--rebuild]
 
 The script is idempotent: re-running with --rebuild deletes and repopulates
 all collections; without it, existing data is preserved.
@@ -19,7 +26,6 @@ all collections; without it, existing data is preserved.
 
 import argparse
 import hashlib
-import json
 import logging
 import sys
 import uuid
@@ -487,6 +493,109 @@ GDPR_ARTICLES: list[dict] = [
 ]
 
 
+# ── Regulatory data loader ────────────────────────────────────────────────────
+
+ROOT = Path(__file__).parent.parent  # project root
+REGULATORY_DIR = ROOT / "data" / "regulatory"
+
+
+def parse_regulatory_txt(path: Path) -> list[dict]:
+    """Parse a regulatory .txt file into per-language article dicts.
+
+    Expected file format:
+        ARTICLE: 9
+        REGULATION: eu_ai_act
+        DOMAIN: risk_management
+        TITLE_EN: Article 9 — Risk Management System
+        TITLE_DE: Artikel 9 — Risikomanagementsystem
+
+        === EN ===
+        Article text...
+
+        === DE ===
+        German text...
+
+    Args:
+        path: Path to the .txt file.
+
+    Returns:
+        List of dicts (one per language section found in the file).
+    """
+    text = path.read_text(encoding="utf-8")
+    metadata: dict[str, str] = {}
+    sections: dict[str, str] = {}
+    current_section: str | None = None
+    current_lines: list[str] = []
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("=== ") and stripped.endswith(" ==="):
+            if current_section is not None:
+                sections[current_section] = "\n".join(current_lines).strip()
+            current_section = stripped[4:-4].lower()  # "EN" -> "en"
+            current_lines = []
+        elif current_section is None:
+            if ":" in stripped:
+                key, _, val = stripped.partition(":")
+                metadata[key.strip().lower()] = val.strip()
+        else:
+            current_lines.append(line)
+
+    if current_section is not None and current_lines:
+        sections[current_section] = "\n".join(current_lines).strip()
+
+    results = []
+    for lang, text_content in sections.items():
+        if not text_content:
+            continue
+        results.append({
+            "article_num": int(metadata.get("article", 0)),
+            "lang": lang,
+            "domain": metadata.get("domain", "unknown"),
+            "regulation": metadata.get("regulation", path.parent.name),
+            "title": metadata.get(f"title_{lang}", metadata.get("title_en", "")),
+            "text": text_content,
+        })
+
+    return results
+
+
+def load_regulatory_directory(directory: Path, fallback: list[dict]) -> list[dict]:
+    """Load all .txt files from a regulatory directory, falling back to hardcoded data.
+
+    Args:
+        directory: Path to directory containing article .txt files.
+        fallback: Hardcoded list to use if no files are found or directory missing.
+
+    Returns:
+        List of article dicts.
+    """
+    if not directory.exists():
+        log.info(f"Directory {directory.name}/ not found — using built-in fallback data")
+        return fallback
+
+    txt_files = sorted(directory.glob("*.txt"))
+    if not txt_files:
+        log.info(f"No .txt files in {directory.name}/ — using built-in fallback data")
+        return fallback
+
+    articles: list[dict] = []
+    for f in txt_files:
+        try:
+            parsed = parse_regulatory_txt(f)
+            articles.extend(parsed)
+            log.debug(f"  Loaded {len(parsed)} language section(s) from {f.name}")
+        except Exception as exc:
+            log.warning(f"  Skipping {f.name}: {exc}")
+
+    if articles:
+        log.info(f"Loaded {len(articles)} entries from data/regulatory/{directory.name}/")
+        return articles
+
+    log.warning(f"No valid entries parsed from {directory.name}/ — using built-in fallback data")
+    return fallback
+
+
 # ── Helper functions ───────────────────────────────────────────────────────────
 
 def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> list[str]:
@@ -514,7 +623,8 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
                     end = pos + len(sep)
                     break
         chunks.append(text[start:end].strip())
-        start = end - overlap
+        next_start = end - overlap
+        start = next_start if next_start > start else end  # guarantee forward progress
     return [c for c in chunks if c.strip()]
 
 
@@ -563,6 +673,10 @@ def build_knowledge_base(chroma_host: str, chroma_port: int, rebuild: bool = Fal
     model = SentenceTransformer(EMBEDDING_MODEL)
     log.info("Embedding model loaded")
 
+    # ── Load regulatory text (txt files preferred, hardcoded fallback) ────────
+    eu_ai_act_articles = load_regulatory_directory(REGULATORY_DIR / "eu_ai_act", EU_AI_ACT_ARTICLES)
+    gdpr_articles      = load_regulatory_directory(REGULATORY_DIR / "gdpr",      GDPR_ARTICLES)
+
     # ── Rebuild collections if requested ──────────────────────────────────────
     if rebuild:
         for name in ["eu_ai_act", "gdpr", "compliance_checklist"]:
@@ -581,7 +695,7 @@ def build_knowledge_base(chroma_host: str, chroma_port: int, rebuild: bool = Fal
 
     eu_ids, eu_docs, eu_metas, eu_texts_to_embed = [], [], [], []
 
-    for article in EU_AI_ACT_ARTICLES:
+    for article in eu_ai_act_articles:
         chunks = chunk_text(article["text"])
         for i, chunk in enumerate(chunks):
             cid = make_chunk_id(chunk, prefix=f"eu_{article['article_num']}_{article['lang']}")
@@ -619,7 +733,7 @@ def build_knowledge_base(chroma_host: str, chroma_port: int, rebuild: bool = Fal
 
     gdpr_ids, gdpr_docs, gdpr_metas, gdpr_texts = [], [], [], []
 
-    for article in GDPR_ARTICLES:
+    for article in gdpr_articles:
         chunks = chunk_text(article["text"])
         for i, chunk in enumerate(chunks):
             cid = make_chunk_id(chunk, prefix=f"gdpr_{article['article_num']}_{article['lang']}")

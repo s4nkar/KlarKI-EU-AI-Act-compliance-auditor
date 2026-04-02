@@ -14,6 +14,7 @@ from models.schemas import (
     ArticleScore,
     DocumentChunk,
     GapItem,
+    RegulatoryPassage,
     Severity,
 )
 from services.ollama_client import OllamaClient
@@ -172,6 +173,20 @@ async def analyse_article(
         if isinstance(r, str) and r.strip()
     ]
 
+    # Parse score reasoning
+    score_reasoning = str(result.get("reasoning", "")).strip()
+
+    # Build regulatory passage objects from retrieved ChromaDB results
+    passages: list[RegulatoryPassage] = []
+    for p in regulatory_passages:
+        meta = p.get("metadata", {})
+        passages.append(RegulatoryPassage(
+            title=meta.get("title", meta.get("requirement_id", meta.get("article", ""))),
+            text=p.get("text", ""),
+            regulation=meta.get("regulation", meta.get("source", "")),
+            article_ref=meta.get("article_ref", meta.get("article", "")),
+        ))
+
     logger.info(
         "gap_analysis_done",
         article_num=article_num,
@@ -187,4 +202,6 @@ async def analyse_article(
         gaps=gaps,
         recommendations=recommendations,
         chunk_count=len(user_chunks),
+        score_reasoning=score_reasoning,
+        regulatory_passages=passages,
     )

@@ -1,11 +1,10 @@
-"""Chunk classifier — Ollama (Phase 2) or Triton BERT (Phase 5).
+"""Chunk classifier — selects backend at runtime via USE_TRITON config flag.
 
-Backend is selected at runtime via the USE_TRITON config flag:
-  - USE_TRITON=false (default): few-shot prompting via Ollama + phi3:mini
-  - USE_TRITON=true:            batched BERT inference via Triton gRPC
+  USE_TRITON=false (default): few-shot prompting via Ollama + phi3:mini
+  USE_TRITON=true:            batched BERT inference via Triton gRPC
 
-Both paths return the same list[DocumentChunk] with .domain populated,
-so the rest of the pipeline is unaffected by which backend is active.
+Both backends return the same list[DocumentChunk] with .domain populated,
+keeping the rest of the pipeline backend-agnostic.
 """
 
 from pathlib import Path
@@ -45,8 +44,6 @@ def _parse_label(raw: str) -> ArticleDomain:
     return _LABEL_MAP.get(cleaned, ArticleDomain.UNRELATED)
 
 
-# ── Ollama backend (Phase 2) ──────────────────────────────────────────────────
-
 async def _classify_ollama(chunks: list[DocumentChunk], ollama: OllamaClient) -> list[DocumentChunk]:
     """Sequential few-shot classification via Ollama."""
     prompt_template = _load_prompt()
@@ -66,8 +63,6 @@ async def _classify_ollama(chunks: list[DocumentChunk], ollama: OllamaClient) ->
 
     return chunks
 
-
-# ── Triton backend (Phase 5) ──────────────────────────────────────────────────
 
 async def _classify_triton(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
     """Batched BERT classification via Triton gRPC."""
@@ -94,8 +89,6 @@ async def _classify_triton(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
 
     return chunks
 
-
-# ── Public interface ──────────────────────────────────────────────────────────
 
 async def classify_chunks(
     chunks: list[DocumentChunk],

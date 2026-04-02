@@ -94,7 +94,9 @@ services:
     restart: unless-stopped
 
   klarki-triton:
-    image: nvcr.io/nvidia/tritonserver:24.02-py3
+    build:
+      context: .
+      dockerfile: Dockerfile.triton
     container_name: klarki-triton
     profiles:
       - triton
@@ -104,7 +106,17 @@ services:
       - "8004:8002"
     volumes:
       - ./model_repository:/models
-    command: tritonserver --model-repository=/models
+      - ./training/spacy_ner_model:/spacy_model
+    environment:
+      - SPACY_MODEL_PATH=/spacy_model/model-final
+    command: tritonserver --model-repository=/models --exit-on-error=false
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     networks:
       - klarki-net
     restart: unless-stopped

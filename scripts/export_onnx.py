@@ -78,10 +78,13 @@ def export_to_onnx(
             input_names=["input_ids", "attention_mask"],
             output_names=["logits"] if model_type == "classifier" else ["last_hidden_state"],
             dynamic_axes={
-                "input_ids":      {0: "batch_size", 1: "sequence_length"},
-                "attention_mask": {0: "batch_size", 1: "sequence_length"},
-                "logits":         {0: "batch_size"} if model_type == "classifier"
-                                  else {"last_hidden_state": {0: "batch_size"}},
+                "input_ids":        {0: "batch_size", 1: "sequence_length"},
+                "attention_mask":   {0: "batch_size", 1: "sequence_length"},
+                **({
+                    "logits": {0: "batch_size"},
+                } if model_type == "classifier" else {
+                    "last_hidden_state": {0: "batch_size", 1: "sequence_length"},
+                }),
             },
             opset_version=opset_version,
             do_constant_folding=True,
@@ -89,7 +92,7 @@ def export_to_onnx(
     print(f"  Exported successfully ({Path(output_path).stat().st_size / 1e6:.1f} MB)")
 
     # Validate: compare ONNX output to PyTorch output
-    print("\nValidating ONNX output vs PyTorch…")
+    print("\nValidating ONNX output vs PyTorch...")
     try:
         import onnxruntime as ort
 
@@ -110,7 +113,7 @@ def export_to_onnx(
         max_diff = float(np.abs(onnx_out - pt_arr).max())
         print(f"  Max absolute difference: {max_diff:.2e}")
         if max_diff < 1e-4:
-            print("  PASS — outputs match within tolerance 1e-4")
+            print("  PASS -- outputs match within tolerance 1e-4")
         else:
             print(f"  WARN — difference {max_diff:.2e} exceeds 1e-4 tolerance")
 
