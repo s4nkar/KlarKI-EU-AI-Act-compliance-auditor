@@ -1,81 +1,40 @@
-# KlarKI — three commands to rule them all
+# KlarKI — convenience aliases for run.sh
+# All targets delegate to run.sh — see that file for full documentation.
 #
-#   make setup    first-time init: start containers + seed Ollama + build ChromaDB
-#   make up       start (or restart) all containers
-#   make test     run the full test suite inside the API container
-#
-# Phase 5 extras (requires NVIDIA GPU):
-#   make triton   full Phase 5 pipeline: train BERT + export ONNX + start Triton
-#   make bench    latency benchmark Ollama vs Triton
+# First time:   make setup
+# Day-to-day:   make up      (Ollama mode)  or  make triton  (Triton/BERT mode)
+# Force retrain: make retrain
 
-.PHONY: setup up down test triton bench logs clean help
+.PHONY: setup up triton retrain test bench down logs clean help
 
-# ── Core three ────────────────────────────────────────────────────────────────
-
-## First-time setup: start containers, pull Ollama model, seed ChromaDB
-setup:
-	@echo ""
-	@echo "==> Starting containers..."
-	docker compose up -d
-	@echo ""
-	@echo "==> Running setup pipeline (Ollama + ChromaDB)..."
-	python scripts/setup.py --skip-phase5 --stop-on-error
-	@echo ""
-	@echo "==> Done. Open http://localhost to use KlarKI."
-
-## Start (or restart) all containers
-up:
-	docker compose up -d
-
-## Run the full test suite inside the API container
-test:
-	docker exec klarki-api python -m pytest /tests/ -v --tb=short --asyncio-mode=auto
-
-# ── Phase 5 (GPU required) ────────────────────────────────────────────────────
-
-## Train BERT, export ONNX models, start Triton, enable Triton backend
-triton:
-	@echo "==> Running Phase 5 pipeline (train + export + start Triton)..."
-	python scripts/setup.py --only train-bert --only train-ner \
-	                        --only export-bert --only export-e5 \
-	                        --stop-on-error
-	@echo ""
-	@echo "==> Starting Triton container..."
-	docker compose --profile triton up -d klarki-triton
-	@echo ""
-	@echo "==> Enabling Triton backend in .env..."
-	sed -i 's/USE_TRITON=false/USE_TRITON=true/' .env
-	docker compose up -d klarki-api
-	@echo ""
-	@echo "==> Triton is live. Run 'make bench' to compare latency."
-
-## Benchmark Ollama vs Triton (both must be running)
-bench:
-	python scripts/benchmark_triton.py --n-samples 50
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-
-## Stop all containers
-down:
-	docker compose --profile triton down
-
-## Tail API logs
-logs:
-	docker compose logs -f klarki-api
-
-## Remove containers, volumes, and ChromaDB data (full wipe)
-clean:
-	@echo "WARNING: this deletes all uploads, ChromaDB data, and Ollama models."
-	@read -p "Are you sure? [y/N] " confirm && [ "$$confirm" = "y" ]
-	docker compose --profile triton down -v
-	rm -rf chroma_data/
-
-## Show this help
 help:
-	@echo ""
-	@echo "  KlarKI — available commands"
-	@echo ""
-	@grep -E '^## ' Makefile | sed 's/^## /    /'
-	@echo ""
-	@echo "  Phase 5 extras require an NVIDIA GPU and Docker nvidia runtime."
-	@echo ""
+	@./run.sh help
+
+setup:
+	./run.sh setup
+
+up:
+	./run.sh up
+
+triton:
+	./run.sh triton
+
+# Regenerate training data + retrain BERT + NER + re-export ONNX.
+# Skips infra stages (Ollama pull, ChromaDB rebuild).
+retrain:
+	./run.sh retrain
+
+test:
+	./run.sh test
+
+bench:
+	./run.sh bench
+
+down:
+	./run.sh down
+
+logs:
+	./run.sh logs
+
+clean:
+	./run.sh clean

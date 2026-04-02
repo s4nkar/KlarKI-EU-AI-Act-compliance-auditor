@@ -96,30 +96,39 @@ Open **http://localhost** — complete the **Step 1: Risk Assessment** wizard, t
 
 ## Setup pipeline
 
-`./run.sh setup` runs the full one-shot pipeline — no manual steps required:
+`./run.sh setup` runs the full one-shot pipeline — no manual steps required. Re-running is **safe**: each long-running stage checks for existing outputs and skips itself automatically.
 
-| Stage | What happens | Skip condition |
-|---|---|---|
-| 1. seed-ollama | Pulls `phi3:mini` into Ollama (~2.3 GB, one-time) | Model already present |
-| 2. knowledge-base | Chunks EU AI Act + GDPR → embeds → stores in ChromaDB | — |
-| 3. generate-data | Generates 2,400 synthetic training sentences via Ollama | `clause_labels.jsonl` already has enough data |
-| 4. train-bert | Fine-tunes `deepset/gbert-base` (8-class, ~10 epochs) | — |
-| 5. generate-ner-data | Generates ~320 annotated NER sentences via Ollama | `ner_annotations.jsonl` already has enough data |
-| 6. train-ner | Trains spaCy NER model (blank German model, no lookup-data dep) | — |
-| 6. export-bert | Exports fine-tuned BERT → ONNX | — |
-| 7. export-e5 | Exports multilingual-e5-small → ONNX | — |
-| 8. benchmark | Latency comparison Ollama vs Triton | — |
+| # | Stage | What happens | Auto-skip condition |
+|---|---|---|---|
+| 1 | seed-ollama | Pulls `phi3:mini` into Ollama (~2.3 GB, one-time) | Model already present in Ollama |
+| 2 | knowledge-base | Chunks EU AI Act + GDPR → embeds → stores in ChromaDB | Pass `--rebuild-kb` to force |
+| 3 | generate-data | Generates 2,400 synthetic BERT training sentences via Ollama | `clause_labels.jsonl` already has enough rows (committed to git — skipped on fresh clone) |
+| 4 | train-bert | Fine-tunes `deepset/gbert-base` (8-class classifier) | `bert_classifier/model.safetensors` exists |
+| 5 | generate-ner-data | Generates ~320 annotated NER sentences via Ollama | `ner_annotations.jsonl` already has enough rows (committed to git — skipped on fresh clone) |
+| 6 | train-ner | Trains spaCy NER model (blank German base, no lookup-data dep) | `spacy_ner_model/model-final/` exists |
+| 7 | export-bert | Exports fine-tuned BERT → ONNX | `bert_clause_classifier/1/model.onnx` exists |
+| 8 | export-e5 | Exports multilingual-e5-small → ONNX | `e5_embeddings/1/model.onnx` exists |
+| 9 | benchmark | Latency comparison Ollama vs Triton | — |
+
+To **force** any stage to re-run, use `./run.sh retrain` (stages 3–8) or pass flags directly:
+
+```bash
+./run.sh retrain                                       # regenerate data + retrain everything
+python scripts/setup.py --only train-bert              # retrain BERT only
+python scripts/setup.py --gen-overwrite --only generate-data  # regenerate BERT data only
+python scripts/setup.py --retrain --gen-per-class 300  # retrain with more data
+```
 
 Each stage prints a progress header:
 ```
-  ┌─ Stage 4/6  [████████░░░░░░░░░░░░░░░░] 3/6  ~12 min remaining
-  │  Train BERT classifier
-  └──────────────────────────────────────────────────────
+  +-- Stage 4/9  [########................] 3/9  ~12 min remaining
+  |   Train BERT classifier
+  +------------------------------------------------------
 ```
 
-BERT training prints a per-epoch summary with macro F1 and a progress bar. spaCy NER training uses `tqdm` for epoch progress.
+BERT training prints a per-epoch macro F1 summary. spaCy NER training shows per-epoch loss and F1.
 
-**GPU recommended** for stages 4–8 (RTX 3050 Ti sufficient). Everything falls back to CPU — stages 4–8 will just be slower (~3× longer).
+**GPU recommended** for stages 4–9 (RTX 3050 Ti sufficient). Everything falls back to CPU — training stages will just be slower (~3× longer).
 
 After `setup` completes you have two modes available:
 
@@ -164,20 +173,32 @@ python scripts/setup.py --only knowledge-base --rebuild
 
 ### Synthetic training corpus
 
-The BERT classifier is trained on **`training/data/clause_labels.jsonl`** — a pre-built corpus of 2,400 labeled sentences committed to this repo. You do not need to regenerate it on a fresh clone.
+Both training data files are committed to this repo so a fresh clone skips data generation entirely and goes straight to model training:
 
-How it was generated:
+| File | Contents | Size |
+|---|---|---|
+| `training/data/clause_labels.jsonl` | 2,400 labelled sentences for BERT classifier | ~1.5 MB |
+| `training/data/ner_annotations.jsonl` | ~320 NER-annotated sentences for spaCy | ~200 KB |
+
+How the BERT corpus was generated:
 - For each of the 8 label classes, the actual regulation text is injected into the Ollama prompt as a reference
 - Ollama generates realistic compliance document sentences grounded in the official article language
 - 150 examples per class × 8 classes × 2 languages (EN + DE) = 2,400 total
 - Deduplication is applied at generation time
 
+How the NER corpus was generated:
+- 4 entity labels: `ARTICLE`, `OBLIGATION`, `RISK_TIER`, `REGULATION`
+- Ollama generates sentences with entity spans; offsets are verified via `text.find()` (LLM offsets are never trusted)
+- 40 sentences per label × 4 labels × 2 languages (EN + DE) = ~320 total
+
 **Company documents are never used as training data.** They are the *input* to the trained classifier, not the corpus.
 
-To regenerate the corpus from scratch:
+To regenerate both corpora from scratch (overwrites committed files):
 
 ```bash
 ./run.sh retrain
+# or just the data generation stages:
+python scripts/setup.py --gen-overwrite --only generate-data --only generate-ner-data
 ```
 
 ---
@@ -247,8 +268,11 @@ klarki/
 │   ├── train_classifier.py       # Fine-tune gbert-base; per-epoch F1 progress callback
 │   ├── train_ner.py              # spaCy NER; spacy.blank("de") — no spacy-lookups-data dep
 │   ├── requirements-training.txt
+│   ├── bert_classifier/          # Generated by setup (weights gitignored; config+metrics tracked)
+│   ├── spacy_ner_model/          # Generated by setup (model-final gitignored; metrics tracked)
 │   └── data/
-│       └── clause_labels.jsonl   # Pre-built training corpus (2,400 examples, tracked in git)
+│       ├── clause_labels.jsonl   # Pre-built BERT corpus (2,400 examples, tracked in git)
+│       └── ner_annotations.jsonl # Pre-built NER corpus  (~320 examples, tracked in git)
 ├── model_repository/             # Triton model configs + ONNX models (gitignored)
 └── tests/
 ```
