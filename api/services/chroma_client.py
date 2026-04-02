@@ -38,8 +38,6 @@ class ChromaClient:
         self._host = host
         logger.info("chroma_client_init", host=host)
 
-    # ── Health ──────────────────────────────────────────────────────────────
-
     async def health_check(self) -> bool:
         """Ping ChromaDB heartbeat endpoint.
 
@@ -52,8 +50,6 @@ class ChromaClient:
         except Exception as exc:
             logger.warning("chroma_health_fail", error=str(exc))
             return False
-
-    # ── Collection helpers ──────────────────────────────────────────────────
 
     async def get_or_create_collection(
         self,
@@ -98,8 +94,6 @@ class ChromaClient:
         cols = await asyncio.to_thread(self._client.list_collections)
         # chromadb 1.x returns str names directly; 0.5.x returns Collection objects
         return [c if isinstance(c, str) else c.name for c in cols]
-
-    # ── CRUD ────────────────────────────────────────────────────────────────
 
     async def upsert(
         self,

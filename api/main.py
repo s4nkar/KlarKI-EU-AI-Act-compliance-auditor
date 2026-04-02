@@ -57,7 +57,6 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # ── Health check ──────────────────────────────────────────────────────────
     @app.get("/api/v1/health", response_model=APIResponse, tags=["system"])
     async def health_check() -> APIResponse:
         """Return liveness status of API and dependent services."""
@@ -72,7 +71,6 @@ def create_app() -> FastAPI:
             data={"services": {"chromadb": chroma_ok, "ollama": ollama_ok}},
         )
 
-    # ── Routers ───────────────────────────────────────────────────────────────
     from routers.audit import router as audit_router
     from routers.reports import router as reports_router
     from routers.wizard import router as wizard_router

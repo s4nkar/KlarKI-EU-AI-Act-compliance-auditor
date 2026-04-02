@@ -4,20 +4,24 @@
 
 Runs every initialisation step in order:
 
-  Stage 1  seed-ollama     - pull phi3:mini into the Ollama container
-  Stage 2  knowledge-base  - chunk + embed EU AI Act / GDPR -> ChromaDB
-  Stage 3  generate-data   - generate synthetic BERT training data via Ollama (Phase 5)
-  Stage 4  train-bert      - fine-tune deepset/gbert-base (Phase 5, GPU optional)
-  Stage 5  train-ner       - train spaCy NER model (Phase 5)
-  Stage 6  export-bert     - export fine-tuned BERT -> ONNX (Phase 5)
-  Stage 7  export-e5       - export multilingual-e5-small -> ONNX (Phase 5)
-  Stage 8  benchmark       - latency comparison Ollama vs Triton (Phase 5)
+  Stage 1  seed-ollama       - pull phi3:mini into the Ollama container
+  Stage 2  knowledge-base    - chunk + embed EU AI Act / GDPR -> ChromaDB
+  Stage 3  generate-data     - generate synthetic BERT training data via Ollama
+  Stage 4  train-bert        - fine-tune deepset/gbert-base (GPU recommended)
+  Stage 5  generate-ner-data - generate synthetic NER training data via Ollama
+  Stage 6  train-ner         - train spaCy NER model
+  Stage 7  export-bert       - export fine-tuned BERT -> ONNX
+  Stage 8  export-e5         - export multilingual-e5-small -> ONNX
+  Stage 9  benchmark         - latency comparison Ollama vs Triton
+
+Re-running is safe: each long-running stage auto-skips if its outputs exist.
+Use --retrain to force full regeneration of data + models + exports.
 
 Usage:
     # Full pipeline (Ollama + ChromaDB must be running):
     python scripts/setup.py
 
-    # Skip GPU-heavy Phase 5 stages (fast first-run setup):
+    # Skip BERT/NER training and ONNX stages:
     python scripts/setup.py --skip-phase5
 
     # ChromaDB only (re-seed knowledge base):
@@ -46,7 +50,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-# -- Colour helpers ------------------------------------------------------------
+
 
 RESET  = "\033[0m"
 BOLD   = "\033[1m"
@@ -106,8 +110,6 @@ def fail(msg: str, elapsed: float) -> None:
     print(_c(RED, f"  !!  {msg}") + _c(DIM, f"  ({elapsed:.1f}s)"))
 
 
-# -- Stage runner --------------------------------------------------------------
-
 def run(cmd: list[str], dry_run: bool = False) -> int:
     """Run a subprocess, streaming output. Returns exit code."""
     print(_c(DIM, "     $ " + " ".join(str(c) for c in cmd)))
@@ -116,8 +118,6 @@ def run(cmd: list[str], dry_run: bool = False) -> int:
     result = subprocess.run(cmd, text=True)
     return result.returncode
 
-
-# -- Stage definitions ---------------------------------------------------------
 
 ROOT = Path(__file__).parent.parent  # project root
 
@@ -379,10 +379,8 @@ def stage_benchmark(args: argparse.Namespace) -> bool:
     return run(cmd, args.dry_run) == 0
 
 
-# -- Stage registry (ordered) --------------------------------------------------
-
 STAGES: list[tuple[str, str, bool]] = [
-    # (id, description, phase5_only)
+    # (id, description, skip_with_skip_phase5)
     ("seed-ollama",       "Seed Ollama model",                   False),
     ("knowledge-base",    "Build ChromaDB knowledge base",       False),
     ("generate-data",     "Generate BERT training data",         True),
@@ -406,8 +404,6 @@ STAGE_FNS = {
     "benchmark":         stage_benchmark,
 }
 
-# -- CLI -----------------------------------------------------------------------
-
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="KlarKI one-shot setup pipeline",
@@ -428,7 +424,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--skip-export",    action="store_true", help="Skip ONNX export")
     p.add_argument("--skip-benchmark", action="store_true", help="Skip benchmark")
     p.add_argument("--skip-phase5",    action="store_true",
-                   help="Skip all Phase 5 stages (generate + train + export + benchmark)")
+                   help="Skip BERT/NER training and ONNX export stages (generate + train + export + benchmark)")
 
     # Behaviour
     p.add_argument("--dry-run",       action="store_true", help="Print commands without executing")
@@ -464,8 +460,6 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-# -- Main ----------------------------------------------------------------------
-
 def main() -> None:
     args = parse_args()
 
@@ -496,12 +490,11 @@ def main() -> None:
 
     # Print plan
     print(_c(BOLD, "  Stages to run:"))
-    for sid, desc, p5 in STAGES:
-        tag = _c(DIM, " [Phase 5]") if p5 else ""
+    for sid, desc, _ in STAGES:
         if sid in run_ids:
-            print(f"    {_c(GREEN, '[x]')} {desc}{tag}")
+            print(f"    {_c(GREEN, '[x]')} {desc}")
         else:
-            print(f"    {_c(DIM, '[ ]')} {desc}{tag}  {_c(DIM, '(skipped)')}")
+            print(f"    {_c(DIM, '[ ]')} {desc}  {_c(DIM, '(skipped)')}")
 
     # Execute
     results: dict[str, tuple[bool | None, float]] = {}

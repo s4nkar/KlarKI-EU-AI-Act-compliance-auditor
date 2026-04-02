@@ -36,10 +36,6 @@ ROOT = Path(__file__).parent.parent
 
 _TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
 
-# ---------------------------------------------------------------------------
-# Entity label definitions
-# ---------------------------------------------------------------------------
-
 ENTITY_CONFIGS = [
     {
         "label": "ARTICLE",
@@ -94,10 +90,6 @@ ENTITY_CONFIGS = [
 LANGUAGES = [("en", "English"), ("de", "German")]
 
 
-# ---------------------------------------------------------------------------
-# Ollama helpers
-# ---------------------------------------------------------------------------
-
 def ollama_generate(host: str, model: str, prompt: str) -> str:
     payload = {"model": model, "prompt": prompt, "stream": False, "format": "json"}
     with httpx.Client(timeout=_TIMEOUT) as client:
@@ -116,10 +108,6 @@ def check_ollama(host: str) -> None:
         print(f"  ERROR: Cannot reach Ollama: {exc}")
         raise SystemExit(1)
 
-
-# ---------------------------------------------------------------------------
-# Prompt builder
-# ---------------------------------------------------------------------------
 
 def build_prompt(config: dict, lang_code: str, lang_name: str, n: int) -> str:
     label = config["label"]
@@ -150,11 +138,7 @@ def build_prompt(config: dict, lang_code: str, lang_name: str, n: int) -> str:
     )
 
 
-# ---------------------------------------------------------------------------
-# Parser: extract records from LLM output
-# ---------------------------------------------------------------------------
-
-def _extract_records_from_raw(raw: str, label: str) -> list[dict]:
+def _extract_records_from_raw(raw: str) -> list[dict]:
     """Try multiple strategies to extract records from LLM JSON output."""
     # Strategy 1: parse as-is
     try:
@@ -197,7 +181,7 @@ def parse_records(raw: str, label: str) -> list[dict]:
     Returns records in the format expected by train_ner.py:
       {"text": "...", "entities": [{"start": int, "end": int, "label": str}]}
     """
-    raw_records = _extract_records_from_raw(raw, label)
+    raw_records = _extract_records_from_raw(raw)
     results = []
 
     for rec in raw_records:
@@ -228,10 +212,6 @@ def parse_records(raw: str, label: str) -> list[dict]:
 
     return results
 
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate spaCy NER training data via Ollama")

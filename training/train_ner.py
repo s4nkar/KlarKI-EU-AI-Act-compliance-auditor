@@ -37,7 +37,6 @@ except ImportError:
 
 ENTITY_LABELS = ["ARTICLE", "OBLIGATION", "RISK_TIER", "REGULATION"]
 
-# ── Colour helpers ─────────────────────────────────────────────────────────────
 RESET = "\033[0m"
 BOLD  = "\033[1m"
 GREEN = "\033[32m"
@@ -55,8 +54,6 @@ def _bar(current: int, total: int, width: int = 28) -> str:
     filled = int(width * current / max(total, 1))
     return f"[{'#' * filled}{'.' * (width - filled)}] {current}/{total}"
 
-
-# ── Data loading ───────────────────────────────────────────────────────────────
 
 def load_annotations(path: str) -> list[dict]:
     """Load NER annotations from JSONL."""
