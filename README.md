@@ -197,7 +197,7 @@ How the NER corpus was generated:
 
 **Company documents are never used as training data.** They are the *input* to the trained classifier, not the corpus.
 
-## Phase 2: GPU-accelerated Triton backend
+To regenerate both corpora from scratch (overwrites committed files):
 
 ```bash
 ./run.sh retrain
