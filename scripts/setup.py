@@ -316,9 +316,19 @@ def stage_train_ner(args: argparse.Namespace) -> bool:
 
 
 def stage_export_bert(args: argparse.Namespace) -> bool:
-    """Stage 5 - export fine-tuned BERT to ONNX."""
+    """Stage 5 - export fine-tuned BERT to ONNX.
+
+    Auto-skips if the ONNX model already exists and --retrain was not passed.
+    """
     step("Exporting BERT classifier to ONNX")
     bert_dir = ROOT / "training" / "bert_classifier"
+    onnx_path = ROOT / "model_repository" / "bert_clause_classifier" / "1" / "model.onnx"
+
+    if not args.gen_overwrite and not args.dry_run and onnx_path.exists():
+        print(_c(YELLOW, "  --  bert_clause_classifier ONNX already exists -- skipping export."))
+        print(_c(DIM, "      Run './run.sh retrain' to force re-export."))
+        return True
+
     if not args.dry_run and not bert_dir.exists():
         print(_c(RED, f"     ERROR: {bert_dir} not found - run train-bert first"))
         return False
@@ -326,20 +336,30 @@ def stage_export_bert(args: argparse.Namespace) -> bool:
         sys.executable,
         str(ROOT / "scripts" / "export_onnx.py"),
         "--model-path",  str(bert_dir),
-        "--output-path", str(ROOT / "model_repository" / "bert_clause_classifier" / "1" / "model.onnx"),
+        "--output-path", str(onnx_path),
         "--model-type",  "classifier",
     ]
     return run(cmd, args.dry_run) == 0
 
 
 def stage_export_e5(args: argparse.Namespace) -> bool:
-    """Stage 6 - export multilingual-e5-small to ONNX."""
+    """Stage 6 - export multilingual-e5-small to ONNX.
+
+    Auto-skips if the ONNX model already exists and --retrain was not passed.
+    """
     step("Exporting multilingual-e5-small to ONNX")
+    onnx_path = ROOT / "model_repository" / "e5_embeddings" / "1" / "model.onnx"
+
+    if not args.gen_overwrite and not args.dry_run and onnx_path.exists():
+        print(_c(YELLOW, "  --  e5_embeddings ONNX already exists -- skipping export."))
+        print(_c(DIM, "      Run './run.sh retrain' to force re-export."))
+        return True
+
     cmd = [
         sys.executable,
         str(ROOT / "scripts" / "export_onnx.py"),
         "--model-path",  "intfloat/multilingual-e5-small",
-        "--output-path", str(ROOT / "model_repository" / "e5_embeddings" / "1" / "model.onnx"),
+        "--output-path", str(onnx_path),
         "--model-type",  "embeddings",
     ]
     return run(cmd, args.dry_run) == 0

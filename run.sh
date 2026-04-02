@@ -1,19 +1,38 @@
 #!/usr/bin/env bash
-# KlarKI runner
+# KlarKI runner — all commands in one place.
 #
-#   ./run.sh setup    Complete first-time init:
-#                       containers + Ollama + ChromaDB + generate training data
-#                       + train BERT + export ONNX (GPU recommended, CPU works slower)
+# FIRST TIME
+#   ./run.sh setup      Full init: containers + Ollama + ChromaDB + training pipeline.
+#                       Smart skip conditions mean re-running is safe:
+#                         - Ollama model already present?          skip pull
+#                         - clause_labels.jsonl has enough rows?   skip BERT data gen
+#                         - ner_annotations.jsonl has enough rows? skip NER data gen
+#                         - bert_classifier/ weights exist?        skip BERT training
+#                         - spacy_ner_model/model-final exists?    skip NER training
+#                         - ONNX files exist?                      skip ONNX export
 #
-#   ./run.sh up       Start (or restart) all containers in Ollama mode
-#   ./run.sh triton   Switch to Triton/BERT mode (requires prior setup)
-#   ./run.sh test     Run the full test suite inside the API container
+# DAY-TO-DAY
+#   ./run.sh up         Start containers in Ollama mode  (USE_TRITON=false)
+#   ./run.sh triton     Switch to Triton/BERT mode       (USE_TRITON=true, GPU required)
 #
-# Other:
-#   ./run.sh bench    Latency benchmark Ollama vs Triton
-#   ./run.sh down     Stop all containers
-#   ./run.sh logs     Tail API logs
-#   ./run.sh clean    Full wipe (containers + volumes + data)
+# RETRAINING
+#   ./run.sh retrain    Force-regenerate training data + retrain BERT + NER + re-export ONNX.
+#                       Skips infra stages (Ollama pull, ChromaDB rebuild).
+#                       Equivalent to: python scripts/setup.py --retrain
+#
+#   To retrain with more data:
+#     python scripts/setup.py --retrain --gen-per-class 300 --ner-per-label 60
+#
+#   To regenerate data only (no retrain):
+#     python scripts/setup.py --only generate-data --gen-overwrite
+#     python scripts/setup.py --only generate-ner-data --gen-overwrite
+#
+# OTHER
+#   ./run.sh bench      Latency benchmark Ollama vs Triton
+#   ./run.sh test       Run full test suite inside the API container
+#   ./run.sh down       Stop all containers
+#   ./run.sh logs       Tail API logs
+#   ./run.sh clean      Full wipe (containers + volumes + ChromaDB data)
 
 set -e
 CMD="${1:-help}"
@@ -60,7 +79,8 @@ cmd_retrain() {
   python -m pip install -r training/requirements-training.txt -q \
     || abort "pip install failed."
 
-  info "Retraining: generate new data + retrain BERT + NER + re-export ONNX..."
+  info "Retraining: force-regenerate data + retrain BERT + NER + re-export ONNX..."
+  info "(Skips: Ollama pull, ChromaDB rebuild — pass --only <stage> for finer control)"
   python scripts/setup.py --retrain --stop-on-error
 
   success "Retrain complete. Run './run.sh triton' to switch to the new model."
@@ -113,20 +133,29 @@ cmd_help() {
 
   KlarKI -- available commands
 
-    ./run.sh setup    Complete init: containers + models + training + ONNX export
-    ./run.sh up       Start all containers in Ollama mode
-    ./run.sh triton   Switch to Triton BERT mode (requires prior setup)
+    ./run.sh setup    Complete init: containers + models + training + ONNX export.
+                      Re-running is safe: long stages are skipped if outputs exist.
+
+    ./run.sh up       Start all containers in Ollama mode (day-to-day)
+    ./run.sh triton   Switch to Triton BERT mode (requires prior setup + NVIDIA GPU)
     ./run.sh test     Run full test suite inside the API container
 
-    ./run.sh retrain  Regenerate training data + retrain BERT + re-export ONNX
+    ./run.sh retrain  Force-regenerate data + retrain BERT + NER + re-export ONNX.
+                      Use when you want fresh training (ignores existing outputs).
     ./run.sh bench    Benchmark Ollama vs Triton latency
     ./run.sh down     Stop all containers
     ./run.sh logs     Tail API logs
-    ./run.sh clean    Full wipe (containers + volumes + data)
+    ./run.sh clean    Full wipe (containers + volumes + ChromaDB data)
     ./run.sh help     Show this message
 
-  First time:  ./run.sh setup   (does everything, GPU recommended)
-  Day-to-day:  ./run.sh up      (Ollama) or ./run.sh triton (BERT)
+  First time:   ./run.sh setup    (does everything; GPU recommended for training)
+  Day-to-day:   ./run.sh up       (Ollama)  or  ./run.sh triton  (BERT/Triton)
+  Retrain only: ./run.sh retrain  (skips Ollama pull and ChromaDB rebuild)
+
+  Fine-grained control (see python scripts/setup.py --help):
+    python scripts/setup.py --only train-bert          # retrain BERT only
+    python scripts/setup.py --only generate-data --gen-overwrite  # regen BERT data
+    python scripts/setup.py --retrain --gen-per-class 300         # more data
 
 EOF
 }
