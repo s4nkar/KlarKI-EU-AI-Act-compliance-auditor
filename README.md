@@ -1,4 +1,4 @@
-# KlarKI — EU AI Act + GDPR Compliance Auditor
+# KlarKI - EU AI Act + GDPR Compliance Auditor
 
 Local-first compliance auditing for AI systems. Assess your risk tier, upload your policy documents, and get a scored gap analysis against **EU AI Act Articles 9–15** and **GDPR** — entirely on your own machine. No data leaves your network.
 
@@ -130,7 +130,7 @@ BERT training prints a per-epoch macro F1 summary. spaCy NER training shows per-
 
 **GPU recommended** for stages 4–9 (RTX 3050 Ti sufficient). Everything falls back to CPU — training stages will just be slower (~3× longer).
 
-After `setup` completes you have two modes available:
+Go to **http://localhost:80**
 
 ```bash
 ./run.sh up       # Ollama mode   — USE_TRITON=false (default)
@@ -167,9 +167,13 @@ data/regulatory/
 
 Each file contains both English and German text (`=== EN ===` / `=== DE ===` sections). To add a new article, create a `.txt` file in the same format and re-run:
 
-```bash
-python scripts/setup.py --only knowledge-base --rebuild
-```
+### Triton / gbert-base (Phase 2, GPU recommended)
+- Enabled when `USE_TRITON=true`
+- Uses a fine-tuned `deepset/gbert-base` BERT model exported to ONNX
+- Served via NVIDIA Triton Inference Server (batched, gRPC)
+- ~50–100× faster than Ollama per chunk
+- **German-first:** gbert-base is trained on German text. English documents are still classified correctly (the model was fine-tuned on mixed DE/EN data) but the Ollama backend is more balanced for English-heavy documents.
+- Requires training and export before use (see Phase 2 below)
 
 ### Synthetic training corpus
 
@@ -193,7 +197,7 @@ How the NER corpus was generated:
 
 **Company documents are never used as training data.** They are the *input* to the trained classifier, not the corpus.
 
-To regenerate both corpora from scratch (overwrites committed files):
+## Phase 2: GPU-accelerated Triton backend
 
 ```bash
 ./run.sh retrain
@@ -201,9 +205,12 @@ To regenerate both corpora from scratch (overwrites committed files):
 python scripts/setup.py --gen-overwrite --only generate-data --only generate-ner-data
 ```
 
----
-
-## Classifier backends
+This runs the full Phase 2 pipeline:
+1. Fine-tunes `deepset/gbert-base` on `training/data/clause_labels.jsonl`
+2. Trains the spaCy NER model on `training/data/ner_annotations.jsonl`
+3. Exports both models to ONNX
+4. Starts the Triton container
+5. Switches `.env` to `USE_TRITON=true` and restarts the API
 
 Every compliance report shows which backend classified the document.
 
