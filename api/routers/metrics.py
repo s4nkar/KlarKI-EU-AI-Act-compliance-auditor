@@ -3,6 +3,7 @@
 Endpoints:
     GET /api/v1/metrics/classifier  — BERT per-class precision/recall/F1 + confusion matrix
     GET /api/v1/metrics/ner         — spaCy NER per-entity-label precision/recall/F1
+    GET /api/v1/metrics/evaluation  — Latest results from evaluation suite (eval_*.py)
 """
 
 import json
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/api/v1/metrics", tags=["metrics"])
 _TRAINING_ROOT = Path(__file__).parent.parent.parent / "training"
 _BERT_METRICS_PATH = _TRAINING_ROOT / "bert_classifier" / "metrics.json"
 _NER_METRICS_PATH  = _TRAINING_ROOT / "spacy_ner_model" / "metrics.json"
+_EVAL_RESULTS_DIR  = Path(__file__).parent.parent.parent / "tests" / "evaluation" / "results"
 
 
 def _load_metrics(path: Path, label: str) -> dict:

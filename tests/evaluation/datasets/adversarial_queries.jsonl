@@ -1,0 +1,30 @@
+{"text": "hazard governance process and lifecycle safety controls", "expected_label": "risk_management", "paraphrase_of": "risk management system"}
+{"text": "threat identification and vulnerability mitigation framework", "expected_label": "risk_management", "paraphrase_of": "risk management"}
+{"text": "operational safety assurance methodology for automated systems", "expected_label": "risk_management", "paraphrase_of": "risk management"}
+{"text": "system safety controls and residual exposure evaluation", "expected_label": "risk_management", "paraphrase_of": "risk management"}
+{"text": "dataset curation and sampling procedures for model training", "expected_label": "data_governance", "paraphrase_of": "training data quality"}
+{"text": "ground truth labelling quality assurance and review process", "expected_label": "data_governance", "paraphrase_of": "data quality criteria"}
+{"text": "training corpus representativeness analysis across subgroups", "expected_label": "data_governance", "paraphrase_of": "demographic representativeness"}
+{"text": "feature distribution examination and class imbalance correction", "expected_label": "data_governance", "paraphrase_of": "bias examination"}
+{"text": "system design blueprint and engineering architecture overview", "expected_label": "technical_documentation", "paraphrase_of": "system architecture documentation"}
+{"text": "model card and AI system capability profile document", "expected_label": "technical_documentation", "paraphrase_of": "technical documentation"}
+{"text": "engineering specifications component interface descriptions", "expected_label": "technical_documentation", "paraphrase_of": "technical specifications"}
+{"text": "development rationale design decisions methodology writeup", "expected_label": "technical_documentation", "paraphrase_of": "technical file"}
+{"text": "operational telemetry and event capture pipeline", "expected_label": "record_keeping", "paraphrase_of": "automatic logging"}
+{"text": "decision provenance tracking and traceability mechanism", "expected_label": "record_keeping", "paraphrase_of": "audit trail"}
+{"text": "inference history management and log storage policy", "expected_label": "record_keeping", "paraphrase_of": "log retention"}
+{"text": "immutable audit journal for AI system operations", "expected_label": "record_keeping", "paraphrase_of": "audit trail integrity"}
+{"text": "algorithmic disclosure and explainability requirements for users", "expected_label": "transparency", "paraphrase_of": "transparency obligations"}
+{"text": "user-facing documentation and decision rationale communication", "expected_label": "transparency", "paraphrase_of": "transparency information"}
+{"text": "clear communication of automated system involvement to users", "expected_label": "transparency", "paraphrase_of": "AI disclosure"}
+{"text": "interpretability and explanation provision for affected persons", "expected_label": "transparency", "paraphrase_of": "explanation requirement"}
+{"text": "manual intervention and supervisory control mechanisms", "expected_label": "human_oversight", "paraphrase_of": "human oversight measures"}
+{"text": "human check before autonomous decision execution process", "expected_label": "human_oversight", "paraphrase_of": "human review requirement"}
+{"text": "supervisor alert and escalation procedure for AI failures", "expected_label": "human_oversight", "paraphrase_of": "human intervention"}
+{"text": "kill switch and safe shutdown capability for AI operation", "expected_label": "human_oversight", "paraphrase_of": "override functionality"}
+{"text": "model performance reliability under distribution shift conditions", "expected_label": "security", "paraphrase_of": "robustness testing"}
+{"text": "attack surface reduction and system hardening measures", "expected_label": "security", "paraphrase_of": "cybersecurity measures"}
+{"text": "accuracy degradation monitoring and performance alerting", "expected_label": "security", "paraphrase_of": "accuracy requirements"}
+{"text": "adversarial robustness benchmarking and red team testing", "expected_label": "security", "paraphrase_of": "adversarial testing"}
+{"text": "inference integrity protection against model poisoning attacks", "expected_label": "security", "paraphrase_of": "security measures"}
+{"text": "fault tolerance and graceful degradation under input corruption", "expected_label": "security", "paraphrase_of": "resilience requirements"}

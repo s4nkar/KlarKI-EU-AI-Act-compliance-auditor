@@ -1,0 +1,80 @@
+{"text": "A comprehensive risk management system must be established and maintained throughout the AI system lifecycle.", "label": "risk_management", "lang": "en"}
+{"text": "The provider shall identify and analyse known and foreseeable risks to health, safety, and fundamental rights.", "label": "risk_management", "lang": "en"}
+{"text": "Residual risks must be evaluated against the risk management framework before deployment of the system.", "label": "risk_management", "lang": "en"}
+{"text": "Risk mitigation measures were implemented to address all identified hazards in the classification module.", "label": "risk_management", "lang": "en"}
+{"text": "The AI system undergoes continuous risk assessment throughout its operational phase.", "label": "risk_management", "lang": "en"}
+{"text": "Safety validation procedures include testing under all reasonably foreseeable conditions of misuse.", "label": "risk_management", "lang": "en"}
+{"text": "Our risk register documents all identified risks with corresponding mitigation strategies and owners.", "label": "risk_management", "lang": "en"}
+{"text": "Periodic reviews of risk controls are conducted at least annually or after any significant change.", "label": "risk_management", "lang": "en"}
+{"text": "Das Risikomanagementsystem muss für alle Hochrisiko-KI-Systeme über den gesamten Lebenszyklus etabliert werden.", "label": "risk_management", "lang": "de"}
+{"text": "Hazard analysis was conducted per IEC 62443 for the AI-based safety-critical decision support system.", "label": "risk_management", "lang": "en"}
+{"text": "Training datasets shall be free from errors, complete, and have appropriate statistical properties.", "label": "data_governance", "lang": "en"}
+{"text": "Data collection procedures ensure demographic representativeness across all relevant user groups.", "label": "data_governance", "lang": "en"}
+{"text": "Bias examination was conducted on the training data prior to model development and feature selection.", "label": "data_governance", "lang": "en"}
+{"text": "Validation and test datasets are kept strictly separate from training data throughout the development pipeline.", "label": "data_governance", "lang": "en"}
+{"text": "Personal data used for training was anonymised in accordance with GDPR Article 25 privacy by design.", "label": "data_governance", "lang": "en"}
+{"text": "Data lineage is documented for all training, validation, and test sets used in the model.", "label": "data_governance", "lang": "en"}
+{"text": "The quality criteria applied to training data include accuracy, completeness, and temporal timeliness.", "label": "data_governance", "lang": "en"}
+{"text": "Examination of training data for biases includes statistical disparity testing across demographic subgroups.", "label": "data_governance", "lang": "en"}
+{"text": "Trainingsdaten müssen frei von Fehlern sein und angemessene statistische Eigenschaften aufweisen.", "label": "data_governance", "lang": "de"}
+{"text": "The data governance framework establishes roles and responsibilities for dataset management and curation.", "label": "data_governance", "lang": "en"}
+{"text": "Technical documentation shall describe the general purpose of the AI system and all intended use cases.", "label": "technical_documentation", "lang": "en"}
+{"text": "System architecture diagrams and component descriptions are maintained in the technical dossier.", "label": "technical_documentation", "lang": "en"}
+{"text": "The design specifications include data flow diagrams, model selection rationale, and hyperparameter choices.", "label": "technical_documentation", "lang": "en"}
+{"text": "Technical documentation covers the entire development lifecycle including training methodology and evaluation.", "label": "technical_documentation", "lang": "en"}
+{"text": "Performance metrics and benchmark results are documented in the technical specifications file.", "label": "technical_documentation", "lang": "en"}
+{"text": "The intended purpose, capabilities, and known limitations are clearly stated in technical documentation.", "label": "technical_documentation", "lang": "en"}
+{"text": "Software version control records and change management logs form part of the technical file.", "label": "technical_documentation", "lang": "en"}
+{"text": "Technische Dokumentation beschreibt die Systemarchitektur und alle wesentlichen Entwicklungsentscheidungen.", "label": "technical_documentation", "lang": "de"}
+{"text": "Component testing results and integration test reports are included in the technical dossier.", "label": "technical_documentation", "lang": "en"}
+{"text": "The technical file documents the methods, steps, and criteria used to validate the AI system.", "label": "technical_documentation", "lang": "en"}
+{"text": "Automatic logging of all AI system operations enables post-deployment audit and traceability capabilities.", "label": "record_keeping", "lang": "en"}
+{"text": "Event logs are retained for the minimum period required to enable regulatory review and investigation.", "label": "record_keeping", "lang": "en"}
+{"text": "The system maintains complete audit trails of all decisions made by the AI component.", "label": "record_keeping", "lang": "en"}
+{"text": "Log files capture input data, output predictions, and confidence scores for each inference event.", "label": "record_keeping", "lang": "en"}
+{"text": "Record keeping procedures ensure full traceability of AI-assisted decisions over their operational lifetime.", "label": "record_keeping", "lang": "en"}
+{"text": "Automated logs include timestamps, user identifiers, and system state at each decision point.", "label": "record_keeping", "lang": "en"}
+{"text": "The audit trail enables reconstruction of the AI system's decision process for any historical event.", "label": "record_keeping", "lang": "en"}
+{"text": "Das Protokollierungssystem zeichnet alle Entscheidungen des KI-Systems mit Zeitstempel automatisch auf.", "label": "record_keeping", "lang": "de"}
+{"text": "Records of training runs, including hyperparameters and evaluation metrics, are permanently preserved.", "label": "record_keeping", "lang": "en"}
+{"text": "System logs are protected from unauthorized modification to ensure the integrity of audit records.", "label": "record_keeping", "lang": "en"}
+{"text": "Deployers must be provided with clear instructions for use and information about system capabilities.", "label": "transparency", "lang": "en"}
+{"text": "The AI system notifies users when they are interacting with an automated decision-making system.", "label": "transparency", "lang": "en"}
+{"text": "Transparency documentation explains the logic underlying AI-generated recommendations to affected persons.", "label": "transparency", "lang": "en"}
+{"text": "Users are informed of the limitations and appropriate use cases of the AI system before deployment.", "label": "transparency", "lang": "en"}
+{"text": "The system provides meaningful explanations for its outputs to affected persons upon request.", "label": "transparency", "lang": "en"}
+{"text": "Instructions for use include information about intended purpose and conditions of appropriate deployment.", "label": "transparency", "lang": "en"}
+{"text": "Transparency obligations require disclosure of the AI nature of the system to all end users.", "label": "transparency", "lang": "en"}
+{"text": "Transparenzanforderungen verlangen klare Informationen über KI-gestützte Entscheidungen für Nutzer.", "label": "transparency", "lang": "de"}
+{"text": "The system provides human-readable explanations alongside all automated recommendations.", "label": "transparency", "lang": "en"}
+{"text": "Deployers receive documentation of the AI system's capabilities, limitations, and validated performance.", "label": "transparency", "lang": "en"}
+{"text": "Human oversight measures enable operators to monitor the AI system during real-time operation.", "label": "human_oversight", "lang": "en"}
+{"text": "The system includes stop and override functionality allowing human intervention at any point.", "label": "human_oversight", "lang": "en"}
+{"text": "Operators are trained to understand the AI system's outputs and to recognise potential anomalies.", "label": "human_oversight", "lang": "en"}
+{"text": "Human review is mandatory before acting on any high-stakes AI-generated recommendation.", "label": "human_oversight", "lang": "en"}
+{"text": "The AI system alerts human supervisors when prediction confidence falls below the defined threshold.", "label": "human_oversight", "lang": "en"}
+{"text": "Oversight procedures ensure humans can disregard AI outputs and take full manual control.", "label": "human_oversight", "lang": "en"}
+{"text": "Regular human audits of AI-generated decisions are conducted to detect systematic errors or drift.", "label": "human_oversight", "lang": "en"}
+{"text": "Menschliche Aufsichtsmaßnahmen ermöglichen die Überwachung und Kontrolle des KI-Systems jederzeit.", "label": "human_oversight", "lang": "de"}
+{"text": "The system supports human-in-the-loop operation for all safety-critical classification decisions.", "label": "human_oversight", "lang": "en"}
+{"text": "Oversight logs record all instances of human intervention and manual overrides of AI decisions.", "label": "human_oversight", "lang": "en"}
+{"text": "The AI system achieves the required level of accuracy for its intended purpose across all test conditions.", "label": "security", "lang": "en"}
+{"text": "Robustness testing confirms the system maintains performance under adversarial input conditions.", "label": "security", "lang": "en"}
+{"text": "Cybersecurity measures protect the AI system against unauthorized access and model manipulation.", "label": "security", "lang": "en"}
+{"text": "Accuracy metrics are documented and validated across diverse demographic groups and edge cases.", "label": "security", "lang": "en"}
+{"text": "The system is hardened against adversarial attacks that could compromise prediction integrity.", "label": "security", "lang": "en"}
+{"text": "Resilience testing covers failure modes including corrupted inputs and infrastructure outages.", "label": "security", "lang": "en"}
+{"text": "Security vulnerability assessments are conducted before deployment and after any significant update.", "label": "security", "lang": "en"}
+{"text": "Genauigkeit und Robustheit des KI-Systems werden kontinuierlich gemessen und bewertet.", "label": "security", "lang": "de"}
+{"text": "The system maintains consistent performance metrics within defined statistical tolerance bounds.", "label": "security", "lang": "en"}
+{"text": "Penetration testing and security audits are conducted per ISO 27001 before production release.", "label": "security", "lang": "en"}
+{"text": "The quarterly revenue report shows a 15 percent increase in sales compared to the previous period.", "label": "unrelated", "lang": "en"}
+{"text": "Employee onboarding procedures include completing mandatory HR training within the first 30 days.", "label": "unrelated", "lang": "en"}
+{"text": "Marketing campaigns are scheduled for Q3 with a primary focus on digital and social channels.", "label": "unrelated", "lang": "en"}
+{"text": "Office supply procurement follows the approved vendor list outlined in the purchasing policy.", "label": "unrelated", "lang": "en"}
+{"text": "The annual general meeting is scheduled for the third Thursday of each fiscal year.", "label": "unrelated", "lang": "en"}
+{"text": "Customer service response times should not exceed 24 hours for all standard enquiries.", "label": "unrelated", "lang": "en"}
+{"text": "Travel reimbursement requests must be submitted within 30 days of the completed travel date.", "label": "unrelated", "lang": "en"}
+{"text": "The IT helpdesk ticketing system is available around the clock for incident reporting.", "label": "unrelated", "lang": "en"}
+{"text": "Budgetplanung für das nächste Quartal wird in der Sitzung am Montag gemeinsam besprochen.", "label": "unrelated", "lang": "de"}
+{"text": "Project milestone reviews are conducted monthly to ensure adherence to the delivery timeline.", "label": "unrelated", "lang": "en"}
