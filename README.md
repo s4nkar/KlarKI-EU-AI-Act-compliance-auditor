@@ -110,9 +110,12 @@ python scripts/setup.py --only knowledge-base --rebuild-kb
 python scripts/setup.py --retrain --gen-per-class 300    # retrain with more data
 ```
 
----
-
-## Classifier backends
+This runs the full Phase 2 pipeline:
+1. Fine-tunes `deepset/gbert-base` on `training/data/clause_labels.jsonl`
+2. Trains the spaCy NER model on `training/data/ner_annotations.jsonl`
+3. Exports both models to ONNX
+4. Starts the Triton container
+5. Switches `.env` to `USE_TRITON=true` and restarts the API
 
 ### Ollama / phi3:mini (default)
 
