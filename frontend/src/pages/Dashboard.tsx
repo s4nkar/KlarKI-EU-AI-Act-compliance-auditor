@@ -1,4 +1,4 @@
-// Compliance dashboard: overall score, risk tier, 7 article cards, PDF download.
+// Premium compliance dashboard: overall score, risk tier, article grid, PDF download.
 
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
@@ -15,7 +15,7 @@ export default function Dashboard() {
   const { auditId } = useParams<{ auditId: string }>()
   const [report, setReport] = useState<ComplianceReport | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]   = useState<string | null>(null)
 
   useEffect(() => {
     if (!auditId) return
@@ -28,11 +28,12 @@ export default function Dashboard() {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <svg className="w-8 h-8 animate-spin text-brand-400" fill="none" viewBox="0 0 24 24">
+        <div className="flex flex-col items-center justify-center h-64 gap-3">
+          <svg className="w-8 h-8 animate-spin text-brand-500" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
+          <p className="text-sm text-slate-400">Loading compliance report…</p>
         </div>
       </Layout>
     )
@@ -41,9 +42,15 @@ export default function Dashboard() {
   if (error || !report) {
     return (
       <Layout>
-        <div className="max-w-xl mx-auto text-center py-16">
-          <p className="text-slate-500 mb-4">{error ?? 'Report not found.'}</p>
-          <Link to="/" className="text-brand-600 hover:underline text-sm">← Start a new audit</Link>
+        <div className="max-w-xl mx-auto text-center py-20">
+          <div className="w-14 h-14 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+            <svg className="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <p className="text-slate-600 mb-5">{error ?? 'Report not found.'}</p>
+          <Link to="/" className="btn-primary">← Start a new audit</Link>
         </div>
       </Layout>
     )
@@ -52,11 +59,14 @@ export default function Dashboard() {
   const { label: tierLabel, className: tierClass } = riskTierLabel(report.risk_tier)
   const sorted = [...report.article_scores].sort((a, b) => a.article_num - b.article_num)
 
+  const totalGaps    = sorted.reduce((s, a) => s + a.gaps.length, 0)
+  const criticalGaps = sorted.reduce((s, a) => s + a.gaps.filter(g => g.severity === 'critical').length, 0)
+  const majorGaps    = sorted.reduce((s, a) => s + a.gaps.filter(g => g.severity === 'major').length, 0)
+
   return (
     <Layout>
       <EmotionWarning flag={report.emotion_flag} />
 
-      {/* Wizard vs document risk tier comparison */}
       {report.wizard_risk_tier && (
         <RiskTierComparison
           wizardTier={report.wizard_risk_tier}
@@ -64,107 +74,141 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Summary header */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 mb-6 flex flex-col sm:flex-row items-center gap-6">
-        <ScoreRadial score={report.overall_score} size={140} label="Overall Score" />
+      {/* ── Hero section ─────────────────────────────────────────────────── */}
+      <div className="card p-6 mb-6">
+        <div className="flex flex-col sm:flex-row items-center gap-6">
+          <ScoreRadial score={report.overall_score} size={140} label="Overall Score" />
 
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h1 className="text-xl font-bold text-slate-800">Compliance Report</h1>
-            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${tierClass}`}>
-              {tierLabel}
-            </span>
+          <div className="flex-1 min-w-0 text-center sm:text-left">
+            <div className="flex flex-wrap items-center gap-2 mb-1 justify-center sm:justify-start">
+              <h1 className="text-xl font-bold text-slate-900">Compliance Report</h1>
+              <span className={`badge ${tierClass}`}>{tierLabel}</span>
+            </div>
+            <p className="text-sm text-slate-400 mb-4">{formatDate(report.created_at)}</p>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+              <StatBox label="Total Chunks"    value={report.total_chunks} />
+              <StatBox label="Classified"      value={report.classified_chunks} />
+              <StatBox label="Language"        value={report.language.toUpperCase()} />
+              <StatBox label="Source Files"    value={report.source_files.length} />
+              <StatBox label="Classifier"      value={report.classifier_backend} mono />
+            </div>
           </div>
-          <p className="text-sm text-slate-500 mb-3">{formatDate(report.created_at)}</p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-            <StatBox label="Total Chunks" value={report.total_chunks} />
-            <StatBox label="Classified" value={report.classified_chunks} />
-            <StatBox label="Language" value={report.language.toUpperCase()} />
-            <StatBox label="Source Files" value={report.source_files.length} />
-            <StatBox label="Classifier" value={report.classifier_backend} />
+          <div className="shrink-0">
+            <ReportDownload auditId={report.audit_id} />
           </div>
-        </div>
-
-        <div className="shrink-0">
-          <ReportDownload auditId={report.audit_id} />
         </div>
       </div>
 
-      {/* Article grid */}
-      <h2 className="text-base font-semibold text-slate-600 mb-3 uppercase tracking-wide text-xs">
-        Article Scores (EU AI Act Articles 9–15)
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {sorted.map(article => (
-          <ArticleCard key={article.article_num} score={article} auditId={report.audit_id} />
-        ))}
+      {/* ── Gap summary bar ───────────────────────────────────────────────── */}
+      {totalGaps > 0 && (
+        <div className="flex flex-wrap gap-3 mb-6">
+          {criticalGaps > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200">
+              <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+              <span className="text-sm font-semibold text-red-700">{criticalGaps} Critical Gap{criticalGaps !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+          {majorGaps > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
+              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+              <span className="text-sm font-semibold text-amber-700">{majorGaps} Major Gap{majorGaps !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200">
+            <span className="text-sm text-slate-600">{totalGaps} total gaps across {sorted.length} articles</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Article grid ─────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="section-label mb-0">Article Scores — EU AI Act Art. 9–15</h2>
+        <span className="text-xs text-slate-400">{sorted.length} articles analysed</span>
       </div>
 
-      {sorted.length === 0 && (
-        <div className="text-center py-12 text-slate-400">
+      {sorted.length === 0 ? (
+        <div className="card p-12 text-center text-slate-400">
           No article scores found in this report.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {sorted.map(article => (
+            <ArticleCard key={article.article_num} score={article} auditId={report.audit_id} />
+          ))}
         </div>
       )}
     </Layout>
   )
 }
 
-function StatBox({ label, value }: { label: string; value: string | number }) {
+function StatBox({ label, value, mono }: { label: string; value: string | number; mono?: boolean }) {
   return (
-    <div className="bg-slate-50 rounded-lg px-3 py-2">
-      <p className="text-xs text-slate-400">{label}</p>
-      <p className="font-semibold text-slate-700">{value}</p>
+    <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
+      <p className={`text-sm font-bold text-slate-800 truncate ${mono ? 'font-mono' : ''}`}>{value}</p>
     </div>
   )
 }
 
 const TIER_RANK: Record<RiskTier, number> = { prohibited: 3, high: 2, limited: 1, minimal: 0 }
 
-function RiskTierComparison({
-  wizardTier,
-  documentTier,
-}: {
-  wizardTier: RiskTier
-  documentTier: RiskTier
-}) {
+function RiskTierComparison({ wizardTier, documentTier }: { wizardTier: RiskTier; documentTier: RiskTier }) {
   const { label: wizLabel, className: wizClass } = riskTierLabel(wizardTier)
   const { label: docLabel, className: docClass } = riskTierLabel(documentTier)
-
   const wizRank = TIER_RANK[wizardTier]
   const docRank = TIER_RANK[documentTier]
 
   let message: string
-  let bannerClass: string
+  let cfg: { bg: string; border: string; text: string; icon: React.ReactNode }
+
   if (wizardTier === documentTier) {
     message = 'The document-derived risk tier matches your self-assessment. Your audit is internally consistent.'
-    bannerClass = 'bg-green-50 border-green-200 text-green-800'
+    cfg = {
+      bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800',
+      icon: <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    }
   } else if (docRank > wizRank) {
     message = 'The document audit found a higher risk tier than your self-assessment. The document contains keywords associated with higher-risk AI use cases. Review the flagged areas carefully before deployment.'
-    bannerClass = 'bg-red-50 border-red-200 text-red-800'
+    cfg = {
+      bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800',
+      icon: <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
+    }
   } else {
-    message = `The document audit derived a lower risk tier than your self-assessment. This is informational only — the document-based tier uses keyword detection and may not capture all risks your system poses. The wizard result (${riskTierLabel(wizardTier).label}) is a self-reported signal; a qualified assessor should confirm the final tier.`
-    bannerClass = 'bg-amber-50 border-amber-200 text-amber-800'
+    message = `The document audit derived a lower risk tier than your self-assessment. The wizard result (${riskTierLabel(wizardTier).label}) remains the primary signal — a qualified assessor should confirm the final tier.`
+    cfg = {
+      bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800',
+      icon: <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    }
   }
 
   return (
-    <div className={`mb-6 rounded-xl border p-4 ${bannerClass}`}>
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="text-xs font-semibold uppercase tracking-wide opacity-70">Risk Tier Comparison</p>
-        <span className="text-xs opacity-60 italic">Wizard result is informational only — does not affect scores</span>
+    <div className={`mb-6 rounded-xl border p-4 ${cfg.bg} ${cfg.border}`}>
+      <div className="flex items-center gap-2 mb-2.5">
+        {cfg.icon}
+        <p className={`text-xs font-bold uppercase tracking-widest ${cfg.text} opacity-70`}>
+          Risk Tier Comparison
+        </p>
+        <span className={`text-xs ml-auto italic ${cfg.text} opacity-50`}>
+          Wizard result is informational only
+        </span>
       </div>
-      <div className="flex flex-wrap items-center gap-4 mb-2">
+      <div className="flex flex-wrap items-center gap-3 mb-2">
         <div className="flex items-center gap-2 text-sm">
-          <span className="opacity-70">Step 1 — Self-assessment:</span>
-          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${wizClass}`}>{wizLabel}</span>
+          <span className={`opacity-70 ${cfg.text}`}>Self-assessment:</span>
+          <span className={`badge ${wizClass}`}>{wizLabel}</span>
         </div>
-        <span className="text-slate-400 text-sm">→</span>
+        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
         <div className="flex items-center gap-2 text-sm">
-          <span className="opacity-70">Step 2 — Document audit:</span>
-          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${docClass}`}>{docLabel}</span>
+          <span className={`opacity-70 ${cfg.text}`}>Document audit:</span>
+          <span className={`badge ${docClass}`}>{docLabel}</span>
         </div>
       </div>
-      <p className="text-sm">{message}</p>
+      <p className={`text-sm ${cfg.text}`}>{message}</p>
     </div>
   )
 }
