@@ -1,4 +1,4 @@
-// Circular progress gauge 0–100 with score-based colour coding.
+// Circular compliance score gauge 0–100 with gradient stroke.
 
 interface ScoreRadialProps {
   score: number
@@ -6,76 +6,73 @@ interface ScoreRadialProps {
   label?: string
 }
 
-const RADIUS = 38
+const RADIUS = 36
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
-function strokeColor(score: number) {
-  if (score >= 70) return '#16a34a' // green-600
-  if (score >= 40) return '#d97706' // amber-600
-  return '#dc2626' // red-600
-}
-
-function textColorClass(score: number) {
-  if (score >= 70) return 'text-green-600'
-  if (score >= 40) return 'text-amber-600'
-  return 'text-red-600'
+function scoreTheme(score: number) {
+  if (score >= 70) return { stroke: '#10b981', text: '#059669', bg: '#d1fae5', label: 'Good' }
+  if (score >= 40) return { stroke: '#f59e0b', text: '#d97706', bg: '#fef3c7', label: 'Needs Work' }
+  return { stroke: '#ef4444', text: '#dc2626', bg: '#fee2e2', label: 'At Risk' }
 }
 
 export default function ScoreRadial({ score, size = 120, label }: ScoreRadialProps) {
   const clamped = Math.max(0, Math.min(100, score))
   const offset = CIRCUMFERENCE * (1 - clamped / 100)
-  const color = strokeColor(clamped)
+  const theme = scoreTheme(clamped)
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-2">
       <svg
         width={size}
         height={size}
         viewBox="0 0 100 100"
         aria-label={`Compliance score: ${Math.round(clamped)}`}
       >
-        {/* Track */}
+        {/* Track ring */}
         <circle
           cx="50" cy="50" r={RADIUS}
           fill="none"
-          stroke="#e2e8f0"
+          stroke="#f1f5f9"
           strokeWidth="10"
         />
-        {/* Progress */}
+        {/* Progress arc */}
         <circle
           cx="50" cy="50" r={RADIUS}
           fill="none"
-          stroke={color}
+          stroke={theme.stroke}
           strokeWidth="10"
           strokeLinecap="round"
           strokeDasharray={CIRCUMFERENCE}
           strokeDashoffset={offset}
           transform="rotate(-90 50 50)"
-          style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+          style={{ transition: 'stroke-dashoffset 0.7s cubic-bezier(0.4, 0, 0.2, 1)' }}
         />
-        {/* Score text */}
+        {/* Score number */}
         <text
-          x="50" y="46"
+          x="50" y="44"
           textAnchor="middle"
           dominantBaseline="middle"
-          fontSize="20"
-          fontWeight="700"
-          fill={color}
+          fontSize="22"
+          fontWeight="800"
+          fill={theme.text}
+          fontFamily="Inter, system-ui, sans-serif"
         >
           {Math.round(clamped)}
         </text>
+        {/* /100 label */}
         <text
-          x="50" y="62"
+          x="50" y="60"
           textAnchor="middle"
           dominantBaseline="middle"
           fontSize="9"
           fill="#94a3b8"
+          fontFamily="Inter, system-ui, sans-serif"
         >
           / 100
         </text>
       </svg>
       {label && (
-        <span className={`text-sm font-semibold ${textColorClass(clamped)}`}>
+        <span className="text-xs font-semibold tracking-wide" style={{ color: theme.text }}>
           {label}
         </span>
       )}
