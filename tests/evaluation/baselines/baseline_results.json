@@ -1,0 +1,15 @@
+{
+  "saved_at": "2026-04-03T00:00:00",
+  "note": "Seeded from training/bert_classifier/metrics.json (initial training run)",
+  "metrics": {
+    "classifier.macro_f1":          0.8917,
+    "classifier.accuracy":          0.8917,
+    "rag.recall@3":                 null,
+    "rag.recall@5":                 null,
+    "rag.mrr":                      null,
+    "adversarial.accuracy":         null,
+    "bert_consistency":             1.0,
+    "hallucination.citation_rate":  null,
+    "pipeline.checks_passed_ratio": null
+  }
+}

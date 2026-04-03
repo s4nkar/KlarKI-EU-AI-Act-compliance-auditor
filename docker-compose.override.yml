@@ -7,6 +7,7 @@ services:
     volumes:
       - ./api:/app
       - ./tests:/tests        # mount tests at /tests for pytest
+      - ./training:/training  # mount training models for eval scripts
       - upload_data:/data/uploads
       - chroma_data:/data/chroma
     environment:

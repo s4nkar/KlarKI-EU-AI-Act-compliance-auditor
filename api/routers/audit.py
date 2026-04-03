@@ -6,6 +6,7 @@ Endpoints:
     GET  /api/v1/audit/{audit_id}/status — Lightweight status poll
 """
 
+import asyncio
 import os
 import uuid
 from pathlib import Path
@@ -175,6 +176,51 @@ async def _run_pipeline(
                 status=status,
                 report=_audits[audit_id].report,
             )
+    
+    async def process_article(
+        article_num,
+        domain,
+        domain_chunks,
+        embeddings,
+        chroma,
+        ollama,
+    ):
+        art_chunks = domain_chunks.get(domain, [])
+        query_chunks = art_chunks[:3]
+
+        reg_passages = []
+
+        if art_chunks:
+            for c in query_chunks:
+                passages = await retrieve_requirements(
+                    chunk=c,
+                    embedding_service=embeddings,
+                    chroma_client=chroma,
+                    top_k=3,
+                )
+                reg_passages.extend(passages)
+
+        # deduplicate
+        seen = set()
+        unique_passages = []
+
+        for p in reg_passages:
+            key = p.get("id") or p.get("text")
+            if key not in seen:
+                seen.add(key)
+                unique_passages.append(p)
+
+        reg_passages = unique_passages[:5]
+
+        score = await analyse_article(
+            article_num=article_num,
+            domain=domain,
+            user_chunks=art_chunks,
+            regulatory_passages=reg_passages,
+            ollama=ollama,
+        )
+
+        return score
 
     try:
         chroma = request.app.state.chroma
@@ -206,28 +252,20 @@ async def _run_pipeline(
             if chunk.domain:
                 domain_chunks[chunk.domain].append(chunk)
 
-        article_scores = []
+        tasks = []
         for article_num, domain in ARTICLE_DOMAINS.items():
-            art_chunks = domain_chunks.get(domain, [])
-
-            # Retrieve regulatory passages for a representative chunk
-            reg_passages: list[dict] = []
-            if art_chunks:
-                reg_passages = await retrieve_requirements(
-                    chunk=art_chunks[0],
-                    embedding_service=embeddings,
-                    chroma_client=chroma,
-                    top_k=5,
+            tasks.append(
+                process_article(
+                    article_num,
+                    domain,
+                    domain_chunks,
+                    embeddings,
+                    chroma,
+                    ollama,
                 )
-
-            score = await analyse_article(
-                article_num=article_num,
-                domain=domain,
-                user_chunks=art_chunks,
-                regulatory_passages=reg_passages,
-                ollama=ollama,
             )
-            article_scores.append(score)
+
+        article_scores = await asyncio.gather(*tasks)
 
         # Aggregate article scores into a ComplianceReport
         _set_status(AuditStatus.SCORING)
