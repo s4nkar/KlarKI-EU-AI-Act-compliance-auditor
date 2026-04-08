@@ -19,15 +19,20 @@ Hardware:
 
 import argparse
 import json
+import random
 import time
+from collections import Counter
 from pathlib import Path
 
+import numpy as np
 import torch
+import torch.nn as nn
 from datasets import Dataset
 from sklearn.metrics import classification_report, f1_score
 from transformers import (
     BertForSequenceClassification,
     BertTokenizer,
+    DataCollatorWithPadding,
     Trainer,
     TrainerCallback,
     TrainerControl,
@@ -87,10 +92,12 @@ class EpochProgressCallback(TrainerCallback):
             + _c(_DIM, f"  ({epoch_time:.0f}s this epoch  /  {total_elapsed:.0f}s total)")
         )
 
-        if f1 >= 0.85:
-            print(_c(_GREEN, "  [OK] Above 0.85 F1 target"))
+        if f1 >= 0.93:
+            print(_c(_GREEN, "  [OK] Above 0.93 production target"))
+        elif f1 >= 0.85:
+            print(_c(_AMBER, "  [~] Above 0.85 but below 0.93 production target"))
         elif epoch == self._total:
-            print(_c(_AMBER, "  [!!] Below 0.85 F1 target -- consider more data or epochs"))
+            print(_c(_RED, "  [!!] Below 0.85 — consider more data or epochs"))
 
 # Label order must match ArticleDomain enum in api/models/schemas.py.
 LABELS = [
@@ -122,10 +129,10 @@ def load_jsonl(path: str) -> list[dict]:
     return records
 
 
-def split_dataset(records: list[dict], val_ratio: float = 0.15) -> tuple[list, list]:
-    """Stratified train/val split."""
+def split_dataset(records: list[dict], val_ratio: float = 0.15, seed: int = 42) -> tuple[list, list]:
+    """Stratified train/val split — reproducible with seed."""
     from collections import defaultdict
-    import random
+    rng = random.Random(seed)
 
     by_label: dict[str, list] = defaultdict(list)
     for r in records:
@@ -133,7 +140,7 @@ def split_dataset(records: list[dict], val_ratio: float = 0.15) -> tuple[list, l
 
     train, val = [], []
     for items in by_label.values():
-        random.shuffle(items)
+        rng.shuffle(items)
         cut = max(1, int(len(items) * (1 - val_ratio)))
         train.extend(items[:cut])
         val.extend(items[cut:])
@@ -144,18 +151,18 @@ def split_dataset(records: list[dict], val_ratio: float = 0.15) -> tuple[list, l
 # ── Tokenisation ──────────────────────────────────────────────────────────────
 
 def tokenize(batch: dict, tokenizer, max_length: int = 256) -> dict:
+    # No padding here — DataCollatorWithPadding pads each batch to its own max
+    # length, saving ~30-40% memory vs padding every sequence to 256.
     return tokenizer(
         batch["text"],
         truncation=True,
         max_length=max_length,
-        padding="max_length",
     )
 
 
 # ── Metrics ───────────────────────────────────────────────────────────────────
 
 def compute_metrics(eval_pred) -> dict:
-    import numpy as np
     logits, labels = eval_pred
     preds = np.argmax(logits, axis=-1)
     f1 = f1_score(labels, preds, average="macro")
@@ -169,12 +176,12 @@ def main() -> None:
     parser.add_argument("--data", default="training/data/clause_labels.jsonl")
     parser.add_argument("--output", default="training/bert_classifier")
     parser.add_argument("--base-model", default=BASE_MODEL)
-    parser.add_argument("--epochs", type=int, default=10,
-                        help="Max epochs — early stopping triggers before this (default: 10)")
+    parser.add_argument("--epochs", type=int, default=12,
+                        help="Max epochs — early stopping triggers before this (default: 12)")
     parser.add_argument("--batch-size", type=int, default=16,
                         help="Per-device batch size (effective batch = 2x via grad accumulation)")
-    parser.add_argument("--lr", type=float, default=3e-5,
-                        help="Peak learning rate with cosine decay (default: 3e-5)")
+    parser.add_argument("--lr", type=float, default=2e-5,
+                        help="Peak learning rate with cosine decay (default: 2e-5)")
     parser.add_argument("--max-length", type=int, default=256,
                         help="Max token length for tokeniser (default: 256)")
     parser.add_argument("--seed", type=int, default=42)
@@ -184,7 +191,7 @@ def main() -> None:
     records = load_jsonl(args.data)
     print(f"  Loaded {len(records)} examples across {len(LABELS)} classes")
 
-    train_data, val_data = split_dataset(records)
+    train_data, val_data = split_dataset(records, seed=args.seed)
     print(f"  Train: {len(train_data)}, Val: {len(val_data)}")
 
     # Convert labels to IDs
@@ -202,8 +209,8 @@ def main() -> None:
 
     train_ds = train_ds.rename_column("label", "labels")
     val_ds   = val_ds.rename_column(  "label", "labels")
-    train_ds.set_format("torch", columns=["input_ids", "attention_mask", "labels"])
-    val_ds.set_format(  "torch", columns=["input_ids", "attention_mask", "labels"])
+    train_ds.set_format("torch")
+    val_ds.set_format(  "torch")
 
     print(f"\nLoading model {args.base_model}")
     model = BertForSequenceClassification.from_pretrained(
@@ -238,21 +245,48 @@ def main() -> None:
         logging_steps=20,
         seed=args.seed,
         fp16=torch.cuda.is_available(),
-        # Label smoothing handles noise in LLM-generated training data (0.1 = 10%)
-        label_smoothing_factor=0.1,
         # Windows-safe: no multiprocessing in DataLoader
         dataloader_num_workers=0,
+        # Keep only the 3 best checkpoints to avoid disk bloat
+        save_total_limit=3,
         report_to="none",
     )
 
-    trainer = Trainer(
+    # Class weights: inverse frequency from raw training list (before torch conversion).
+    # Clipped to [0.5, 2.5] to avoid extreme values on balanced datasets.
+    label_counts = Counter(r["label"] for r in train_data)  # int labels post-conversion
+    total_samples = sum(label_counts.values())
+    raw_weights = [
+        total_samples / (len(LABELS) * max(label_counts.get(i, 1), 1))
+        for i in range(len(LABELS))
+    ]
+    class_weights = torch.tensor(
+        [min(max(w, 0.5), 2.5) for w in raw_weights], dtype=torch.float
+    ).to(device)
+    print(f"  Class weights: { {LABELS[i]: round(class_weights[i].item(), 3) for i in range(len(LABELS))} }")
+
+    # Label smoothing constant — applied manually since we override compute_loss.
+    # Smoothing reduces overconfidence on LLM-generated (noisy) training data.
+    _SMOOTH = 0.1
+
+    class WeightedTrainer(Trainer):
+        def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+            labels = inputs.pop("labels")
+            outputs = model(**inputs)
+            logits = outputs.logits
+            # Weighted cross-entropy + manual label smoothing
+            ce_loss = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=_SMOOTH)(logits, labels)
+            return (ce_loss, outputs) if return_outputs else ce_loss
+
+    trainer = WeightedTrainer(
         model=model,
         args=training_args,
         train_dataset=train_ds,
         eval_dataset=val_ds,
         compute_metrics=compute_metrics,
+        data_collator=DataCollatorWithPadding(tokenizer, pad_to_multiple_of=8 if torch.cuda.is_available() else None),
         callbacks=[
-            EarlyStoppingCallback(early_stopping_patience=3),
+            EarlyStoppingCallback(early_stopping_patience=4),
             EpochProgressCallback(total_epochs=args.epochs),
         ],
     )
@@ -264,11 +298,10 @@ def main() -> None:
     results = trainer.evaluate()
     print(f"\nFinal validation macro F1: {results['eval_macro_f1']:.4f}")
 
-    if results["eval_macro_f1"] < 0.85:
-        print("WARNING: macro F1 below 0.85 target — consider more training data or epochs.")
+    if results["eval_macro_f1"] < 0.93:
+        print("WARNING: macro F1 below 0.93 production target — consider more training data or epochs.")
 
     # Full classification report
-    import numpy as np
     from sklearn.metrics import confusion_matrix
     preds_output = trainer.predict(val_ds)
     preds = np.argmax(preds_output.predictions, axis=-1)

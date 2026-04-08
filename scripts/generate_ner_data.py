@@ -39,50 +39,68 @@ _TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
 ENTITY_CONFIGS = [
     {
         "label": "ARTICLE",
-        "description": "References to specific regulation articles, e.g. 'Article 9', 'Article 13', 'Artikel 10', 'Art. 14', 'GDPR Article 35'.",
+        "description": "References to specific regulation articles by number. The span is ONLY the article reference itself, e.g. 'Article 9', 'Article 13', 'Artikel 10', 'Art. 14', 'GDPR Article 35'. Do NOT include surrounding words.",
         "examples_en": [
             '{"text": "Article 9 establishes the risk management system requirements.", "entities": [{"span": "Article 9", "label": "ARTICLE"}]}',
             '{"text": "Both Article 13 and Article 14 address operator responsibilities.", "entities": [{"span": "Article 13", "label": "ARTICLE"}, {"span": "Article 14", "label": "ARTICLE"}]}',
+            '{"text": "The provider must comply with Article 17 before market deployment.", "entities": [{"span": "Article 17", "label": "ARTICLE"}]}',
+            '{"text": "GDPR Article 35 requires a data protection impact assessment.", "entities": [{"span": "GDPR Article 35", "label": "ARTICLE"}]}',
         ],
         "examples_de": [
             '{"text": "Artikel 9 legt die Anforderungen an das Risikomanagement fest.", "entities": [{"span": "Artikel 9", "label": "ARTICLE"}]}',
             '{"text": "Gemaess Artikel 13 sind Transparenzpflichten zu erfuellen.", "entities": [{"span": "Artikel 13", "label": "ARTICLE"}]}',
+            '{"text": "Art. 17 regelt die Markteinsfuehrungspflichten fuer Hochrisikosysteme.", "entities": [{"span": "Art. 17", "label": "ARTICLE"}]}',
+            '{"text": "Die Anforderungen aus Artikel 10 und Artikel 11 muessen beide erfuellt werden.", "entities": [{"span": "Artikel 10", "label": "ARTICLE"}, {"span": "Artikel 11", "label": "ARTICLE"}]}',
         ],
     },
     {
         "label": "OBLIGATION",
-        "description": "Compliance obligations or duties: phrases like 'must document', 'shall maintain', 'are required to', 'obligated to report', 'must implement'.",
+        "description": "A compliance duty expressed as a SHORT modal verb phrase. The span is ONLY the modal verb plus the main verb (2-4 words maximum). CORRECT spans: 'must document', 'shall maintain', 'must implement', 'are required to', 'must notify', 'shall ensure', 'muss dokumentieren', 'muss sicherstellen', 'muessen melden', 'ist verpflichtet'. Do NOT annotate the full sentence — only the obligation verb phrase.",
         "examples_en": [
-            '{"text": "Providers must document all training data sources.", "entities": [{"span": "must document", "label": "OBLIGATION"}]}',
-            '{"text": "The operator shall maintain an audit trail of system decisions.", "entities": [{"span": "shall maintain", "label": "OBLIGATION"}]}',
+            '{"text": "Providers must document all training data sources used in development.", "entities": [{"span": "must document", "label": "OBLIGATION"}]}',
+            '{"text": "The operator shall maintain an audit trail of all system decisions.", "entities": [{"span": "shall maintain", "label": "OBLIGATION"}]}',
+            '{"text": "Deployers must notify the authority within 15 days of any serious incident.", "entities": [{"span": "must notify", "label": "OBLIGATION"}]}',
+            '{"text": "High-risk AI providers shall ensure human oversight mechanisms are in place.", "entities": [{"span": "shall ensure", "label": "OBLIGATION"}]}',
+            '{"text": "Importers are required to verify that the system conforms to Article 10.", "entities": [{"span": "are required to", "label": "OBLIGATION"}]}',
         ],
         "examples_de": [
-            '{"text": "Anbieter muessen alle Trainingsdatenquellen dokumentieren.", "entities": [{"span": "muessen alle Trainingsdatenquellen dokumentieren", "label": "OBLIGATION"}]}',
-            '{"text": "Der Betreiber muss ein Auditprotokoll fuehren.", "entities": [{"span": "muss ein Auditprotokoll fuehren", "label": "OBLIGATION"}]}',
+            '{"text": "Anbieter muessen alle Trainingsdatenquellen vollstaendig dokumentieren.", "entities": [{"span": "muessen dokumentieren", "label": "OBLIGATION"}]}',
+            '{"text": "Der Betreiber muss ein lueckenloses Auditprotokoll fuehren.", "entities": [{"span": "muss fuehren", "label": "OBLIGATION"}]}',
+            '{"text": "Hochrisikosysteme muessen eine menschliche Aufsicht sicherstellen.", "entities": [{"span": "muessen sicherstellen", "label": "OBLIGATION"}]}',
+            '{"text": "Der Anbieter ist verpflichtet, schwerwiegende Vorfaelle zu melden.", "entities": [{"span": "ist verpflichtet", "label": "OBLIGATION"}]}',
+            '{"text": "Importeure muessen die Konformitaet des Systems vor der Vermarktung pruefen.", "entities": [{"span": "muessen pruefen", "label": "OBLIGATION"}]}',
         ],
     },
     {
         "label": "RISK_TIER",
-        "description": "Risk classification labels: 'high-risk', 'prohibited', 'limited risk', 'minimal risk', 'hochriskant', 'verboten', 'begrenztes Risiko', 'minimales Risiko'.",
+        "description": "Risk classification tier labels. The span is the exact risk tier phrase. English values: 'high-risk', 'prohibited', 'limited risk', 'minimal risk', 'unacceptable risk', 'low risk'. German values: 'hochriskant', 'verboten', 'begrenztes Risiko', 'minimales Risiko', 'unannehmbares Risiko', 'Hochrisiko'.",
         "examples_en": [
             '{"text": "This AI system has been classified as high-risk under the EU AI Act.", "entities": [{"span": "high-risk", "label": "RISK_TIER"}]}',
             '{"text": "Real-time biometric surveillance in public spaces is prohibited.", "entities": [{"span": "prohibited", "label": "RISK_TIER"}]}',
+            '{"text": "The chatbot is considered limited risk and only requires transparency measures.", "entities": [{"span": "limited risk", "label": "RISK_TIER"}]}',
+            '{"text": "Spam filters fall under the minimal risk category.", "entities": [{"span": "minimal risk", "label": "RISK_TIER"}]}',
         ],
         "examples_de": [
-            '{"text": "Dieses System wurde als hochriskant eingestuft.", "entities": [{"span": "hochriskant", "label": "RISK_TIER"}]}',
+            '{"text": "Dieses System wurde gemaess KI-Gesetz als hochriskant eingestuft.", "entities": [{"span": "hochriskant", "label": "RISK_TIER"}]}',
             '{"text": "Die Verwendung von Social-Scoring-Systemen ist verboten.", "entities": [{"span": "verboten", "label": "RISK_TIER"}]}',
+            '{"text": "Chatbots fallen in die Kategorie begrenztes Risiko.", "entities": [{"span": "begrenztes Risiko", "label": "RISK_TIER"}]}',
+            '{"text": "Spamfilter werden als minimales Risiko eingestuft und unterliegen keinen strengen Auflagen.", "entities": [{"span": "minimales Risiko", "label": "RISK_TIER"}]}',
         ],
     },
     {
         "label": "REGULATION",
-        "description": "Regulation or directive names: 'EU AI Act', 'AI Act', 'GDPR', 'General Data Protection Regulation', 'DSGVO', 'Datenschutz-Grundverordnung', 'KI-Gesetz', 'Artificial Intelligence Act'.",
+        "description": "The name of a regulation or directive. The span is ONLY the regulation name. Values: 'EU AI Act', 'AI Act', 'Artificial Intelligence Act', 'GDPR', 'General Data Protection Regulation', 'DSGVO', 'Datenschutz-Grundverordnung', 'KI-Gesetz', 'NIS2', 'Cyber Resilience Act'.",
         "examples_en": [
             '{"text": "The EU AI Act introduces a risk-based framework for AI systems.", "entities": [{"span": "EU AI Act", "label": "REGULATION"}]}',
             '{"text": "Compliance requires adherence to both the EU AI Act and GDPR.", "entities": [{"span": "EU AI Act", "label": "REGULATION"}, {"span": "GDPR", "label": "REGULATION"}]}',
+            '{"text": "The General Data Protection Regulation sets strict rules for data processing.", "entities": [{"span": "General Data Protection Regulation", "label": "REGULATION"}]}',
+            '{"text": "Under the Artificial Intelligence Act, providers of high-risk systems must register.", "entities": [{"span": "Artificial Intelligence Act", "label": "REGULATION"}]}',
         ],
         "examples_de": [
-            '{"text": "Das KI-Gesetz fuehrt einen risikobasierten Rahmen fuer KI ein.", "entities": [{"span": "KI-Gesetz", "label": "REGULATION"}]}',
+            '{"text": "Das KI-Gesetz fuehrt einen risikobasierten Rahmen fuer KI-Systeme ein.", "entities": [{"span": "KI-Gesetz", "label": "REGULATION"}]}',
             '{"text": "Die DSGVO und das KI-Gesetz gelten gemeinsam fuer diese Anwendung.", "entities": [{"span": "DSGVO", "label": "REGULATION"}, {"span": "KI-Gesetz", "label": "REGULATION"}]}',
+            '{"text": "Die Datenschutz-Grundverordnung regelt die Verarbeitung personenbezogener Daten.", "entities": [{"span": "Datenschutz-Grundverordnung", "label": "REGULATION"}]}',
+            '{"text": "Gemaess dem EU AI Act muessen Hochrisikosysteme registriert werden.", "entities": [{"span": "EU AI Act", "label": "REGULATION"}]}',
         ],
     },
 ]
@@ -215,8 +233,8 @@ def parse_records(raw: str, label: str) -> list[dict]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate spaCy NER training data via Ollama")
-    parser.add_argument("--n-per-label", type=int, default=40,
-                        help="Sentences per label per language (default: 40, total ~320)")
+    parser.add_argument("--n-per-label", type=int, default=200,
+                        help="Sentences per label per language (default: 200, total ~1600)")
     parser.add_argument("--output", default="training/data/ner_annotations.jsonl")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--ollama-host", default="http://localhost:11434")

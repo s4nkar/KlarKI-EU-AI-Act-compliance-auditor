@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Auto-generate BERT training data from EU AI Act + GDPR regulatory text.
+"""Auto-generate BERT classifier training data from EU AI Act + GDPR regulatory text.
 
 Uses Ollama (the same LLM already running) to produce synthetic labeled
 compliance document sentences for each of the 8 article domains.
@@ -8,22 +8,22 @@ Each prompt includes the actual regulation text as reference, so generated
 examples are grounded in the official requirements rather than generic
 descriptions. This produces more accurate, varied, and realistic training data.
 
-Target: 150 examples per class x 8 classes x 2 languages = 2,400 examples.
+Target: 400 examples per class x 8 classes x 2 languages = 6,400 examples.
 Generated examples are APPENDED to clause_labels.jsonl (hand-crafted examples
 are preserved). Duplicates are deduplicated by text content.
 
 Usage:
-    # Default: 150 per class, EN + DE
-    python scripts/generate_training_data.py
+    # Default: 400 per class, EN + DE
+    python scripts/generate_bert_training_data.py
 
     # Faster smoke test (20 per class)
-    python scripts/generate_training_data.py --n-per-class 20
+    python scripts/generate_bert_training_data.py --n-per-class 20
 
     # Overwrite instead of append
-    python scripts/generate_training_data.py --overwrite
+    python scripts/generate_bert_training_data.py --overwrite
 
     # Custom Ollama host
-    python scripts/generate_training_data.py --ollama-host http://localhost:11434
+    python scripts/generate_bert_training_data.py --ollama-host http://localhost:11434
 
 Run this BEFORE train_classifier.py.
 setup.py runs it automatically as the 'generate-data' stage.
@@ -58,42 +58,50 @@ DOMAINS = [
     {
         "label": "risk_management",
         "article": "Article 9",
-        "description": "risk management systems, risk registers, risk analysis, residual risk, lifecycle risk assessment, foreseeable misuse, hazard identification",
+        "description": "Identifying, evaluating, and mitigating risks of an AI system. Key concepts: risk register, hazard identification, risk analysis, residual risk, foreseeable misuse, risk mitigation measures, lifecycle risk assessment, safety risk, harm potential.",
+        "not_confused_with": "technical_documentation (which describes HOW the system works, not what can go wrong). A sentence about risk management will mention hazards, risk levels, mitigation, or potential harms — not system architecture or component descriptions.",
     },
     {
         "label": "data_governance",
         "article": "Article 10",
-        "description": "training data quality, dataset documentation, bias examination, data collection processes, data representativeness, data labelling, validation datasets",
+        "description": "Quality, sourcing, and management of training/validation data. Key concepts: training data quality, dataset documentation, bias examination, data representativeness, data labelling, data collection processes, validation datasets, ground truth.",
+        "not_confused_with": "technical_documentation (which covers the full system design, not specifically data). Sentences are about the DATA ITSELF — its quality, collection, labelling, bias.",
     },
     {
         "label": "technical_documentation",
         "article": "Article 11",
-        "description": "technical documentation, system architecture, model cards, design specifications, development process, Annex IV, conformity documentation",
+        "description": "Written documentation describing the AI system design and architecture. Key concepts: system architecture, component specifications, design documents, model cards, Annex IV documentation, conformity assessment, development methodology, system description.",
+        "not_confused_with": "risk_management (hazards/harms) and human_oversight (human control). A sentence about technical_documentation will mention documents, specifications, architecture diagrams, design files, or system descriptions — NOT risks or human control.",
     },
     {
         "label": "record_keeping",
         "article": "Article 12",
-        "description": "audit logs, automatic event recording, prediction logging, timestamp records, traceability, log retention, monitoring logs",
+        "description": "Automated logging and retention of operational records. Key concepts: audit logs, event logs, automatic recording, log retention policy, traceability, prediction logs, timestamp records, monitoring logs, logging requirements.",
+        "not_confused_with": "technical_documentation (design docs) or transparency (user-facing disclosure). Sentences are specifically about LOGS that are automatically generated during system operation.",
     },
     {
         "label": "transparency",
         "article": "Article 13",
-        "description": "user information, instructions for use, AI disclosure, system capabilities, limitations disclosure, deployer information, automated decision notification",
+        "description": "Providing information to users and deployers about the AI system. Key concepts: user disclosure, instructions for use, AI disclosure notice, capability limitations, automated decision notification, deployer information package, transparency obligations.",
+        "not_confused_with": "human_oversight (which is about control/override, not disclosure) and technical_documentation (internal design docs, not user-facing info). Sentences are about INFORMING users or the public.",
     },
     {
         "label": "human_oversight",
         "article": "Article 14",
-        "description": "human review, override capability, stop button, human-in-the-loop, oversight procedures, competent persons, manual intervention, deactivation mechanism",
+        "description": "Mechanisms for humans to monitor, intervene in, or override AI decisions. Key concepts: human review, override capability, stop/pause button, human-in-the-loop, oversight procedures, manual intervention, deactivation mechanism, competent natural person.",
+        "not_confused_with": "transparency (which is about disclosure) and technical_documentation (which describes system components). Sentences are specifically about a HUMAN BEING ABLE TO CONTROL or stop the system.",
     },
     {
         "label": "security",
         "article": "Article 15",
-        "description": "adversarial robustness, cybersecurity measures, accuracy metrics, resilience testing, data poisoning prevention, fail-safe mechanisms, security testing",
+        "description": "Resilience and protection of the AI system against attacks and failures. Key concepts: adversarial robustness, cybersecurity, data poisoning prevention, fail-safe mechanisms, accuracy under attack, resilience testing, security vulnerabilities, evasion attacks.",
+        "not_confused_with": "risk_management (general harms) and technical_documentation (system design). Sentences focus specifically on ATTACKS, cyber threats, robustness against adversarial inputs, or failsafe protections.",
     },
     {
         "label": "unrelated",
         "article": "none",
-        "description": "general business text, financial reports, HR policies, marketing content, supply chain, administrative procedures — NOT related to AI compliance",
+        "description": "General business text completely unrelated to AI compliance. Examples: financial reports, quarterly results, HR leave policies, marketing campaigns, supply chain logistics, office administration, customer service scripts.",
+        "not_confused_with": "Any AI compliance class. Must NOT mention AI, machine learning, algorithms, risk management, data governance, or regulatory compliance.",
     },
 ]
 
@@ -235,32 +243,37 @@ def build_prompt(domain: dict, language_name: str, lang_code: str, n: int) -> st
             f'{{"sentences": ["...", "..."]}}'
         )
 
+    not_confused = domain.get("not_confused_with", "")
+    disambiguation = f"\nIMPORTANT — do NOT generate sentences that could belong to other classes:\n{not_confused}\n" if not_confused else ""
+
     return (
         f'You are generating training data for a compliance classification model.\n'
         f'\n'
         f'Label: {domain["label"].upper()}\n'
         f'Regulation: EU AI Act {domain["article"]}\n'
-        f'{article_ref}\n'
+        f'Description: {domain["description"]}\n'
+        f'{article_ref}'
+        f'{disambiguation}\n'
         f'Generate {n} short sentences (10-30 words) that could appear in an AI system\'s '
-        f'compliance documentation, internal policy, or audit report demonstrating compliance '
-        f'with the above regulation. {lang_instruction}\n'
+        f'compliance documentation, internal policy, or audit report. {lang_instruction}\n'
         f'\n'
         f'Requirements:\n'
+        f'- Each sentence must UNAMBIGUOUSLY belong to {domain["label"].upper()} — a human expert must agree\n'
         f'- Use realistic compliance language (policy declarations, process steps, audit findings)\n'
         f'- Avoid repeating phrases or synonymous rewrites\n'
         f'- Vary sentence structure (statements, imperatives, passive constructions)\n'
         f'- Keep sentences independent — each must stand alone\n'
         f'- Do NOT copy or paraphrase the reference text directly\n'
         f'\n'
-        f'Return ONLY a JSON array of {n} strings:\n'
+        f'Return ONLY a JSON object:\n'
         f'{{"sentences": ["...", "..."]}}'
     )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Auto-generate BERT training data via Ollama")
-    parser.add_argument("--n-per-class", type=int, default=150,
-                        help="Examples to generate per class per language (default: 150)")
+    parser.add_argument("--n-per-class", type=int, default=400,
+                        help="Examples to generate per class per language (default: 400)")
     parser.add_argument("--output",  default="training/data/clause_labels.jsonl",
                         help="Output JSONL path")
     parser.add_argument("--overwrite", action="store_true",
