@@ -42,17 +42,8 @@ model_repository/*/1/*.onnx
 
 # ── Training artifacts ────────────────────────────────────────────────────────
 # Entire trained model output — reproducible via `make retrain`
-training/bert_classifier/checkpoint-*/
-training/bert_classifier/*.safetensors
-training/bert_classifier/*.bin
-training/bert_classifier/*.pt
-training/bert_classifier/*.pth
-training/bert_classifier/config.json
-training/bert_classifier/metrics.json
-training/bert_classifier/special_tokens_map.json
-training/bert_classifier/tokenizer_config.json
-training/bert_classifier/tokenizer.json
-training/bert_classifier/vocab.txt
+# (run `python training/train_classifier.py` to regenerate training/bert_classifier/)
+training/bert_classifier/
 
 training/spacy_ner_model/model-final/
 training/spacy_ner_model/train.spacy
