@@ -210,7 +210,7 @@ def stage_generate_data(args: argparse.Namespace) -> bool:
     # Auto-skip if the corpus already has sufficient data
     if not args.gen_overwrite and not args.dry_run and data_path.exists():
         line_count = sum(1 for ln in data_path.open(encoding="utf-8") if ln.strip())
-        min_needed = args.gen_per_class * 8  # 8 label classes
+        min_needed = args.gen_per_class * 8 * 2  # 8 classes × 2 languages
         if line_count >= min_needed:
             print(_c(YELLOW,
                 f"  --  clause_labels.jsonl already has {line_count} examples "
@@ -220,7 +220,7 @@ def stage_generate_data(args: argparse.Namespace) -> bool:
 
     cmd = [
         sys.executable,
-        str(ROOT / "scripts" / "generate_training_data.py"),
+        str(ROOT / "scripts" / "generate_bert_training_data.py"),
         "--output",        str(data_path),
         "--ollama-host",   args.ollama_host,
         "--ollama-model",  args.ollama_model,
@@ -308,9 +308,11 @@ def stage_train_ner(args: argparse.Namespace) -> bool:
     cmd = [
         sys.executable,
         str(ROOT / "training" / "train_ner.py"),
-        "--data",   str(ROOT / "training" / "data" / "ner_annotations.jsonl"),
-        "--output", str(ROOT / "training" / "spacy_ner_model"),
-        "--epochs", "30",
+        "--data",       str(ROOT / "training" / "data" / "ner_annotations.jsonl"),
+        "--output",     str(ROOT / "training" / "spacy_ner_model"),
+        "--epochs",     str(args.ner_epochs),
+        "--batch-size", str(args.ner_batch),
+        "--patience",   str(args.ner_patience),
     ]
     return run(cmd, args.dry_run) == 0
 
@@ -440,20 +442,23 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--ollama-model", default="phi3:mini")
 
     # generate-data hyper-params
-    p.add_argument("--gen-per-class", type=int, default=150,
-                   help="Synthetic examples per class per language (default: 150)")
+    p.add_argument("--gen-per-class", type=int, default=400,
+                   help="Synthetic examples per class per language (default: 400)")
     p.add_argument("--gen-batch",     type=int, default=20,
                    help="Examples per Ollama call in generate-data stage (default: 20)")
     p.add_argument("--gen-overwrite", action="store_true",
                    help="Overwrite existing clause_labels.jsonl / ner_annotations.jsonl instead of appending")
-    p.add_argument("--ner-per-label", type=int, default=40,
-                   help="NER sentences per entity label per language (default: 40, total ~320)")
+    p.add_argument("--ner-per-label", type=int, default=200,
+                   help="NER sentences per entity label per language (default: 200, total ~1600)")
     p.add_argument("--retrain", action="store_true",
                    help="Force full retrain: overwrite training data, retrain BERT + NER, re-export ONNX")
 
     # Training hyper-params
-    p.add_argument("--bert-epochs",   type=int, default=5)
+    p.add_argument("--bert-epochs",   type=int, default=12)
     p.add_argument("--bert-batch",    type=int, default=16)
+    p.add_argument("--ner-epochs",    type=int, default=60)
+    p.add_argument("--ner-batch",     type=int, default=32)
+    p.add_argument("--ner-patience",  type=int, default=10)
     p.add_argument("--bench-samples", type=int, default=20,
                    help="Number of samples per backend in benchmark")
 

@@ -42,18 +42,52 @@ interface NerMetricsData {
   final_loss: number
 }
 
+interface EvalResult {
+  eval: string
+  status: 'pass' | 'warn' | 'fail' | 'skip'
+  reason?: string
+  // classifier
+  macro_f1?: number
+  accuracy?: number
+  per_class?: Record<string, { precision: number; recall: number; f1: number; support: number }>
+  // rag
+  'recall@1'?: number
+  'recall@3'?: number
+  'recall@5'?: number
+  mrr?: number
+  n_queries?: number
+  // adversarial
+  adversarial_accuracy?: number
+  n_examples?: number
+  n_correct?: number
+  // consistency
+  bert?: { consistency_rate: number; n_probes: number }
+  ollama?: { consistency_rate: number; n_probes: number }
+  // hallucination
+  citation_rate?: number
+  n_articles?: number
+  // pipeline
+  checks?: Record<string, boolean>
+  checks_passed?: number
+  checks_total?: number
+}
+
+type EvalResultsMap = Record<string, EvalResult>
+
 export default function ClassifierMetrics() {
-  const [data, setData]       = useState<ClassifierMetricsData | null>(null)
-  const [nerData, setNerData] = useState<NerMetricsData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [data, setData]         = useState<ClassifierMetricsData | null>(null)
+  const [nerData, setNerData]   = useState<NerMetricsData | null>(null)
+  const [evalData, setEvalData] = useState<EvalResultsMap | null>(null)
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState<string | null>(null)
   const [fromStatic, setFromStatic] = useState(false)
 
   useEffect(() => {
     Promise.allSettled([
       apiClient.get<{ status: string; data: ClassifierMetricsData }>('/api/v1/metrics/classifier'),
       apiClient.get<{ status: string; data: NerMetricsData }>('/api/v1/metrics/ner'),
-    ]).then(async ([bertResult, nerResult]) => {
+      apiClient.get<{ status: string; data: EvalResultsMap }>('/api/v1/metrics/evaluation'),
+    ]).then(async ([bertResult, nerResult, evalResult]) => {
       if (bertResult.status === 'fulfilled') {
         setData(bertResult.value.data.data)
       } else {
@@ -71,7 +105,10 @@ export default function ClassifierMetrics() {
         }
       }
       if (nerResult.status === 'fulfilled') setNerData(nerResult.value.data.data)
-      // NER metrics are optional — no error if missing
+      if (evalResult.status === 'fulfilled') {
+        const map = evalResult.value.data.data
+        if (Object.keys(map).length > 0) setEvalData(map)
+      }
     }).finally(() => setLoading(false))
   }, [])
 
@@ -294,6 +331,9 @@ export default function ClassifierMetrics() {
 
       {/* NER metrics section */}
       {nerData && <NerMetricsSection data={nerData} />}
+
+      {/* Evaluation suite results */}
+      <EvaluationSection data={evalData} />
     </Layout>
   )
 }
@@ -311,6 +351,87 @@ function MetaCard({ label, value, sub, icon }: { label: string; value: string | 
       <p className="stat-value">{value}</p>
       <p className="text-xs font-semibold text-slate-700 mt-0.5">{label}</p>
       <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
+    </div>
+  )
+}
+
+function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
+  if (!data) {
+    return (
+      <div className="border-t border-slate-200 pt-8 mb-10">
+        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Evaluation Suite</h1>
+        <p className="text-sm text-slate-500 mb-4">
+          Run <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded-md font-mono text-slate-700">./run.sh test</code> to execute the evaluation suite and populate this section.
+        </p>
+        <div className="card p-6 text-center text-slate-400 text-sm">No evaluation results yet.</div>
+      </div>
+    )
+  }
+
+  const EVAL_META: Record<string, { label: string; desc: string }> = {
+    classifier:   { label: 'Gold Dataset',     desc: 'BERT on 80 hand-labeled examples' },
+    rag:          { label: 'RAG Retrieval',     desc: 'Recall@K against ChromaDB' },
+    pipeline:     { label: 'End-to-End',        desc: 'Full pipeline on synthetic doc' },
+    hallucination:{ label: 'Hallucination',     desc: 'Citation & grounding checks' },
+    adversarial:  { label: 'Adversarial',       desc: '30 paraphrase robustness tests' },
+    consistency:  { label: 'Consistency',       desc: 'Determinism across repeated runs' },
+  }
+
+  const statusStyle = (s: string) =>
+    s === 'pass' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    : s === 'warn' ? 'bg-amber-50 text-amber-700 border-amber-200'
+    : s === 'skip' ? 'bg-slate-100 text-slate-500 border-slate-200'
+    : 'bg-red-50 text-red-700 border-red-200'
+
+  const statusDot = (s: string) =>
+    s === 'pass' ? '#10b981' : s === 'warn' ? '#f59e0b' : s === 'skip' ? '#94a3b8' : '#ef4444'
+
+  function keyMetric(key: string, r: EvalResult): string {
+    if (key === 'classifier') return r.macro_f1 != null ? `Macro F1 ${(r.macro_f1 * 100).toFixed(1)}%` : '—'
+    if (key === 'rag')        return r['recall@3'] != null ? `Recall@3 ${(r['recall@3'] * 100).toFixed(1)}%  ·  MRR ${r.mrr?.toFixed(3) ?? '—'}` : '—'
+    if (key === 'adversarial')return r.adversarial_accuracy != null ? `Accuracy ${(r.adversarial_accuracy * 100).toFixed(1)}%` : '—'
+    if (key === 'consistency')return r.bert?.consistency_rate != null ? `BERT ${(r.bert.consistency_rate * 100).toFixed(0)}%  ·  LLM ${r.ollama?.consistency_rate != null ? (r.ollama.consistency_rate * 100).toFixed(0) + '%' : '—'}` : '—'
+    if (key === 'hallucination') return r.citation_rate != null ? `Citation rate ${(r.citation_rate * 100).toFixed(1)}%` : '—'
+    if (key === 'pipeline')   return r.checks_passed != null ? `${r.checks_passed}/${r.checks_total} checks passed` : '—'
+    return '—'
+  }
+
+  return (
+    <div className="border-t border-slate-200 pt-8 mb-10">
+      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Evaluation Suite</h1>
+      <p className="text-sm text-slate-500 mb-6">
+        Results from the last <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded-md font-mono text-slate-700">./run.sh test</code> run.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {Object.entries(EVAL_META).map(([key, meta]) => {
+          const r = data[key]
+          if (!r) return (
+            <div key={key} className="card p-5 opacity-50">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">{meta.label}</p>
+              <p className="text-xs text-slate-400">{meta.desc}</p>
+              <p className="text-sm text-slate-400 mt-3">Not yet run</p>
+            </div>
+          )
+          return (
+            <div key={key} className="card p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{meta.label}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{meta.desc}</p>
+                </div>
+                <span className={`badge border ${statusStyle(r.status)}`}>
+                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: statusDot(r.status) }} />
+                  {r.status}
+                </span>
+              </div>
+              {r.status === 'skip'
+                ? <p className="text-xs text-slate-400 italic">{r.reason ?? 'Skipped'}</p>
+                : <p className="text-sm font-semibold text-slate-700 tabular-nums">{keyMetric(key, r)}</p>
+              }
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

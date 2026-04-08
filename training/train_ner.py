@@ -25,14 +25,9 @@ import time
 from pathlib import Path
 
 import spacy
+import spacy.util
 from spacy.tokens import DocBin
 from spacy.training import Example
-
-try:
-    from tqdm import tqdm as _tqdm
-    HAS_TQDM = True
-except ImportError:
-    HAS_TQDM = False
 
 
 ENTITY_LABELS = ["ARTICLE", "OBLIGATION", "RISK_TIER", "REGULATION"]
@@ -40,6 +35,7 @@ ENTITY_LABELS = ["ARTICLE", "OBLIGATION", "RISK_TIER", "REGULATION"]
 RESET = "\033[0m"
 BOLD  = "\033[1m"
 GREEN = "\033[32m"
+AMBER = "\033[33m"
 CYAN  = "\033[36m"
 DIM   = "\033[2m"
 RED   = "\033[31m"
@@ -53,6 +49,50 @@ def _bar(current: int, total: int, width: int = 28) -> str:
     """Return an ASCII progress bar string."""
     filled = int(width * current / max(total, 1))
     return f"[{'#' * filled}{'.' * (width - filled)}] {current}/{total}"
+
+
+def _resolve_spans(record: dict, nlp) -> list[tuple[int, int, str]]:
+    """Return deduplicated (start_char, end_char, label) tuples for one record.
+
+    Resolves all char spans to token spans, drops any that don't align with
+    token boundaries, then greedily keeps the longest non-overlapping span.
+    """
+    doc = nlp.make_doc(record["text"])
+    candidates = []
+    for ent in record.get("entities", []):
+        span = doc.char_span(ent["start"], ent["end"], label=ent["label"])
+        if span is not None:
+            candidates.append(span)
+    candidates.sort(key=lambda s: s.end - s.start, reverse=True)
+    accepted, occupied = [], set()
+    for span in candidates:
+        tokens = set(range(span.start, span.end))
+        if not (tokens & occupied):
+            accepted.append((span.start_char, span.end_char, span.label_))
+            occupied |= tokens
+    return accepted
+
+
+def _make_example(record: dict, nlp) -> Example:
+    spans = _resolve_spans(record, nlp)
+    return Example.from_dict(nlp.make_doc(record["text"]), {"entities": spans})
+
+
+def _eval_f1(nlp, records: list[dict]) -> tuple[float, dict]:
+    """Run NER on records and return (overall_f1, ents_per_type)."""
+    from spacy.scorer import Scorer
+    scorer = Scorer()
+    examples = []
+    for record in records:
+        ref_doc = nlp.make_doc(record["text"])
+        ref_doc.ents = [
+            ref_doc.char_span(s, e, label=l)
+            for s, e, l in _resolve_spans(record, nlp)
+            if ref_doc.char_span(s, e, label=l) is not None
+        ]
+        examples.append(Example(nlp(record["text"]), ref_doc))
+    scores = scorer.score(examples)
+    return round(scores.get("ents_f", 0.0), 4), scores.get("ents_per_type", {})
 
 
 def load_annotations(path: str) -> list[dict]:
@@ -113,7 +153,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Train spaCy NER for EU AI Act entities")
     parser.add_argument("--data", default="training/data/ner_annotations.jsonl")
     parser.add_argument("--output", default="training/spacy_ner_model")
-    parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--epochs", type=int, default=60,
+                        help="Max epochs — early stopping may trigger earlier (default: 60)")
+    parser.add_argument("--batch-size", type=int, default=32,
+                        help="Mini-batch size for training updates (default: 32)")
+    parser.add_argument("--patience", type=int, default=10,
+                        help="Early stopping patience in epochs on dev F1 (default: 10)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--dropout", type=float, default=0.3)
     args = parser.parse_args()
@@ -157,72 +202,75 @@ def main() -> None:
     train_db.to_disk(output_path / "train.spacy")
     dev_db.to_disk(  output_path / "dev.spacy")
 
+    # ── Pre-build training examples once (avoids redundant span resolution per epoch)
+    print(_c(DIM, "  Building training examples..."))
+    train_examples = [_make_example(r, nlp) for r in train_records]
+
     # ── Training loop ──────────────────────────────────────────────────────────
-    print(f"\n  Starting training: {args.epochs} epochs, dropout={args.dropout}")
+    print(f"\n  Starting training: max {args.epochs} epochs, batch={args.batch_size}, "
+          f"dropout={args.dropout}, patience={args.patience}")
     print(_c(DIM, "  -" * 30))
 
     optimizer = nlp.initialize()
     other_pipes = [p for p in nlp.pipe_names if p != "ner"]
 
-    epoch_range = range(1, args.epochs + 1)
-    if HAS_TQDM:
-        epoch_iter = _tqdm(
-            epoch_range,
-            desc="  Epochs",
-            unit="epoch",
-            ncols=72,
-            bar_format="  {l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
-        )
-    else:
-        epoch_iter = epoch_range
-
     t_start = time.time()
-    best_loss = float("inf")
+    best_f1 = 0.0
+    best_loss = 0.0
+    best_epoch = 0
+    patience_count = 0
+    model_best_path = output_path / "model-best"
 
     with nlp.disable_pipes(*other_pipes):
-        for epoch in epoch_iter:
-            random.shuffle(train_records)
+        for epoch in range(1, args.epochs + 1):
+            random.shuffle(train_examples)
             losses: dict = {}
-
-            for record in train_records:
-                doc = nlp.make_doc(record["text"])
-                spans = []
-                for ent in record.get("entities", []):
-                    span = doc.char_span(ent["start"], ent["end"], label=ent["label"])
-                    if span:
-                        spans.append(span)
-                doc.ents = spans
-                example = Example(nlp(record["text"]), doc)
-                nlp.update([example], drop=args.dropout, losses=losses, sgd=optimizer)
+            for batch in spacy.util.minibatch(train_examples, size=args.batch_size):
+                nlp.update(batch, drop=args.dropout, losses=losses, sgd=optimizer)
 
             ner_loss = losses.get("ner", 0.0)
-            improved = ner_loss < best_loss
-            if improved:
-                best_loss = ner_loss
 
-            if HAS_TQDM:
-                epoch_iter.set_postfix(  # type: ignore[union-attr]
-                    loss=f"{ner_loss:.4f}",
-                    best=f"{best_loss:.4f}",
-                )
+            # Per-epoch dev F1 — drives best-model saving and early stopping
+            dev_f1, _ = _eval_f1(nlp, dev_records)
+            improved = dev_f1 > best_f1
+
+            if improved:
+                best_f1 = dev_f1
+                best_loss = ner_loss
+                best_epoch = epoch
+                patience_count = 0
+                nlp.to_disk(model_best_path)
             else:
-                # Plain progress every 5 epochs (or last epoch)
-                if epoch % 5 == 0 or epoch == args.epochs:
-                    elapsed = time.time() - t_start
-                    bar = _bar(epoch, args.epochs)
-                    marker = _c(GREEN, "^") if improved else " "
-                    print(
-                        f"  Epoch {epoch:>3}/{args.epochs}  {bar}"
-                        f"  loss={ner_loss:.4f} {marker}"
-                        + _c(DIM, f"  {elapsed:.0f}s elapsed")
-                    )
+                patience_count += 1
+
+            # Progress reporting every 5 epochs
+            if epoch % 5 == 0 or epoch == 1 or improved:
+                elapsed = time.time() - t_start
+                bar = _bar(epoch, args.epochs)
+                f1_colour = GREEN if dev_f1 >= 0.90 else AMBER if dev_f1 >= 0.75 else RED
+                marker = _c(GREEN, " ← best") if improved else ""
+                print(
+                    f"  Epoch {epoch:>3}/{args.epochs}  {bar}"
+                    f"  loss={ner_loss:.4f}  dev_F1={_c(f1_colour, f'{dev_f1:.4f}')}{marker}"
+                    + _c(DIM, f"  {elapsed:.0f}s")
+                )
+
+            # Early stopping
+            if patience_count >= args.patience:
+                print(_c(AMBER, f"\n  Early stopping at epoch {epoch} "
+                                f"(no dev F1 improvement for {args.patience} epochs)"))
+                break
 
     total_time = time.time() - t_start
     print(_c(DIM, "\n  -" * 30))
     print(_c(GREEN, f"  Training complete in {total_time:.1f}s"))
-    print(_c(DIM, f"  Final NER loss: {best_loss:.4f}"))
+    print(_c(GREEN, f"  Best dev F1: {best_f1:.4f} at epoch {best_epoch}"))
 
-    # Save final model
+    # Load best model for evaluation and final save
+    print(_c(DIM, f"  Loading best model from epoch {best_epoch}..."))
+    nlp.from_disk(model_best_path)
+
+    # Save as model-final (the best checkpoint, not the last epoch)
     model_path = output_path / "model-final"
     nlp.to_disk(model_path)
     print(_c(GREEN, f"  Model saved to {model_path}"))
@@ -230,20 +278,15 @@ def main() -> None:
 
     # -- Evaluation on dev set -------------------------------------------------
     print(_c(BOLD, "\n  Evaluating on dev set..."))
+    _, ents_per_type = _eval_f1(nlp, dev_records)
+    # Re-fetch full scores for overall metrics
     from spacy.scorer import Scorer
     scorer = Scorer()
-    examples_dev = []
-    for record in dev_records:
-        ref_doc = nlp.make_doc(record["text"])
-        spans = []
-        for ent in record.get("entities", []):
-            span = ref_doc.char_span(ent["start"], ent["end"], label=ent["label"])
-            if span is not None:
-                spans.append(span)
-        ref_doc.ents = spans
-        pred_doc = nlp(record["text"])
-        examples_dev.append(Example(pred_doc, ref_doc))
-
+    examples_dev = [
+        Example(nlp(r["text"]),
+                _make_example(r, nlp).reference)
+        for r in dev_records
+    ]
     scores = scorer.score(examples_dev)
     ents_per_type = scores.get("ents_per_type", {})
 
@@ -256,14 +299,14 @@ def main() -> None:
         r  = round(s.get("r",  0.0), 4)
         f1 = round(s.get("f",  0.0), 4)
         per_label.append({"label": label, "precision": p, "recall": r, "f1": f1})
-        colour = GREEN if f1 >= 0.80 else AMBER if f1 >= 0.60 else RED
+        colour = GREEN if f1 >= 0.85 else AMBER if f1 >= 0.70 else RED
         print(_c(colour, f"  {label:<20} {p:>6.3f} {r:>6.3f} {f1:>6.3f}"))
 
     overall_f1 = round(scores.get("ents_f", 0.0), 4)
     overall_p  = round(scores.get("ents_p", 0.0), 4)
     overall_r  = round(scores.get("ents_r", 0.0), 4)
     print("  " + "-" * 42)
-    overall_colour = GREEN if overall_f1 >= 0.80 else AMBER if overall_f1 >= 0.60 else RED
+    overall_colour = GREEN if overall_f1 >= 0.90 else AMBER if overall_f1 >= 0.75 else RED
     print(_c(overall_colour, f"  {'Overall':<20} {overall_p:>6.3f} {overall_r:>6.3f} {overall_f1:>6.3f}"))
 
     # Save metrics JSON

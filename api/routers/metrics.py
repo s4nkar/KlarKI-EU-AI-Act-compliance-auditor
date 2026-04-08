@@ -17,10 +17,18 @@ from models.schemas import APIResponse
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/metrics", tags=["metrics"])
 
-_TRAINING_ROOT = Path(__file__).parent.parent.parent / "training"
+# Paths work for both local dev (repo root) and Docker container (/app → /training, /tests)
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_TRAINING_ROOT = next(
+    (p for p in [_REPO_ROOT / "training", Path("/training")] if p.is_dir()),
+    _REPO_ROOT / "training",
+)
 _BERT_METRICS_PATH = _TRAINING_ROOT / "bert_classifier" / "metrics.json"
 _NER_METRICS_PATH  = _TRAINING_ROOT / "spacy_ner_model" / "metrics.json"
-_EVAL_RESULTS_DIR  = Path(__file__).parent.parent.parent / "tests" / "evaluation" / "results"
+_EVAL_RESULTS_DIR  = next(
+    (p for p in [_REPO_ROOT / "tests" / "evaluation" / "results", Path("/tests/evaluation/results")] if p.is_dir()),
+    Path("/tests/evaluation/results"),
+)
 
 
 def _load_metrics(path: Path, label: str) -> dict:
@@ -65,3 +73,27 @@ async def get_ner_metrics() -> APIResponse:
     data = _load_metrics(_NER_METRICS_PATH, "NER")
     logger.info("ner_metrics_served", overall_f1=data.get("overall_f1"))
     return APIResponse(status="success", data=data)
+
+
+@router.get("/evaluation", response_model=APIResponse)
+async def get_evaluation_results() -> APIResponse:
+    """Return the latest results from the evaluation suite (eval_*.py).
+
+    Reads all *.json files from tests/evaluation/results/ and returns them
+    keyed by eval name.  Returns an empty dict (not 404) when no results exist
+    so the frontend can display a "not yet run" state gracefully.
+    """
+    if not _EVAL_RESULTS_DIR.exists():
+        return APIResponse(status="success", data={})
+
+    results: dict = {}
+    for path in sorted(_EVAL_RESULTS_DIR.glob("*.json")):
+        try:
+            with open(path, encoding="utf-8") as f:
+                payload = json.load(f)
+            results[path.stem] = payload
+        except Exception as exc:
+            logger.warning("eval_result_read_failed", path=str(path), error=str(exc))
+
+    logger.info("eval_results_served", count=len(results))
+    return APIResponse(status="success", data=results)

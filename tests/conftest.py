@@ -7,7 +7,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import pytest_asyncio
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
+# Support both local dev (repo/api) and Docker container (/app)
+_local_api = os.path.join(os.path.dirname(__file__), "..", "api")
+_container_api = "/app"
+_api_path = _local_api if os.path.isdir(_local_api) else _container_api
+sys.path.insert(0, _api_path)
 
 
 # ── App fixture ────────────────────────────────────────────────────────────────
