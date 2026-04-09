@@ -75,8 +75,7 @@ async def _run_async(verbose: bool) -> dict:
     import os
 
     try:
-        from services.document_parser    import parse_text
-        from services.chunker             import chunk_document
+        from services.chunker             import chunk_text
         from services.language_detector   import detect_language
         from services.classifier          import classify_chunks
         from services.embedding_service   import EmbeddingService
@@ -93,7 +92,9 @@ async def _run_async(verbose: bool) -> dict:
     chroma_host = os.getenv("CHROMADB_HOST", "localhost")
 
     # ── service connectivity ────────────────────────────────────────────────
-    ollama = OllamaClient(host=ollama_host)
+    import os as _os
+    ollama_model = _os.getenv("OLLAMA_MODEL", "phi3:mini")
+    ollama = OllamaClient(host=ollama_host, model=ollama_model)
     try:
         if not await ollama.health_check():
             raise RuntimeError("unhealthy")
@@ -111,11 +112,11 @@ async def _run_async(verbose: bool) -> dict:
 
     # ── stage 1: parse + chunk ──────────────────────────────────────────────
     if verbose: print("  Stage 1: Chunking …")
-    chunks = chunk_document(SYNTHETIC_DOCUMENT, source_file="synthetic_doc.txt")
+    chunks = await chunk_text(SYNTHETIC_DOCUMENT, source_file="synthetic_doc.txt")
     if verbose: print(f"    {len(chunks)} chunks produced")
 
     # ── stage 2: detect language ────────────────────────────────────────────
-    lang = detect_language(SYNTHETIC_DOCUMENT)
+    lang = await detect_language(SYNTHETIC_DOCUMENT)
     if verbose: print(f"  Stage 2: Language detected → {lang}")
 
     # ── stage 3: classify ───────────────────────────────────────────────────
@@ -177,7 +178,11 @@ async def _run_async(verbose: bool) -> dict:
         "all_7_articles_present":   len(report.article_scores) == 7,
         "score_in_range":           0.0 <= report.overall_score <= 100.0,
         "no_negative_scores":       all(0 <= a.score <= 100 for a in report.article_scores),
-        "reasoning_populated":      all(bool(a.score_reasoning) for a in report.article_scores),
+        "reasoning_populated":      all(
+            bool(a.score_reasoning)
+            for a in report.article_scores
+            if a.chunk_count > 0  # articles with no user chunks have no LLM reasoning
+        ),
         "gap_titles_non_empty":     all(
             all(bool(g.title) for g in a.gaps)
             for a in report.article_scores

@@ -127,8 +127,9 @@ async def _ollama_consistency_async(n_runs: int, verbose: bool) -> dict:
     except ImportError as e:
         return _skip_section("ollama", f"Cannot import services: {e}")
 
-    ollama_host = os.getenv("OLLAMA_HOST", "localhost")
-    ollama = OllamaClient(host=ollama_host)
+    ollama_host  = os.getenv("OLLAMA_HOST", "localhost")
+    ollama_model = os.getenv("OLLAMA_MODEL", "phi3:mini")
+    ollama = OllamaClient(host=ollama_host, model=ollama_model)
     try:
         if not await ollama.health_check():
             raise RuntimeError()
@@ -183,8 +184,22 @@ def _skip_section(backend: str, reason: str) -> dict:
 
 
 def run(n_runs: int = 5, verbose: bool = False) -> dict:
-    bert_results   = run_bert_consistency(n_runs=n_runs, verbose=verbose)
-    ollama_results = asyncio.run(_ollama_consistency_async(n_runs=n_runs, verbose=verbose))
+    import concurrent.futures
+    bert_results = run_bert_consistency(n_runs=n_runs, verbose=verbose)
+
+    # asyncio.run() cannot be called from a running event loop (e.g. pytest-asyncio).
+    # Detect this and run the coroutine in a fresh thread instead.
+    try:
+        asyncio.get_running_loop()
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            ollama_results = pool.submit(
+                asyncio.run,
+                _ollama_consistency_async(n_runs=n_runs, verbose=verbose),
+            ).result()
+    except RuntimeError:
+        ollama_results = asyncio.run(
+            _ollama_consistency_async(n_runs=n_runs, verbose=verbose)
+        )
 
     overall_status = "pass"
     if bert_results.get("status") == "fail" or ollama_results.get("status") == "fail":

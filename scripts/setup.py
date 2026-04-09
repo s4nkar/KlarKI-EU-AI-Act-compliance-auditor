@@ -448,8 +448,8 @@ def parse_args() -> argparse.Namespace:
                    help="Examples per Ollama call in generate-data stage (default: 20)")
     p.add_argument("--gen-overwrite", action="store_true",
                    help="Overwrite existing clause_labels.jsonl / ner_annotations.jsonl instead of appending")
-    p.add_argument("--ner-per-label", type=int, default=200,
-                   help="NER sentences per entity label per language (default: 200, total ~1600)")
+    p.add_argument("--ner-per-label", type=int, default=375,
+                   help="NER sentences per entity label per language (default: 375, total ~3000)")
     p.add_argument("--retrain", action="store_true",
                    help="Force full retrain: overwrite training data, retrain BERT + NER, re-export ONNX")
 

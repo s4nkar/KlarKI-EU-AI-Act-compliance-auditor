@@ -13,7 +13,7 @@ import triton_python_backend_utils as pb_utils
 
 _SPACY_MODEL_PATH = os.environ.get(
     "SPACY_MODEL_PATH",
-    "/models/spacy_ner/spacy_model",
+    "/spacy_model/model-final",
 )
 
 

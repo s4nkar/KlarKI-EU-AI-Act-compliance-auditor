@@ -55,13 +55,18 @@ ENTITY_CONFIGS = [
     },
     {
         "label": "OBLIGATION",
-        "description": "A compliance duty expressed as a SHORT modal verb phrase. The span is ONLY the modal verb plus the main verb (2-4 words maximum). CORRECT spans: 'must document', 'shall maintain', 'must implement', 'are required to', 'must notify', 'shall ensure', 'muss dokumentieren', 'muss sicherstellen', 'muessen melden', 'ist verpflichtet'. Do NOT annotate the full sentence — only the obligation verb phrase.",
+        "description": "A compliance duty expressed as a SHORT modal verb phrase. The span is ONLY the modal verb plus the main verb (2-4 words maximum). Use a wide variety of obligation forms. CORRECT spans: 'must document', 'shall maintain', 'must implement', 'are required to', 'must notify', 'shall ensure', 'is obliged to', 'have to register', 'must be verified', 'shall be assessed', 'are expected to', 'need to demonstrate', 'must undergo', 'shall submit', 'must retain', 'are obligated to', 'have an obligation to', 'must be conducted', 'shall be documented'. Do NOT annotate the full sentence — only the obligation verb phrase. Vary the obligation forms across sentences.",
         "examples_en": [
             '{"text": "Providers must document all training data sources used in development.", "entities": [{"span": "must document", "label": "OBLIGATION"}]}',
             '{"text": "The operator shall maintain an audit trail of all system decisions.", "entities": [{"span": "shall maintain", "label": "OBLIGATION"}]}',
             '{"text": "Deployers must notify the authority within 15 days of any serious incident.", "entities": [{"span": "must notify", "label": "OBLIGATION"}]}',
-            '{"text": "High-risk AI providers shall ensure human oversight mechanisms are in place.", "entities": [{"span": "shall ensure", "label": "OBLIGATION"}]}',
+            '{"text": "All high-risk AI systems have to be registered in the EU database before deployment.", "entities": [{"span": "have to be registered", "label": "OBLIGATION"}]}',
             '{"text": "Importers are required to verify that the system conforms to Article 10.", "entities": [{"span": "are required to", "label": "OBLIGATION"}]}',
+            '{"text": "The conformity assessment shall be conducted by a notified body.", "entities": [{"span": "shall be conducted", "label": "OBLIGATION"}]}',
+            '{"text": "Manufacturers need to demonstrate technical robustness before market placement.", "entities": [{"span": "need to demonstrate", "label": "OBLIGATION"}]}',
+            '{"text": "Records of incidents must be retained for at least five years.", "entities": [{"span": "must be retained", "label": "OBLIGATION"}]}',
+            '{"text": "The provider is obliged to report any serious malfunction to the authority.", "entities": [{"span": "is obliged to", "label": "OBLIGATION"}]}',
+            '{"text": "Operators have an obligation to inform affected persons of automated decision-making.", "entities": [{"span": "have an obligation to", "label": "OBLIGATION"}]}',
         ],
         "examples_de": [
             '{"text": "Anbieter muessen alle Trainingsdatenquellen vollstaendig dokumentieren.", "entities": [{"span": "muessen dokumentieren", "label": "OBLIGATION"}]}',
@@ -69,6 +74,11 @@ ENTITY_CONFIGS = [
             '{"text": "Hochrisikosysteme muessen eine menschliche Aufsicht sicherstellen.", "entities": [{"span": "muessen sicherstellen", "label": "OBLIGATION"}]}',
             '{"text": "Der Anbieter ist verpflichtet, schwerwiegende Vorfaelle zu melden.", "entities": [{"span": "ist verpflichtet", "label": "OBLIGATION"}]}',
             '{"text": "Importeure muessen die Konformitaet des Systems vor der Vermarktung pruefen.", "entities": [{"span": "muessen pruefen", "label": "OBLIGATION"}]}',
+            '{"text": "Hochrisiko-KI-Systeme sind vor der Inbetriebnahme zu registrieren.", "entities": [{"span": "sind zu registrieren", "label": "OBLIGATION"}]}',
+            '{"text": "Der Hersteller hat nachzuweisen, dass das System die Sicherheitsanforderungen erfuellt.", "entities": [{"span": "hat nachzuweisen", "label": "OBLIGATION"}]}',
+            '{"text": "Alle Vorfaelle muessen innerhalb von 72 Stunden gemeldet werden.", "entities": [{"span": "muessen gemeldet werden", "label": "OBLIGATION"}]}',
+            '{"text": "Betreiber sind gehalten, betroffene Personen ueber automatisierte Entscheidungen zu informieren.", "entities": [{"span": "sind gehalten", "label": "OBLIGATION"}]}',
+            '{"text": "Die Konformitaetsbewertung muss von einer benannten Stelle durchgefuehrt werden.", "entities": [{"span": "muss durchgefuehrt werden", "label": "OBLIGATION"}]}',
         ],
     },
     {
@@ -203,6 +213,8 @@ def parse_records(raw: str, label: str) -> list[dict]:
     results = []
 
     for rec in raw_records:
+        if not isinstance(rec, dict):
+            continue
         text = str(rec.get("text", "")).strip()
         if not text or len(text) < 15:
             continue
@@ -212,7 +224,7 @@ def parse_records(raw: str, label: str) -> list[dict]:
 
         for ent in entities_raw:
             span_text = str(ent.get("span", "")).strip()
-            ent_label = str(ent.get("label", label)).strip()
+            ent_label = label  # always use the config label — never trust LLM label output
             if not span_text:
                 continue
             idx = text.find(span_text)
@@ -235,6 +247,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Generate spaCy NER training data via Ollama")
     parser.add_argument("--n-per-label", type=int, default=200,
                         help="Sentences per label per language (default: 200, total ~1600)")
+    parser.add_argument("--labels", nargs="+", default=None,
+                        help="Only generate for these labels (e.g. --labels OBLIGATION)")
     parser.add_argument("--output", default="training/data/ner_annotations.jsonl")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--ollama-host", default="http://localhost:11434")
@@ -269,8 +283,16 @@ def main() -> None:
 
     total_written = 0
 
+    active_configs = ENTITY_CONFIGS
+    if args.labels:
+        active_configs = [c for c in ENTITY_CONFIGS if c["label"] in args.labels]
+        if not active_configs:
+            print(f"ERROR: No matching configs for labels: {args.labels}")
+            raise SystemExit(1)
+        print(f"Generating only for: {[c['label'] for c in active_configs]}")
+
     with open(output_path, "a", encoding="utf-8") as out_f:
-        for config in ENTITY_CONFIGS:
+        for config in active_configs:
             for lang_code, lang_name in LANGUAGES:
                 needed = args.n_per_label
                 collected: list[dict] = []

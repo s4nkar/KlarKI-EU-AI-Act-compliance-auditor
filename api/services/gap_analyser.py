@@ -150,6 +150,7 @@ async def analyse_article(
             )],
             recommendations=["Retry the audit or review documentation manually."],
             chunk_count=len(user_chunks),
+            score_reasoning="LLM analysis failed — manual review required.",
         )
 
     # Parse score

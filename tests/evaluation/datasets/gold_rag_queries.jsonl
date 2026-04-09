@@ -15,21 +15,25 @@
 {"query": "technical file content development lifecycle documentation", "expected_articles": [11], "description": "Technical file completeness"}
 {"query": "performance benchmarks and metrics documentation", "expected_articles": [11], "description": "Performance documentation"}
 {"query": "software component descriptions and architecture diagrams", "expected_articles": [11], "description": "Architecture documentation"}
+{"query": "updates modifications changes high-risk AI system technical documentation obligations", "expected_articles": [11], "description": "Documentation update obligations"}
 {"query": "automatic logging AI system operational events", "expected_articles": [12], "description": "Core Article 12 obligation"}
 {"query": "audit trail traceability AI decisions post deployment", "expected_articles": [12], "description": "Audit trail requirement"}
 {"query": "log retention period regulatory review compliance", "expected_articles": [12], "description": "Retention obligation"}
 {"query": "event logs timestamps inference records AI system", "expected_articles": [12], "description": "Log content requirement"}
 {"query": "audit log integrity protection unauthorized modification", "expected_articles": [12], "description": "Log integrity requirement"}
+{"query": "traceability log records access competent authority post deployment review", "expected_articles": [12], "description": "Log access for regulatory review"}
 {"query": "transparency information deployers instructions for use AI", "expected_articles": [13], "description": "Core Article 13 obligation"}
 {"query": "user notification disclosure interacting with AI system", "expected_articles": [13], "description": "AI disclosure requirement"}
 {"query": "explanation logic AI generated recommendations", "expected_articles": [13], "description": "Explainability obligation"}
 {"query": "capabilities limitations disclosure end users deployers", "expected_articles": [13], "description": "Capability disclosure"}
 {"query": "instructions for use deployment conditions AI system", "expected_articles": [13], "description": "Usage instructions"}
+{"query": "provider contact details identification name address transparency obligations", "expected_articles": [13], "description": "Provider identification in transparency obligations"}
 {"query": "human oversight measures monitoring AI real time operation", "expected_articles": [14], "description": "Core Article 14 obligation"}
 {"query": "override stop functionality human intervention AI", "expected_articles": [14], "description": "Override capability"}
 {"query": "human in the loop safety critical AI decisions", "expected_articles": [14], "description": "Human-in-the-loop"}
 {"query": "operator training understanding AI outputs anomaly detection", "expected_articles": [14], "description": "Operator competence"}
 {"query": "human supervision alert low confidence AI prediction", "expected_articles": [14], "description": "Confidence-based escalation"}
+{"query": "natural persons designated assigned human oversight responsibilities high-risk AI", "expected_articles": [14], "description": "Designated oversight persons requirement"}
 {"query": "AI system accuracy performance level intended purpose", "expected_articles": [15], "description": "Core Article 15 obligation"}
 {"query": "robustness testing adversarial inputs AI system", "expected_articles": [15], "description": "Adversarial robustness"}
 {"query": "cybersecurity measures protection AI model manipulation", "expected_articles": [15], "description": "Security measures"}
