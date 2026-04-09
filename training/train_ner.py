@@ -21,8 +21,14 @@ Python backend at model_repository/spacy_ner/1/model.py.
 import argparse
 import json
 import random
+import sys
 import time
 from pathlib import Path
+
+# Windows cp1252 stdout can't encode non-ASCII symbols (e.g. ←, —).
+# Reconfigure to UTF-8 so progress output renders correctly.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 import spacy
 import spacy.util
@@ -85,11 +91,8 @@ def _eval_f1(nlp, records: list[dict]) -> tuple[float, dict]:
     examples = []
     for record in records:
         ref_doc = nlp.make_doc(record["text"])
-        ref_doc.ents = [
-            ref_doc.char_span(s, e, label=l)
-            for s, e, l in _resolve_spans(record, nlp)
-            if ref_doc.char_span(s, e, label=l) is not None
-        ]
+        spans = [ref_doc.char_span(s, e, label=l) for s, e, l in _resolve_spans(record, nlp)]
+        ref_doc.ents = [sp for sp in spans if sp is not None]
         examples.append(Example(nlp(record["text"]), ref_doc))
     scores = scorer.score(examples)
     return round(scores.get("ents_f", 0.0), 4), scores.get("ents_per_type", {})
@@ -109,41 +112,19 @@ def load_annotations(path: str) -> list[dict]:
 def build_doc_bin(records: list[dict], nlp) -> DocBin:
     """Convert annotation records to a spaCy DocBin.
 
-    Overlapping spans (E1010) are resolved greedily: spans are sorted by
-    length descending so longer/more-specific spans win, and any span whose
-    token range overlaps an already-accepted span is dropped.
+    Overlapping spans are resolved via _resolve_spans (greedy, longest wins).
     """
     db = DocBin()
-    skipped = 0
     for record in records:
-        text = record["text"]
-        entities = record.get("entities", [])
-        doc = nlp.make_doc(text)
-
-        # Resolve all char spans to token spans, drop any that don't align
-        candidates = []
-        for ent in entities:
-            span = doc.char_span(ent["start"], ent["end"], label=ent["label"])
-            if span is not None:
-                candidates.append(span)
-
-        # Greedy non-overlapping selection: longest span wins
-        candidates.sort(key=lambda s: s.end - s.start, reverse=True)
-        accepted = []
-        occupied: set[int] = set()
-        for span in candidates:
-            tokens = set(range(span.start, span.end))
-            if tokens & occupied:
-                skipped += 1
-                continue
-            accepted.append(span)
-            occupied |= tokens
-
-        doc.ents = accepted
+        doc = nlp.make_doc(record["text"])
+        doc.ents = [
+            sp for sp in (
+                doc.char_span(s, e, label=l)
+                for s, e, l in _resolve_spans(record, nlp)
+            )
+            if sp is not None
+        ]
         db.add(doc)
-
-    if skipped:
-        print(_c(DIM, f"  Dropped {skipped} overlapping spans during DocBin build."))
     return db
 
 
@@ -216,7 +197,7 @@ def main() -> None:
 
     t_start = time.time()
     best_f1 = 0.0
-    best_loss = 0.0
+    best_loss: float | None = None
     best_epoch = 0
     patience_count = 0
     model_best_path = output_path / "model-best"
@@ -267,8 +248,11 @@ def main() -> None:
     print(_c(GREEN, f"  Best dev F1: {best_f1:.4f} at epoch {best_epoch}"))
 
     # Load best model for evaluation and final save
-    print(_c(DIM, f"  Loading best model from epoch {best_epoch}..."))
-    nlp.from_disk(model_best_path)
+    if best_epoch == 0 or not model_best_path.exists():
+        print(_c(AMBER, "  WARNING: No best model checkpoint found — using final epoch state."))
+    else:
+        print(_c(DIM, f"  Loading best model from epoch {best_epoch}..."))
+        nlp.from_disk(model_best_path)
 
     # Save as model-final (the best checkpoint, not the last epoch)
     model_path = output_path / "model-final"
@@ -278,8 +262,6 @@ def main() -> None:
 
     # -- Evaluation on dev set -------------------------------------------------
     print(_c(BOLD, "\n  Evaluating on dev set..."))
-    _, ents_per_type = _eval_f1(nlp, dev_records)
-    # Re-fetch full scores for overall metrics
     from spacy.scorer import Scorer
     scorer = Scorer()
     examples_dev = [
@@ -318,7 +300,7 @@ def main() -> None:
         "labels":      ENTITY_LABELS,
         "val_size":    len(dev_records),
         "train_size":  len(train_records),
-        "final_loss":  round(best_loss, 4),
+        "final_loss":  round(best_loss, 4) if best_loss is not None else None,
     }
     metrics_path = output_path / "metrics.json"
     with open(metrics_path, "w", encoding="utf-8") as f:

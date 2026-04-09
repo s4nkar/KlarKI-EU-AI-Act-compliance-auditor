@@ -52,6 +52,8 @@ async def _run_async(top_k: int, verbose: bool) -> dict:
     try:
         from services.embedding_service import EmbeddingService
         from services.chroma_client import ChromaClient
+        from services.rag_engine import retrieve_requirements
+        from models.schemas import DocumentChunk
     except ImportError as e:
         return _skip(f"Cannot import API services: {e}. Run from repo root.")
 
@@ -85,41 +87,36 @@ async def _run_async(top_k: int, verbose: bool) -> dict:
     reciprocal_ranks: list[float] = []
     per_query_results: list[dict] = []
 
-    for q in queries:
+    for idx, q in enumerate(queries):
         query_text        = q["query"]
         expected_articles = set(q["expected_articles"])
 
-        # Embed query
-        vectors = await emb_service.embed([query_text])
+        # Wrap query as a DocumentChunk with domain=None so retrieve_requirements
+        # applies no article filter — same unfiltered path used when domain is
+        # unknown at the start of the pipeline.
+        chunk = DocumentChunk(
+            chunk_id=f"eval-query-{idx:03d}",
+            text=query_text,
+            source_file="eval_gold_queries",
+            chunk_index=idx,
+            language="en",
+            domain=None,
+        )
 
-        # Query ChromaDB — search both collections
-        results: list[dict] = []
-        for col in ("eu_ai_act", "gdpr"):
-            if col not in collections:
-                continue
-            raw = await chroma.query(
-                collection_name=col,
-                query_embeddings=vectors,
-                n_results=min(top_k, 10),
-            )
-            ids       = raw.get("ids",       [[]])[0]
-            docs      = raw.get("documents", [[]])[0]
-            metas     = raw.get("metadatas", [[]])[0]
-            distances = raw.get("distances", [[]])[0]
-            for i, (doc_id, doc, meta, dist) in enumerate(
-                zip(ids, docs, metas, distances)
-            ):
-                results.append({
-                    "rank":        i + 1,
-                    "id":          doc_id,
-                    "text":        doc[:120],
-                    "article_num": meta.get("article_num"),
-                    "distance":    round(dist, 4),
-                    "collection":  col,
-                })
+        # Use the production retrieval path (eu_ai_act + compliance_checklist,
+        # language-preferred, sorted by distance).
+        retrieved = await retrieve_requirements(
+            chunk, emb_service, chroma, top_k=max(top_k, 5)
+        )
 
-        # Sort merged results by distance (lower = more similar)
-        results.sort(key=lambda x: x["distance"])
+        results = [
+            {
+                "article_num": r["metadata"].get("article_num"),
+                "distance":    round(r["distance"], 4),
+                "text":        r["text"][:120],
+            }
+            for r in retrieved
+        ]
 
         # Compute Recall@K and rank of first hit
         first_hit_rank: int | None = None

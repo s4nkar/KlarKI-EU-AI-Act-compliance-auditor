@@ -75,8 +75,10 @@ def _check_article_score(score) -> list[str]:
     violations: list[str] = []
     art = score.article_num
 
-    # Rule 1: passages must exist
-    if not score.regulatory_passages:
+    # Rule 1: articles where actual user chunks were analysed must have regulatory
+    # passages backing their gaps. Articles with no classified chunks produce a
+    # synthetic "no documentation" gap that needs no citation.
+    if score.chunk_count > 0 and not score.regulatory_passages:
         violations.append(
             f"Article {art}: no regulatory passages retrieved — "
             "gap analysis is ungrounded"
@@ -109,7 +111,7 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
     import os
 
     try:
-        from services.chunker           import chunk_document
+        from services.chunker           import chunk_text
         from services.language_detector import detect_language
         from services.classifier        import classify_chunks
         from services.embedding_service import EmbeddingService
@@ -124,7 +126,8 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
     ollama_host = os.getenv("OLLAMA_HOST", "localhost")
     chroma_host = os.getenv("CHROMADB_HOST", "localhost")
 
-    ollama = OllamaClient(host=ollama_host)
+    ollama_model = os.getenv("OLLAMA_MODEL", "phi3:mini")
+    ollama = OllamaClient(host=ollama_host, model=ollama_model)
     chroma = ChromaClient(host=chroma_host)
     try:
         ok = await ollama.health_check() and await chroma.health_check()
@@ -136,7 +139,7 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
     emb = EmbeddingService()
 
     # Run a minimal pipeline to get ArticleScores
-    chunks     = chunk_document(SYNTHETIC_DOCUMENT, source_file="hallucination_test.txt")
+    chunks     = await chunk_text(SYNTHETIC_DOCUMENT, source_file="hallucination_test.txt")
     classified = await classify_chunks(chunks, ollama)
 
     ARTICLE_DOMAINS = {
@@ -177,6 +180,7 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
             "gaps":             len(score.gaps),
             "recommendations":  len(score.recommendations),
             "passages":         len(score.regulatory_passages),
+            "chunk_count":      score.chunk_count,
             "violations":       violations,
         }
 
@@ -184,9 +188,13 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
             icon = "✓" if not violations else "✗"
             print(f"  {icon} Article {art_num}: {len(score.gaps)} gaps, {len(score.regulatory_passages)} passages, {len(violations)} violations")
 
-    citation_rate = sum(
-        1 for v in article_results.values() if v["passages"] > 0
-    ) / max(len(article_results), 1)
+    # Citation rate: fraction of articles that *had user chunks* and retrieved passages.
+    # Articles with no classified chunks are excluded — they never trigger RAG.
+    articles_with_chunks = [v for v in article_results.values() if v["chunk_count"] > 0]
+    citation_rate = (
+        sum(1 for v in articles_with_chunks if v["passages"] > 0)
+        / max(len(articles_with_chunks), 1)
+    )
 
     status: str
     if strict:
