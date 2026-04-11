@@ -196,7 +196,7 @@ async def _run_pipeline(
                     chunk=c,
                     embedding_service=embeddings,
                     chroma_client=chroma,
-                    top_k=3,
+                    top_k=5,
                 )
                 reg_passages.extend(passages)
 
