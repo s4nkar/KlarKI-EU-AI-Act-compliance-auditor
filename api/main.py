@@ -12,6 +12,7 @@ from models.schemas import APIResponse
 from services.chroma_client import ChromaClient
 from services.embedding_service import EmbeddingService
 from services.ollama_client import OllamaClient
+from services.rag_engine import build_bm25_index
 
 logger = structlog.get_logger()
 
@@ -28,6 +29,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Embedding model — loaded once, shared across all requests
     # Runs on CPU; keeps VRAM free for Ollama
     app.state.embeddings = EmbeddingService(model_name=settings.embedding_model)
+
+    # BM25 index — built from ChromaDB corpus once at startup
+    # Also pre-loads the cross-encoder to avoid cold-start on first request
+    await build_bm25_index(chroma)
 
     logger.info("klarki_ready")
     yield

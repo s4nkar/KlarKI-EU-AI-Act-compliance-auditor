@@ -70,6 +70,12 @@ interface EvalResult {
   checks?: Record<string, boolean>
   checks_passed?: number
   checks_total?: number
+  // ner
+  overall_f1?: number
+  per_label?: Record<string, { precision: number; recall: number; f1: number; tp: number; fp: number; fn: number }>
+  weak_labels?: Record<string, number>
+  failing_labels?: Record<string, number>
+  n_gold?: number
 }
 
 type EvalResultsMap = Record<string, EvalResult>
@@ -370,6 +376,7 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
 
   const EVAL_META: Record<string, { label: string; desc: string }> = {
     classifier:   { label: 'Gold Dataset',     desc: 'BERT on 80 hand-labeled examples' },
+    ner:          { label: 'NER Gold Eval',    desc: '8-label entity recognition — 31 gold sentences' },
     rag:          { label: 'RAG Retrieval',     desc: 'Recall@K against ChromaDB' },
     pipeline:     { label: 'End-to-End',        desc: 'Full pipeline on synthetic doc' },
     hallucination:{ label: 'Hallucination',     desc: 'Citation & grounding checks' },
@@ -388,6 +395,7 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
 
   function keyMetric(key: string, r: EvalResult): string {
     if (key === 'classifier') return r.macro_f1 != null ? `Macro F1 ${(r.macro_f1 * 100).toFixed(1)}%` : '—'
+    if (key === 'ner')        return r.overall_f1 != null ? `Overall F1 ${(r.overall_f1 * 100).toFixed(1)}%  ·  ${r.n_gold ?? '—'} gold samples` : '—'
     if (key === 'rag')        return r['recall@3'] != null ? `Recall@3 ${(r['recall@3'] * 100).toFixed(1)}%  ·  MRR ${r.mrr?.toFixed(3) ?? '—'}` : '—'
     if (key === 'adversarial')return r.adversarial_accuracy != null ? `Accuracy ${(r.adversarial_accuracy * 100).toFixed(1)}%` : '—'
     if (key === 'consistency')return r.bert?.consistency_rate != null ? `BERT ${(r.bert.consistency_rate * 100).toFixed(0)}%  ·  LLM ${r.ollama?.consistency_rate != null ? (r.ollama.consistency_rate * 100).toFixed(0) + '%' : '—'}` : '—'
@@ -426,7 +434,14 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
               </div>
               {r.status === 'skip'
                 ? <p className="text-xs text-slate-400 italic">{r.reason ?? 'Skipped'}</p>
-                : <p className="text-sm font-semibold text-slate-700 tabular-nums">{keyMetric(key, r)}</p>
+                : <div>
+                    <p className="text-sm font-semibold text-slate-700 tabular-nums">{keyMetric(key, r)}</p>
+                    {key === 'ner' && r.weak_labels && Object.keys(r.weak_labels).length > 0 && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        Weak: {Object.keys(r.weak_labels).join(', ')}
+                      </p>
+                    )}
+                  </div>
               }
             </div>
           )

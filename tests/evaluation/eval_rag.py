@@ -52,7 +52,7 @@ async def _run_async(top_k: int, verbose: bool) -> dict:
     try:
         from services.embedding_service import EmbeddingService
         from services.chroma_client import ChromaClient
-        from services.rag_engine import retrieve_requirements
+        from services.rag_engine import retrieve_requirements, build_bm25_index
         from models.schemas import DocumentChunk
     except ImportError as e:
         return _skip(f"Cannot import API services: {e}. Run from repo root.")
@@ -79,6 +79,13 @@ async def _run_async(top_k: int, verbose: bool) -> dict:
 
     if verbose:
         print(f"  ChromaDB OK — collections: {collections}")
+
+    # Build BM25 index from ChromaDB corpus so the eval tests the full
+    # hybrid pipeline (BM25 + vector + RRF + cross-encoder), matching
+    # exactly what production does at app startup.
+    await build_bm25_index(chroma)
+    if verbose:
+        print("  BM25 index built")
 
     emb_service = EmbeddingService()
     queries     = load_queries()

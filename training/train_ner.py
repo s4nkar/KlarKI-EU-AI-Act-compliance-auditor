@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """Train a spaCy NER model for EU AI Act entity recognition.
 
-Extracts entities: ARTICLE, OBLIGATION, RISK_TIER, REGULATION
-from compliance document text.
+Extracts entities:
+  ARTICLE, OBLIGATION, ACTOR, AI_SYSTEM, RISK_TIER, PROCEDURE, REGULATION, PROHIBITED_USE
+
+Uses de_core_news_lg as the backbone (pre-trained German word vectors + tok2vec).
+Falls back to spacy.blank("de") if de_core_news_lg is not installed.
+
+Install backbone:
+    python -m spacy download de_core_news_lg
 
 Usage:
-    pip install spacy tqdm
     python training/train_ner.py \
         --data training/data/ner_annotations.jsonl \
-        --output training/spacy_ner_model \
-        --epochs 30
-
-Uses spacy.blank("de") to avoid the spacy-lookups-data dependency on de_core_news_sm.
-The blank German model has the correct tokenisation rules without requiring lookup tables.
+        --output training/spacy_ner_model
 
 The trained model is saved as a spaCy pipeline and wrapped in a Triton
 Python backend at model_repository/spacy_ner/1/model.py.
@@ -36,7 +37,7 @@ from spacy.tokens import DocBin
 from spacy.training import Example
 
 
-ENTITY_LABELS = ["ARTICLE", "OBLIGATION", "RISK_TIER", "REGULATION"]
+ENTITY_LABELS = ["ARTICLE", "OBLIGATION", "ACTOR", "AI_SYSTEM", "RISK_TIER", "PROCEDURE", "REGULATION", "PROHIBITED_USE"]
 
 RESET = "\033[0m"
 BOLD  = "\033[1m"
@@ -149,13 +150,20 @@ def main() -> None:
     print(_c(BOLD, "\n  NER Training -- EU AI Act Entity Recognition"))
     print(_c(DIM, "  -" * 30))
 
-    # Use spacy.blank("de") — correct German tokenisation without needing
-    # spacy-lookups-data or de_core_news_sm's lexeme_norm tables.
-    print(_c(DIM, "  Loading blank German model (spacy.blank('de'))..."))
-    nlp = spacy.blank("de")
+    # Load de_core_news_lg as backbone (pre-trained German tok2vec + word vectors).
+    # Falls back to blank German model if not installed.
+    try:
+        nlp = spacy.load("de_core_news_lg", exclude=["ner"])
+        backbone = "de_core_news_lg (pre-trained tok2vec + word vectors)"
+    except OSError:
+        print(_c(AMBER, "  WARNING: de_core_news_lg not found — using blank German model."))
+        print(_c(AMBER, "  Install for better accuracy: python -m spacy download de_core_news_lg"))
+        nlp = spacy.blank("de")
+        backbone = "spacy.blank('de')"
+    print(_c(DIM, f"  Backbone: {backbone}"))
 
-    # Add NER component from scratch
-    ner = nlp.add_pipe("ner")
+    # Add fresh NER head on top of the backbone
+    ner = nlp.add_pipe("ner", last=True)
     for label in ENTITY_LABELS:
         ner.add_label(label)
     print(_c(DIM, f"  Entity labels: {', '.join(ENTITY_LABELS)}"))
@@ -192,8 +200,15 @@ def main() -> None:
           f"dropout={args.dropout}, patience={args.patience}")
     print(_c(DIM, "  -" * 30))
 
+    # de_core_news_lg tries to load lexeme_norm lookup tables during initialize()
+    # which requires spacy-lookups-data. NER doesn't need these tables — clear them.
+    nlp.config["initialize"]["lookups"] = None
     optimizer = nlp.initialize()
-    other_pipes = [p for p in nlp.pipe_names if p != "ner"]
+    # Keep tok2vec active so NER benefits from pre-trained representations.
+    # Disable only task-specific heads irrelevant to NER (tagger, parser, etc.).
+    # No-op for blank model which has no tok2vec.
+    skip_in_training = {"ner", "tok2vec"}
+    other_pipes = [p for p in nlp.pipe_names if p not in skip_in_training]
 
     t_start = time.time()
     best_f1 = 0.0
@@ -209,7 +224,7 @@ def main() -> None:
             for batch in spacy.util.minibatch(train_examples, size=args.batch_size):
                 nlp.update(batch, drop=args.dropout, losses=losses, sgd=optimizer)
 
-            ner_loss = losses.get("ner", 0.0)
+            train_loss = losses.get("ner", 0.0)
 
             # Per-epoch dev F1 — drives best-model saving and early stopping
             dev_f1, _ = _eval_f1(nlp, dev_records)
@@ -217,7 +232,7 @@ def main() -> None:
 
             if improved:
                 best_f1 = dev_f1
-                best_loss = ner_loss
+                best_loss = train_loss
                 best_epoch = epoch
                 patience_count = 0
                 nlp.to_disk(model_best_path)
@@ -230,11 +245,19 @@ def main() -> None:
                 bar = _bar(epoch, args.epochs)
                 f1_colour = GREEN if dev_f1 >= 0.90 else AMBER if dev_f1 >= 0.75 else RED
                 marker = _c(GREEN, " ← best") if improved else ""
+
+                # Train loss colouring — high loss late in training suggests underfitting
+                loss_colour = GREEN if train_loss < 0.5 else AMBER if train_loss < 1.0 else RED
+                loss_str = _c(loss_colour, f"train_loss={train_loss:.4f}")
+
                 print(
                     f"  Epoch {epoch:>3}/{args.epochs}  {bar}"
-                    f"  loss={ner_loss:.4f}  dev_F1={_c(f1_colour, f'{dev_f1:.4f}')}{marker}"
+                    f"  {loss_str}  dev_F1={_c(f1_colour, f'{dev_f1:.4f}')}{marker}"
                     + _c(DIM, f"  {elapsed:.0f}s")
                 )
+
+                if train_loss > 1.0 and dev_f1 < 0.60:
+                    print(_c(AMBER, "    [!]  High train loss + low F1 — model may be UNDERFITTING"))
 
             # Early stopping
             if patience_count >= args.patience:
@@ -261,14 +284,19 @@ def main() -> None:
     print(_c(DIM,   "  Copy to model_repository/spacy_ner/1/ for Triton deployment."))
 
     # -- Evaluation on dev set -------------------------------------------------
+    # Disable the same non-NER pipes as during training. After nlp.from_disk()
+    # the full de_core_news_lg pipeline is active; running it during eval causes
+    # the attributeruler/tagger to overwrite doc.ents, producing 0.000 for some labels.
     print(_c(BOLD, "\n  Evaluating on dev set..."))
+    eval_other_pipes = [p for p in nlp.pipe_names if p not in {"ner", "tok2vec"}]
     from spacy.scorer import Scorer
     scorer = Scorer()
-    examples_dev = [
-        Example(nlp(r["text"]),
-                _make_example(r, nlp).reference)
-        for r in dev_records
-    ]
+    with nlp.disable_pipes(*eval_other_pipes):
+        examples_dev = [
+            Example(nlp(r["text"]),
+                    _make_example(r, nlp).reference)
+            for r in dev_records
+        ]
     scores = scorer.score(examples_dev)
     ents_per_type = scores.get("ents_per_type", {})
 
