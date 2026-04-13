@@ -77,24 +77,51 @@ class EpochProgressCallback(TrainerCallback):
         metrics: dict, **kwargs
     ) -> None:
         epoch = int(state.epoch or 0)
-        f1 = metrics.get("eval_macro_f1", 0.0)
-        loss = metrics.get("eval_loss", 0.0)
-        epoch_time = time.time() - self._epoch_start
+        val_f1   = metrics.get("eval_macro_f1", 0.0)
+        val_loss = metrics.get("eval_loss", 0.0)
+        epoch_time    = time.time() - self._epoch_start
         total_elapsed = time.time() - self._train_start
 
+        # Pull the most recent training loss from log history (logged every N steps)
+        train_loss_entries = [
+            e["loss"] for e in state.log_history
+            if "loss" in e and "eval_loss" not in e
+        ]
+        train_loss = train_loss_entries[-1] if train_loss_entries else None
+
         bar = _bar(epoch, self._total)
-        f1_colour = _GREEN if f1 >= 0.85 else _AMBER if f1 >= 0.70 else _RED
-        f1_str = _c(f1_colour, f"{f1:.4f}")
+        f1_colour = _GREEN if val_f1 >= 0.85 else _AMBER if val_f1 >= 0.70 else _RED
+
+        # Build side-by-side loss display to reveal overfitting/underfitting
+        if train_loss is not None:
+            gap = val_loss - train_loss
+            if gap > 0.3:
+                loss_colour = _RED    # val >> train → overfitting
+            elif val_loss > 1.0:
+                loss_colour = _AMBER  # both high → underfitting
+            else:
+                loss_colour = _GREEN
+            loss_str = _c(loss_colour, f"train={train_loss:.4f}  val={val_loss:.4f}  gap={gap:+.4f}")
+        else:
+            loss_str = f"val_loss={val_loss:.4f}"
 
         print(
             f"\n  {_c(_BOLD, f'Epoch {epoch}/{self._total}')}  {bar}"
-            f"  loss={loss:.4f}  macro_F1={f1_str}"
-            + _c(_DIM, f"  ({epoch_time:.0f}s this epoch  /  {total_elapsed:.0f}s total)")
+            f"  {loss_str}  val_F1={_c(f1_colour, f'{val_f1:.4f}')}"
+            + _c(_DIM, f"  ({epoch_time:.0f}s / {total_elapsed:.0f}s total)")
         )
 
-        if f1 >= 0.93:
+        # Bias/variance diagnosis
+        if train_loss is not None:
+            gap = val_loss - train_loss
+            if gap > 0.3:
+                print(_c(_RED,   "  [!!] Large train/val loss gap — model may be OVERFITTING"))
+            elif val_loss > 1.0 and val_f1 < 0.60:
+                print(_c(_AMBER, "  [!]  High loss on both sets — model may be UNDERFITTING"))
+
+        if val_f1 >= 0.93:
             print(_c(_GREEN, "  [OK] Above 0.93 production target"))
-        elif f1 >= 0.85:
+        elif val_f1 >= 0.85:
             print(_c(_AMBER, "  [~] Above 0.85 but below 0.93 production target"))
         elif epoch == self._total:
             print(_c(_RED, "  [!!] Below 0.85 — consider more data or epochs"))

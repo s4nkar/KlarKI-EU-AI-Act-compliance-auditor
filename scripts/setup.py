@@ -8,7 +8,7 @@ Runs every initialisation step in order:
   Stage 2  knowledge-base    - chunk + embed EU AI Act / GDPR -> ChromaDB
   Stage 3  generate-data     - generate synthetic BERT training data via Ollama
   Stage 4  train-bert        - fine-tune deepset/gbert-base (GPU recommended)
-  Stage 5  generate-ner-data - generate synthetic NER training data via Ollama
+  Stage 5  generate-ner-data - generate NER training data via deterministic templates
   Stage 6  train-ner         - train spaCy NER model
   Stage 7  export-bert       - export fine-tuned BERT -> ONNX
   Stage 8  export-e5         - export multilingual-e5-small -> ONNX
@@ -49,6 +49,13 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+# Windows cp1252 stdout can't encode UTF-8 output from subprocesses (German
+# characters, progress bars). Reconfigure to UTF-8 so streamed output renders.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 
 
@@ -111,12 +118,30 @@ def fail(msg: str, elapsed: float) -> None:
 
 
 def run(cmd: list[str], dry_run: bool = False) -> int:
-    """Run a subprocess, streaming output. Returns exit code."""
+    """Run a subprocess, streaming stdout+stderr in real-time. Returns exit code."""
+    import os
     print(_c(DIM, "     $ " + " ".join(str(c) for c in cmd)))
+    sys.stdout.flush()
     if dry_run:
         return 0
-    result = subprocess.run(cmd, text=True)
-    return result.returncode
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
+    # Merge stderr into stdout so all output is streamed live in order.
+    proc = subprocess.Popen(
+        cmd, text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
+        encoding="utf-8",
+        errors="replace",
+        env=env,
+    )
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        print(line, end="", flush=True)
+    proc.wait()
+    return proc.returncode
 
 
 ROOT = Path(__file__).parent.parent  # project root
@@ -260,16 +285,15 @@ def stage_train_bert(args: argparse.Namespace) -> bool:
 
 
 def stage_generate_ner_data(args: argparse.Namespace) -> bool:
-    """Stage - generate synthetic NER training data via Ollama.
+    """Stage - generate NER training data via deterministic template expansion.
 
-    Auto-skips if ner_annotations.jsonl already has enough records.
+    No LLM required. Auto-skips if ner_annotations.jsonl already has enough records.
     Pass --gen-overwrite to force regeneration.
     """
-    step("Generating synthetic NER training data via Ollama")
+    step("Generating NER training data (deterministic templates — no Ollama required)")
     data_path = ROOT / "training" / "data" / "ner_annotations.jsonl"
 
-    # 4 labels x 2 languages x n-per-label
-    min_needed = 4 * 2 * args.ner_per_label
+    min_needed = args.ner_templates
     if not args.gen_overwrite and not args.dry_run and data_path.exists():
         line_count = sum(1 for ln in data_path.open(encoding="utf-8") if ln.strip())
         if line_count >= min_needed:
@@ -282,11 +306,8 @@ def stage_generate_ner_data(args: argparse.Namespace) -> bool:
     cmd = [
         sys.executable,
         str(ROOT / "scripts" / "generate_ner_data.py"),
-        "--output",        str(data_path),
-        "--ollama-host",   args.ollama_host,
-        "--ollama-model",  args.ollama_model,
-        "--n-per-label",   str(args.ner_per_label),
-        "--batch-size",    "10",
+        "--output",       str(data_path),
+        "--n-templates",  str(args.ner_templates),
     ]
     if args.gen_overwrite:
         cmd.append("--overwrite")
@@ -448,8 +469,8 @@ def parse_args() -> argparse.Namespace:
                    help="Examples per Ollama call in generate-data stage (default: 20)")
     p.add_argument("--gen-overwrite", action="store_true",
                    help="Overwrite existing clause_labels.jsonl / ner_annotations.jsonl instead of appending")
-    p.add_argument("--ner-per-label", type=int, default=375,
-                   help="NER sentences per entity label per language (default: 375, total ~3000)")
+    p.add_argument("--ner-templates", type=int, default=5000,
+                   help="Template-generated NER records to produce (default: 5000)")
     p.add_argument("--retrain", action="store_true",
                    help="Force full retrain: overwrite training data, retrain BERT + NER, re-export ONNX")
 

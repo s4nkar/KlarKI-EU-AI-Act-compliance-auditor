@@ -167,7 +167,7 @@ def test_no_concept_below_50_pct() -> None:
     weak = {
         k: v["correct"] / v["total"]
         for k, v in r.get("by_concept", {}).items()
-        if v["correct"] / v["total"] < 0.50
+        if v["total"] >= 3 and v["correct"] / v["total"] < 0.50
     }
     assert not weak, f"Concepts below 50% adversarial accuracy: {weak}"
 

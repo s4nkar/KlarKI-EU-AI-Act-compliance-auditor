@@ -30,9 +30,9 @@ setup.py runs it automatically as the 'generate-data' stage.
 """
 
 import argparse
+import asyncio
 import json
 import re
-import time
 from pathlib import Path
 
 import httpx
@@ -153,16 +153,92 @@ def load_article_text(regulation: str, article_num: int, lang: str = "en") -> st
         return ""
 
 
-_TIMEOUT = httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=5.0)
+def _get_article_domain(path: Path) -> str | None:
+    """Read the DOMAIN: header from the first 8 lines of a regulatory txt file."""
+    for line in path.read_text(encoding="utf-8").splitlines()[:8]:
+        if line.strip().startswith("DOMAIN:"):
+            return line.split(":", 1)[1].strip()
+    return None
 
 
-def ollama_generate(host: str, model: str, prompt: str) -> str:
-    """Synchronous Ollama generate call."""
-    payload = {"model": model, "prompt": prompt, "stream": False, "format": "json"}
-    with httpx.Client(timeout=_TIMEOUT) as client:
-        resp = client.post(f"{host}/api/generate", json=payload)
-        resp.raise_for_status()
-        return resp.json().get("response", "").strip()
+def _split_regulatory_sentences(text: str) -> list[str]:
+    """Split a regulatory article section into individual sentences.
+
+    Skips the first non-empty line (article title), strips list markers
+    like (a), (b), (i), 1., 2., and discards sentences under 40 chars.
+    """
+    lines = text.splitlines()
+    skip_title = True
+    body_lines: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if skip_title:
+            skip_title = False
+            continue  # skip "Article N — Title" line
+        body_lines.append(stripped)
+
+    body = " ".join(body_lines)
+    parts = re.split(r'(?<=[.!?])\s+', body)
+    results: list[str] = []
+    for part in parts:
+        # Strip list item prefixes: (a), (b), (i), (ii), 1., 2., etc.
+        part = re.sub(r'^[\(\[]?(?:[ivxIVX]+|[a-z0-9]{1,3})[\)\]\.]\s+', '', part).strip()
+        if len(part) >= 40:
+            results.append(part)
+    return results
+
+
+def extract_regulatory_sentences(regulatory_dir: Path, lang_codes: set[str]) -> list[dict]:
+    """Extract labeled sentences directly from data/regulatory/ article files.
+
+    Each file's DOMAIN: header determines the classifier label.
+    Files whose domain is not in the 8 trained classes are skipped (e.g. GDPR articles).
+    Returns records with source='regulatory'.
+    """
+    valid_labels = {d["label"] for d in DOMAINS}
+    records: list[dict] = []
+
+    for txt_file in sorted(regulatory_dir.glob("**/*.txt")):
+        domain = _get_article_domain(txt_file)
+        if not domain or domain not in valid_labels:
+            continue
+        sections = _parse_txt_sections(txt_file)
+        for lang_code in sorted(lang_codes):
+            text = sections.get(lang_code, "")
+            if not text:
+                continue
+            for sentence in _split_regulatory_sentences(text):
+                records.append({
+                    "text": sentence,
+                    "label": domain,
+                    "lang": lang_code,
+                    "source": "regulatory",
+                })
+
+    return records
+
+
+async def ollama_generate(
+    client: httpx.AsyncClient,
+    host: str,
+    model: str,
+    prompt: str,
+    num_predict: int,
+) -> str:
+    """Async Ollama generate call using a shared client session."""
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "stream": False,
+        "format": "json",
+        "keep_alive": "-1m",
+        "options": {"num_predict": num_predict},
+    }
+    resp = await client.post(f"{host}/api/generate", json=payload)
+    resp.raise_for_status()
+    return resp.json().get("response", "").strip()
 
 
 def parse_json_list(raw: str) -> list[str]:
@@ -196,30 +272,18 @@ def parse_json_list(raw: str) -> list[str]:
     return lines
 
 
-def build_prompt(domain: dict, language_name: str, lang_code: str, n: int) -> str:
-    """Build a generation prompt anchored to the actual regulation text.
+def build_prompt(
+    domain: dict,
+    language_name: str,
+    n: int,
+    real_examples: list[str] | None = None,
+) -> str:
+    """Build a generation prompt anchored to real regulatory sentences.
 
-    Loads article text from data/regulatory/ and includes a truncated excerpt
-    as reference. This grounds the generated examples in official language rather
-    than vague domain descriptions, producing more accurate training data.
+    Uses actual sentences extracted from data/regulatory/ as few-shot style
+    anchors. This is stronger than showing raw article text because the LLM
+    sees exactly what format and register correct training examples should have.
     """
-    regulation, article_num = DOMAIN_ARTICLE_MAP.get(domain["label"]) or (None, None)
-
-    # Load regulation reference text (EN always; DE for German prompts)
-    article_ref = ""
-    if regulation and article_num:
-        ref_lang = lang_code if lang_code in ("en", "de") else "en"
-        text = load_article_text(regulation, article_num, ref_lang)
-        if not text:
-            text = load_article_text(regulation, article_num, "en")
-        if text:
-            # Truncate to ~800 chars at a sentence boundary
-            if len(text) > 800:
-                truncated = text[:800].rsplit(".", 1)[0] + "."
-            else:
-                truncated = text
-            article_ref = f"\nReference regulation text:\n{truncated}\n"
-
     lang_instruction = f"Generate all {n} sentences in {language_name}."
 
     if domain["label"] == "unrelated":
@@ -239,12 +303,26 @@ def build_prompt(domain: dict, language_name: str, lang_code: str, n: int) -> st
             f'- Keep sentences independent and realistic\n'
             f'- Do not mention AI, machine learning, or EU AI Act\n'
             f'\n'
-            f'Return ONLY a JSON array of {n} strings:\n'
+            f'Return ONLY a JSON object:\n'
             f'{{"sentences": ["...", "..."]}}'
         )
 
+    # Few-shot examples block — real sentences from the regulatory corpus
+    examples_block = ""
+    if real_examples:
+        sample = real_examples[:5]
+        lines = "\n".join(f'  {i + 1}. "{ex}"' for i, ex in enumerate(sample))
+        examples_block = (
+            f"\nReal {language_name} sentences from the regulatory corpus "
+            f"(use these as style and register anchors — do NOT copy them verbatim):\n"
+            f"{lines}\n"
+        )
+
     not_confused = domain.get("not_confused_with", "")
-    disambiguation = f"\nIMPORTANT — do NOT generate sentences that could belong to other classes:\n{not_confused}\n" if not_confused else ""
+    disambiguation = (
+        f"\nIMPORTANT — do NOT generate sentences that could belong to other classes:\n"
+        f"{not_confused}\n"
+    ) if not_confused else ""
 
     return (
         f'You are generating training data for a compliance classification model.\n'
@@ -252,46 +330,107 @@ def build_prompt(domain: dict, language_name: str, lang_code: str, n: int) -> st
         f'Label: {domain["label"].upper()}\n'
         f'Regulation: EU AI Act {domain["article"]}\n'
         f'Description: {domain["description"]}\n'
-        f'{article_ref}'
+        f'{examples_block}'
         f'{disambiguation}\n'
-        f'Generate {n} short sentences (10-30 words) that could appear in an AI system\'s '
+        f'Generate {n} NEW sentences (10-30 words) that could appear in an AI system\'s '
         f'compliance documentation, internal policy, or audit report. {lang_instruction}\n'
         f'\n'
         f'Requirements:\n'
         f'- Each sentence must UNAMBIGUOUSLY belong to {domain["label"].upper()} — a human expert must agree\n'
-        f'- Use realistic compliance language (policy declarations, process steps, audit findings)\n'
+        f'- Match the register of the example sentences above (formal, precise, regulatory)\n'
         f'- Avoid repeating phrases or synonymous rewrites\n'
         f'- Vary sentence structure (statements, imperatives, passive constructions)\n'
         f'- Keep sentences independent — each must stand alone\n'
-        f'- Do NOT copy or paraphrase the reference text directly\n'
+        f'- Do NOT copy or closely paraphrase the example sentences\n'
         f'\n'
         f'Return ONLY a JSON object:\n'
         f'{{"sentences": ["...", "..."]}}'
     )
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Auto-generate BERT training data via Ollama")
+async def _generate_domain_lang(
+    semaphore: asyncio.Semaphore,
+    client: httpx.AsyncClient,
+    domain: dict,
+    lang_code: str,
+    lang_name: str,
+    needed: int,
+    batch_size: int,
+    host: str,
+    model: str,
+    existing_snapshot: frozenset,
+    num_predict: int,
+    real_examples: list[str] | None = None,
+) -> tuple[str, str, list[str]]:
+    """Generate `needed` synthetic sentences for one (domain, language) pair.
+
+    The semaphore is acquired PER REQUEST (not per task) so concurrent tasks
+    interleave correctly and don't all queue up against Ollama at once.
+    Returns (label, lang_code, texts).
+    """
+    generated: list[str] = []
+    seen: set[str] = set(existing_snapshot)
+    # More headroom: at least 6× the minimum batches needed
+    max_attempts = max((needed // batch_size + 3) * 6, 20)
+    attempts = 0
+
+    print(f"  [{domain['label']}][{lang_code}] task started — need {needed}, "
+          f"max_attempts={max_attempts}")
+
+    while len(generated) < needed and attempts < max_attempts:
+        batch_n = min(batch_size, needed - len(generated) + 5)
+        prompt = build_prompt(domain, lang_name, batch_n, real_examples)
+        try:
+            # Acquire semaphore only for the duration of the HTTP request
+            async with semaphore:
+                raw = await ollama_generate(client, host, model, prompt, num_predict)
+            batch = parse_json_list(raw)
+            new_count = 0
+            for text in batch:
+                text = text.strip()
+                if len(text) >= 20 and text not in seen:
+                    generated.append(text)
+                    seen.add(text)
+                    new_count += 1
+            print(f"  [{domain['label']}][{lang_code}] batch {attempts + 1}: "
+                  f"got {len(batch)}, kept {new_count} (total {len(generated)}/{needed})")
+        except Exception as exc:
+            print(f"  [{domain['label']}][{lang_code}] WARNING batch {attempts + 1}: {exc}")
+            await asyncio.sleep(2)
+        attempts += 1
+
+    if len(generated) < needed:
+        print(f"  [{domain['label']}][{lang_code}] reached max_attempts ({max_attempts}) "
+              f"with {len(generated)}/{needed} collected")
+
+    return domain["label"], lang_code, generated[:needed]
+
+
+async def main() -> None:
+    parser = argparse.ArgumentParser(description="Auto-generate BERT training data via Ollama (async)")
     parser.add_argument("--n-per-class", type=int, default=400,
                         help="Examples to generate per class per language (default: 400)")
-    parser.add_argument("--output",  default="training/data/clause_labels.jsonl",
-                        help="Output JSONL path")
-    parser.add_argument("--overwrite", action="store_true",
-                        help="Overwrite output file instead of appending")
-    parser.add_argument("--ollama-host",  default="http://localhost:11434")
+    parser.add_argument("--output", default="training/data/clause_labels.jsonl")
+    parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--ollama-host", default="http://localhost:11434")
     parser.add_argument("--ollama-model", default="phi3:mini")
-    parser.add_argument("--languages",   default="en,de",
-                        help="Comma-separated language codes to generate (default: en,de)")
-    parser.add_argument("--batch-size",  type=int, default=20,
-                        help="Examples to request per Ollama call (default: 20)")
+    parser.add_argument("--languages", default="en,de",
+                        help="Comma-separated language codes (default: en,de)")
+    parser.add_argument("--batch-size", type=int, default=10,
+                        help="Sentences per Ollama call (default: 10; raise to 20-30 on GPU)")
+    parser.add_argument("--semaphore", type=int, default=2,
+                        help="Max concurrent Ollama requests (default: 2; raise to 4-6 on GPU)")
+    parser.add_argument("--num-predict", type=int, default=2048,
+                        help="Max tokens per Ollama response (default: 2048)")
     args = parser.parse_args()
 
     output_path = Path(args.output)
+    if not output_path.is_absolute():
+        output_path = ROOT / output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
-
     active_langs = [(c, n) for c, n in LANGUAGES if c in args.languages.split(",")]
 
-    # Load existing examples to avoid duplicates
+    # Load existing examples
     existing_texts: set[str] = set()
     if output_path.exists() and not args.overwrite:
         with open(output_path, encoding="utf-8") as f:
@@ -307,19 +446,47 @@ def main() -> None:
         output_path.unlink()
         print("Overwrite mode: cleared existing file")
 
-    # Verify Ollama is reachable
+    # Verify Ollama is reachable and the model can actually generate
     print(f"\nChecking Ollama at {args.ollama_host}...")
     try:
-        with httpx.Client(timeout=httpx.Timeout(5.0)) as client:
-            resp = client.get(f"{args.ollama_host}/api/tags")
-            resp.raise_for_status()
-        print("  Ollama is ready.")
+        _probe_timeout = httpx.Timeout(
+            connect=10.0,
+            read=120.0,
+            write=30.0,
+            pool=10.0
+        )
+        async with httpx.AsyncClient(timeout=_probe_timeout) as probe:
+            # 1. Check server is up and model is listed
+            tags_resp = await probe.get(f"{args.ollama_host}/api/tags")
+            tags_resp.raise_for_status()
+            models = [m["name"] for m in tags_resp.json().get("models", [])]
+            if not any(args.ollama_model.split(":")[0] in m for m in models):
+                print(f"  WARNING: model '{args.ollama_model}' not found in Ollama.")
+                print(f"  Available: {models or '(none)'}")
+                print(f"  Pull it first: docker exec klarki-ollama ollama pull {args.ollama_model}")
+                raise SystemExit(1)
+            print(f"  Model '{args.ollama_model}' found.")
+
+            # 2. Fire a tiny real generate request to confirm the model can respond
+            print(f"  Sending test generation request (may take 30–120 s on CPU)...")
+            test_payload = {
+                "model": args.ollama_model,
+                "prompt": 'Return a JSON object: {"ok": true}',
+                "stream": False,
+                "format": "json",
+                "options": {"num_predict": 20},
+            }
+            gen_resp = await probe.post(f"{args.ollama_host}/api/generate", json=test_payload)
+            gen_resp.raise_for_status()
+            print(f"  Ollama generate: OK (response: {gen_resp.json().get('response','')[:60]!r})")
+    except SystemExit:
+        raise
     except Exception as exc:
-        print(f"  ERROR: Cannot reach Ollama: {exc}")
+        print(f"  ERROR: {exc}")
         print("  Start containers first: docker compose up -d")
         raise SystemExit(1)
 
-    # Report which article files were found
+    # Report article reference files
     print("\nRegulatory reference files:")
     for domain in DOMAINS:
         article_ref = DOMAIN_ARTICLE_MAP.get(domain["label"])
@@ -331,63 +498,86 @@ def main() -> None:
         else:
             print(f"  {domain['label']}: no article reference (unrelated class)")
 
-    total_written = 0
+    # Inject real regulatory sentences and build per-(domain, lang) example map
+    print("\nExtracting real regulatory sentences...")
+    active_lang_codes = {c for c, _ in active_langs}
+    reg_records = extract_regulatory_sentences(REGULATORY_DIR, active_lang_codes)
 
+    # Build few-shot anchor map: {(label, lang_code): [sentence, ...]}
+    real_examples_map: dict[tuple[str, str], list[str]] = {}
+    for rec in reg_records:
+        key = (rec["label"], rec["lang"])
+        real_examples_map.setdefault(key, []).append(rec["text"])
+
+    reg_written = 0
     with open(output_path, "a", encoding="utf-8") as out_f:
-        for domain in DOMAINS:
-            for lang_code, lang_name in active_langs:
-                needed = args.n_per_class
-                generated: list[str] = []
+        for rec in reg_records:
+            if rec["text"] not in existing_texts:
+                out_f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                existing_texts.add(rec["text"])
+                reg_written += 1
+    print(f"  Wrote {reg_written} regulatory sentences "
+          f"({len(reg_records) - reg_written} already existed)")
+    for (lbl, lc), examples in sorted(real_examples_map.items()):
+        print(f"  [{lbl}][{lc}] {len(examples)} real sentences available as few-shot anchors")
 
-                print(f"\n  [{domain['label']}] [{lang_code}] generating {needed} examples...")
+    # Snapshot before concurrent tasks — each task gets an immutable view
+    # so they never race on the shared set during generation
+    existing_snapshot = frozenset(existing_texts)
 
-                attempts = 0
-                max_attempts = (needed // args.batch_size + 2) * 2
+    # Launch all (domain × language) tasks concurrently under the semaphore
+    n_tasks = len(DOMAINS) * len(active_langs)
+    print(f"\nGenerating {n_tasks} domain×language combinations "
+          f"(semaphore={args.semaphore}, batch={args.batch_size}, "
+          f"num_predict={args.num_predict})...")
 
-                while len(generated) < needed and attempts < max_attempts:
-                    batch_n = min(args.batch_size, needed - len(generated) + 5)
-                    prompt = build_prompt(domain, lang_name, lang_code, batch_n)
+    # 600s read timeout — phi3:mini on CPU can take 3–8 min per batch
+    _client_timeout = httpx.Timeout(connect=15.0, read=600.0, write=30.0, pool=30.0)
+    semaphore = asyncio.Semaphore(args.semaphore)
 
-                    try:
-                        raw = ollama_generate(args.ollama_host, args.ollama_model, prompt)
-                        batch = parse_json_list(raw)
+    # Write incrementally as each task completes — progress is saved even if
+    # the script is interrupted before all tasks finish
+    total_written = 0
+    async with httpx.AsyncClient(timeout=_client_timeout) as client:
+        pending_tasks = [asyncio.ensure_future(
+            _generate_domain_lang(
+                semaphore, client, domain, lang_code, lang_name,
+                args.n_per_class, args.batch_size,
+                args.ollama_host, args.ollama_model,
+                existing_snapshot, args.num_predict,
+                real_examples=real_examples_map.get((domain["label"], lang_code)),
+            )
+        ) for domain in DOMAINS for lang_code, lang_name in active_langs]
 
-                        new_count = 0
-                        for text in batch:
-                            text = text.strip()
-                            if len(text) < 20:
-                                continue
-                            if text not in existing_texts and text not in generated:
-                                generated.append(text)
-                                new_count += 1
-
-                        print(f"    batch {attempts+1}: got {len(batch)}, kept {new_count} new "
-                              f"(total {len(generated)}/{needed})")
-
-                    except Exception as exc:
-                        print(f"    WARNING: Ollama call failed: {exc}")
-                        time.sleep(2)
-
-                    attempts += 1
-
+        with open(output_path, "a", encoding="utf-8") as out_f:
+            for coro in asyncio.as_completed(pending_tasks):
+                try:
+                    label, lang_code, texts = await coro
+                except Exception as exc:
+                    print(f"  ERROR: task failed — {exc}")
+                    continue
                 written = 0
-                for text in generated[:needed]:
-                    record = {"text": text, "label": domain["label"], "lang": lang_code, "source": "generated"}
-                    out_f.write(json.dumps(record, ensure_ascii=False) + "\n")
-                    existing_texts.add(text)
-                    written += 1
-
+                for text in texts:
+                    if text not in existing_texts:
+                        record = {"text": text, "label": label, "lang": lang_code, "source": "generated"}
+                        out_f.write(json.dumps(record, ensure_ascii=False) + "\n")
+                        existing_texts.add(text)
+                        written += 1
+                out_f.flush()  # ensure OS writes to disk after each task
                 total_written += written
-                print(f"    wrote {written} examples for [{domain['label']}][{lang_code}]")
+                print(f"  wrote {written} examples for [{label}][{lang_code}] "
+                      f"(running total: {total_written})")
 
     print(f"\nDone.")
     print(f"  Written: {total_written} new examples")
     print(f"  Output:  {output_path}")
-
     total_lines = sum(1 for line in open(output_path, encoding="utf-8") if line.strip())
     print(f"  Total in file: {total_lines} examples")
     print(f"\nNext: python training/train_classifier.py --data {output_path}")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    asyncio.run(main())
