@@ -26,15 +26,13 @@ MODEL_PATH = next(
 
 
 @pytest.fixture(scope="module")
-def nlp():
-    """Load the trained spaCy NER model once for all tests in this module."""
+def nlp(spacy_ner_nlp):
+    """Return the session-scoped NER model (loaded once, shared with eval_ner.py)."""
     if MODEL_PATH is None:
         pytest.skip("NER model not found — run ./run.sh setup first")
-    try:
-        import spacy
-    except ImportError:
-        pytest.skip("spacy not installed — run pip install spacy")
-    return spacy.load(str(MODEL_PATH))
+    if spacy_ner_nlp is None:
+        pytest.skip("spacy not installed or model failed to load — run pip install spacy")
+    return spacy_ner_nlp
 
 
 # ── helper ─────────────────────────────────────────────────────────────────

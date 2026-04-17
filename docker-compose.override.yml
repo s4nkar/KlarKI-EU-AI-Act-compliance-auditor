@@ -6,8 +6,8 @@ services:
       dockerfile: Dockerfile.dev
     volumes:
       - ./api:/app
-      - ./tests:/tests        # mount tests at /tests for pytest
-      - ./training:/training  # mount training models for eval scripts
+      - ./tests:/tests # mount tests at /tests for pytest
+      - ./training:/training # mount training models for eval scripts
       - upload_data:/data/uploads
       - chroma_data:/data/chroma
     environment:
@@ -22,7 +22,7 @@ services:
       - ./frontend:/app
       - /app/node_modules
     ports:
-      - "5173:5173"
+      - "3000:5173"
     environment:
       - VITE_API_URL=http://localhost:8000
     command: npm run dev -- --host 0.0.0.0

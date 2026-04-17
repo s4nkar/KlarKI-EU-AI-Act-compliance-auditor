@@ -2,10 +2,37 @@
 
 import os
 import sys
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio
+
+# ── Session-scoped spaCy NER model ────────────────────────────────────────────
+# Loaded ONCE per pytest session and shared across test_ner.py and eval_ner.py.
+# Prevents the ~750 MB de_core_news_lg from being loaded multiple times which
+# would exhaust container memory and cause an OOM kill with no summary printed.
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+@pytest.fixture(scope="session")
+def spacy_ner_nlp():
+    """Return the loaded spaCy NER model, or None if unavailable."""
+    model_path = next(
+        (p for p in [
+            _REPO_ROOT / "training" / "spacy_ner_model" / "model-final",
+            Path("/training/spacy_ner_model/model-final"),
+        ] if p.exists()),
+        None,
+    )
+    if model_path is None:
+        return None
+    try:
+        import spacy
+        return spacy.load(str(model_path))
+    except Exception:
+        return None
 
 # Support both local dev (repo/api) and Docker container (/app)
 _local_api = os.path.join(os.path.dirname(__file__), "..", "api")

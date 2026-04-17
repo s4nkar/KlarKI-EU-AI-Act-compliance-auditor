@@ -384,9 +384,20 @@ _ARTICLE_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Whitelist of compliance-specific verbs for shall/must — prevents matching
+# generic "must be restarted", "shall use", etc. that cause false positives.
+_COMPLIANCE_VERBS_EN = (
+    r'establish|maintain|implement|document|ensure|notify|conduct|submit|retain'
+    r'|verify|demonstrate|undergo|register|draw|provide|assess|comply|certify'
+    r'|disclose|report|monitor|evaluate|test|keep|perform|carry|put|set|develop'
+    r'|deploy|adopt|follow|apply|update|complete|designate|appoint|include'
+    r'|contain|cover|address|identify|record|log|store|preserve|protect|mitigate'
+    r'|publish|make\s+available|make\s+accessible|inform|notify|alert|review'
+)
+
 _OBLIGATION_RE_EN = re.compile(
     r'\b(?:'
-    r'(?:shall|must)(?:\s+be)?\s+\w+'
+    r'(?:shall|must)(?:\s+not)?\s+(?:be\s+)?(?:' + _COMPLIANCE_VERBS_EN + r')'
     r'|are\s+required\s+to'
     r'|is\s+required\s+to'
     r'|are\s+obliged\s+to'
@@ -398,9 +409,18 @@ _OBLIGATION_RE_EN = re.compile(
     re.IGNORECASE,
 )
 
+# Whitelist of compliance-specific verbs for müssen/sollen — DE equivalent.
+_COMPLIANCE_VERBS_DE = (
+    r'einrichten|sicherstellen|dokumentieren|implementieren|melden|prüfen'
+    r'|nachweisen|unterhalten|durchführen|registrieren|erstellen|benennen'
+    r'|bereitstellen|bewerten|einhalten|zertifizieren|offenlegen|überwachen'
+    r'|testen|aufbewahren|speichern|schützen|mindern|veröffentlichen|informieren'
+    r'|benachrichtigen|überprüfen|anwenden|identifizieren|aufzeichnen'
+)
+
 _OBLIGATION_RE_DE = re.compile(
     r'\b(?:'
-    r'(?:müssen?|sollen?)\s+\w+'
+    r'(?:müssen?|sollen?)\s+(?:nicht\s+)?(?:' + _COMPLIANCE_VERBS_DE + r')'
     r'|ist\s+verpflichtet'
     r'|sind\s+verpflichtet'
     r'|ist\s+zu\s+\w+'
@@ -535,6 +555,100 @@ _PROHIBITED_USE_PHRASES_DE: list[str] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Hard negatives — sentences with entity-like words in non-regulatory context.
+# Trains the model to NOT tag these surface patterns when context is wrong.
+# All have empty entity lists by design.
+# ---------------------------------------------------------------------------
+
+_HARD_NEGATIVES_EN: list[str] = [
+    # must/shall with generic verbs — looks like OBLIGATION but isn't
+    "The server must be restarted after each configuration change.",
+    "All files must be backed up before the system update.",
+    "Staff must be informed of any schedule changes in advance.",
+    "The application must be tested by the QA team before release.",
+    "Reports must be submitted to the manager by Friday.",
+    "Passwords must be changed every ninety days for security purposes.",
+    "The software must be updated to the latest version immediately.",
+    "All meetings must be recorded for internal reference only.",
+    "Invoices must be approved by the finance department before payment.",
+    "New employees must be trained on the company safety policy.",
+    # providers/operators/manufacturers as generic business terms — not ACTOR
+    "Cloud service providers offer scalable storage solutions.",
+    "Internet service providers compete on speed and price.",
+    "Equipment manufacturers strive to reduce production costs.",
+    "Event operators are responsible for crowd management.",
+    "Software providers often bundle support with their licences.",
+    "The operator started the machine and monitored its output.",
+    "Platform operators set their own terms of service.",
+    "Manufacturers must balance quality with cost efficiency.",
+    # high-risk in non-AI-Act context — not RISK_TIER
+    "Rock climbing is considered a high-risk recreational activity.",
+    "Trading in derivatives is a high-risk investment strategy.",
+    "High-risk loans carry higher interest rates for borrowers.",
+    "The surgeon performed a high-risk operation successfully.",
+    "Extreme weather creates high-risk conditions for travellers.",
+    # AI system in casual mention — not AI_SYSTEM entity
+    "The company announced plans to develop an AI system next year.",
+    "An AI system was demonstrated at the technology conference.",
+    "Researchers are studying how an AI system can assist doctors.",
+    "The startup launched an AI system for customer support.",
+    # procedure/documentation in generic context — not PROCEDURE
+    "The hiring procedure takes approximately three weeks to complete.",
+    "Standard documentation practices improve team collaboration.",
+    "Follow the procedure outlined in the employee handbook.",
+    "Good documentation reduces onboarding time for new developers.",
+    "The emergency procedure must be practised twice a year.",
+    # article as written piece — not ARTICLE
+    "The journalist published an article about climate change.",
+    "She wrote an article on modern art for the magazine.",
+    "The article was well-received by the academic community.",
+    # regulation/GDPR in passing mention — not REGULATION entity
+    "New regulation in the banking sector is expected next year.",
+    "Local regulation varies significantly between municipalities.",
+]
+
+_HARD_NEGATIVES_DE: list[str] = [
+    # müssen/sollen mit generischen Verben
+    "Der Server muss nach jeder Konfigurationsänderung neu gestartet werden.",
+    "Alle Dateien müssen vor dem Systemupdate gesichert werden.",
+    "Mitarbeiter müssen über Terminänderungen rechtzeitig informiert werden.",
+    "Die Anwendung muss vor der Veröffentlichung vom QA-Team getestet werden.",
+    "Berichte müssen bis Freitag an den Vorgesetzten weitergeleitet werden.",
+    "Passwörter müssen alle neunzig Tage aus Sicherheitsgründen geändert werden.",
+    "Neue Mitarbeiter müssen in der Unternehmenssicherheitsrichtlinie geschult werden.",
+    # Anbieter/Betreiber/Hersteller als allgemeine Geschäftsbegriffe
+    "Cloud-Anbieter bieten skalierbare Speicherlösungen an.",
+    "Gerätehersteller versuchen, Produktionskosten zu senken.",
+    "Veranstaltungsbetreiber sind für das Crowd-Management verantwortlich.",
+    "Softwareanbieter bündeln häufig Support mit ihren Lizenzen.",
+    # hochriskant außerhalb des KI-Kontexts
+    "Klettern gilt als hochriskante Freizeitaktivität.",
+    "Der Handel mit Derivaten ist eine hochriskante Anlagestrategie.",
+    # KI-System in beiläufiger Erwähnung
+    "Das Unternehmen kündigte Pläne zur Entwicklung eines KI-Systems an.",
+    "Auf der Technologiemesse wurde ein KI-System vorgestellt.",
+    # Artikel als Zeitungsartikel
+    "Der Journalist veröffentlichte einen Artikel über den Klimawandel.",
+    "Sie schrieb einen Artikel über moderne Kunst für das Magazin.",
+    # Verfahren/Dokumentation im allgemeinen Kontext
+    "Das Einstellungsverfahren dauert ungefähr drei Wochen.",
+    "Gute Dokumentation verkürzt die Einarbeitungszeit neuer Entwickler.",
+]
+
+
+def generate_hard_negatives() -> list[dict]:
+    """Return hard negative records — entity-like surface patterns in non-regulatory context.
+
+    These have empty entity lists so the model learns NOT to tag familiar
+    words when the surrounding context is non-regulatory.
+    """
+    records = []
+    for text in _HARD_NEGATIVES_EN + _HARD_NEGATIVES_DE:
+        records.append({"text": text, "entities": [], "source": "negative"})
+    return records
+
+
 def _find_entities(text: str, lang: str) -> list[dict]:
     """Find all 8 NER entity labels in a sentence.
 
@@ -644,8 +758,8 @@ def main() -> None:
         description="Generate spaCy NER training data (deterministic — no LLM required)"
     )
     parser.add_argument(
-        "--n-templates", type=int, default=5000,
-        help="Number of template-generated records to produce (default: 5000)",
+        "--n-templates", type=int, default=1000,
+        help="Number of template-generated records to produce (default: 1000)",
     )
     parser.add_argument("--output", default="training/data/ner_annotations.jsonl")
     parser.add_argument("--overwrite", action="store_true",
@@ -706,6 +820,19 @@ def main() -> None:
     print(f"  Wrote {tmpl_written} template records"
           + (f" ({dupes} duplicates skipped)" if dupes else ""))
     total_written += tmpl_written
+
+    # --- Stage 3: Hard negatives ---
+    print("\nWriting hard negative records (entity-like words, non-regulatory context)...")
+    neg_records = generate_hard_negatives()
+    neg_written = 0
+    with open(output_path, "a", encoding="utf-8") as f:
+        for rec in neg_records:
+            if rec["text"] not in existing_texts:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                existing_texts.add(rec["text"])
+                neg_written += 1
+    print(f"  Wrote {neg_written} hard negative records")
+    total_written += neg_written
 
     total_lines = sum(1 for line in open(output_path, encoding="utf-8") if line.strip())
     print(f"\nDone. Total records in file: {total_lines} ({total_written} new this run)")

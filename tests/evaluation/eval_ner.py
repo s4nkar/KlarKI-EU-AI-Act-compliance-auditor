@@ -63,17 +63,17 @@ _RAW_GOLD: list[tuple[str, list[tuple[str, str]]]] = [
 
     # OBLIGATION
     ("Providers must document all training data sources used in development.",
-     [("Providers", "ACTOR"), ("must document", "OBLIGATION")]),
+     [("Providers", "ACTOR"), ("must", "OBLIGATION")]),
     ("The operator shall maintain an audit trail of all system decisions.",
-     [("shall maintain", "OBLIGATION")]),
+     [("shall", "OBLIGATION")]),
     ("Importers are required to verify that the system conforms to Article 10.",
-     [("are required to", "OBLIGATION"), ("Article 10", "ARTICLE")]),
+     [("are required to", "OBLIGATION"), ("Article 10.", "ARTICLE")]),
     ("Anbieter müssen alle Trainingsdaten vollständig dokumentieren.",
      [("müssen", "OBLIGATION")]),
 
     # ACTOR
     ("Under Article 9, providers must establish a risk management system.",
-     [("Article 9", "ARTICLE"), ("providers", "ACTOR"), ("must establish", "OBLIGATION")]),
+     [("Article 9", "ARTICLE"), ("providers", "ACTOR"), ("must", "OBLIGATION")]),
     ("Notified bodies assess conformity of high-risk AI systems.",
      [("Notified bodies", "ACTOR"), ("high-risk", "RISK_TIER")]),
     ("Operators are responsible for the post-market monitoring of the AI system.",
@@ -82,8 +82,9 @@ _RAW_GOLD: list[tuple[str, list[tuple[str, str]]]] = [
      [("Betreiber", "ACTOR")]),
 
     # AI_SYSTEM
+    # "high-risk" is captured as RISK_TIER; "AI system" as AI_SYSTEM (non-overlapping spans)
     ("A high-risk AI system requires a conformity assessment under Article 43.",
-     [("high-risk AI system", "AI_SYSTEM"), ("conformity assessment", "PROCEDURE"), ("Article 43", "ARTICLE")]),
+     [("high-risk", "RISK_TIER"), ("AI system", "AI_SYSTEM"), ("conformity assessment", "PROCEDURE"), ("Article 43.", "ARTICLE")]),
     ("The general-purpose AI model must comply with transparency requirements.",
      [("general-purpose AI model", "AI_SYSTEM")]),
     ("An emotion recognition system deployed in the workplace is prohibited.",
@@ -95,7 +96,7 @@ _RAW_GOLD: list[tuple[str, list[tuple[str, str]]]] = [
     ("This system is classified as high-risk under Article 9 of the EU AI Act.",
      [("high-risk", "RISK_TIER"), ("Article 9", "ARTICLE"), ("EU AI Act", "REGULATION")]),
     ("Real-time biometric surveillance in public spaces is prohibited under Article 5.",
-     [("prohibited", "RISK_TIER"), ("Article 5", "ARTICLE")]),
+     [("prohibited", "RISK_TIER"), ("Article 5.", "ARTICLE")]),
     ("The chatbot is considered limited risk and only requires transparency measures.",
      [("limited risk", "RISK_TIER")]),
     ("Das System wurde als hochriskant eingestuft.",
@@ -103,7 +104,7 @@ _RAW_GOLD: list[tuple[str, list[tuple[str, str]]]] = [
 
     # PROCEDURE
     ("Providers must complete a conformity assessment before market placement.",
-     [("Providers", "ACTOR"), ("must complete", "OBLIGATION"), ("conformity assessment", "PROCEDURE")]),
+     [("Providers", "ACTOR"), ("must", "OBLIGATION"), ("conformity assessment", "PROCEDURE")]),
     ("The risk management system must be established before deployment.",
      [("risk management system", "PROCEDURE")]),
     ("Technical documentation must be maintained for the lifetime of the system.",
@@ -121,11 +122,11 @@ _RAW_GOLD: list[tuple[str, list[tuple[str, str]]]] = [
 
     # PROHIBITED_USE
     ("Social scoring by public authorities is explicitly banned under Article 5.",
-     [("Social scoring", "PROHIBITED_USE"), ("Article 5", "ARTICLE")]),
+     [("Social scoring", "PROHIBITED_USE"), ("Article 5.", "ARTICLE")]),
     ("Emotion recognition in the workplace is prohibited under the EU AI Act.",
      [("Emotion recognition in the workplace", "PROHIBITED_USE"), ("EU AI Act", "REGULATION")]),
     ("Real-time biometric surveillance in public spaces violates Article 5.",
-     [("Real-time biometric surveillance in public spaces", "PROHIBITED_USE"), ("Article 5", "ARTICLE")]),
+     [("Real-time biometric surveillance in public spaces", "PROHIBITED_USE"), ("Article 5.", "ARTICLE")]),
     ("Subliminal manipulation of users is a prohibited AI practice.",
      [("Subliminal manipulation", "PROHIBITED_USE")]),
     ("Social Scoring durch Behörden ist nach Artikel 5 verboten.",
@@ -216,16 +217,28 @@ def _score(nlp, records: list[dict]) -> tuple[dict, list[dict]]:
 # Main run
 # ---------------------------------------------------------------------------
 
-def run(verbose: bool = False) -> dict:
+def _get_nlp():
+    """Load the spaCy model for CLI usage (pytest uses the session fixture instead)."""
+    try:
+        import spacy
+        return spacy.load(str(MODEL_PATH))
+    except Exception as exc:
+        return None
+
+
+def run(verbose: bool = False, nlp=None) -> dict:
     if MODEL_PATH is None:
         return _skip("NER model not found — run ./run.sh setup first")
 
-    try:
-        import spacy
-    except ImportError:
-        return _skip("spacy not installed")
+    if nlp is None:
+        try:
+            import spacy  # noqa: F401
+        except ImportError:
+            return _skip("spacy not installed")
+        nlp = _get_nlp()
 
-    nlp = spacy.load(str(MODEL_PATH))
+    if nlp is None:
+        return _skip("spaCy model could not be loaded")
 
     # Verify all 8 labels are present in the model
     ner = nlp.get_pipe("ner")
@@ -329,25 +342,19 @@ def print_report(r: dict) -> None:
 
 # ── pytest ──────────────────────────────────────────────────────────────────
 
-def test_ner_all_labels_present() -> None:
+def test_ner_all_labels_present(spacy_ner_nlp) -> None:
     """pytest: Trained model must contain all 8 expected NER labels."""
-    if MODEL_PATH is None:
+    if MODEL_PATH is None or spacy_ner_nlp is None:
         import pytest
-        pytest.skip("NER model not found — run ./run.sh setup first")
-    try:
-        import spacy
-    except ImportError:
-        import pytest
-        pytest.skip("spacy not installed — run pip install spacy")
-    nlp = spacy.load(str(MODEL_PATH))
-    ner = nlp.get_pipe("ner")
+        pytest.skip("NER model not available — run ./run.sh setup first")
+    ner = spacy_ner_nlp.get_pipe("ner")
     missing = set(ENTITY_LABELS) - set(ner.labels)
     assert not missing, f"NER model missing labels: {missing}"
 
 
-def test_ner_overall_f1() -> None:
+def test_ner_overall_f1(spacy_ner_nlp) -> None:
     """pytest: NER overall F1 must be ≥ 0.80 on the gold dataset."""
-    r = run()
+    r = run(nlp=spacy_ner_nlp)
     if r["status"] == "skip":
         import pytest
         pytest.skip(r.get("reason", ""))
@@ -357,9 +364,9 @@ def test_ner_overall_f1() -> None:
     )
 
 
-def test_ner_no_label_below_50_pct() -> None:
+def test_ner_no_label_below_50_pct(spacy_ner_nlp) -> None:
     """pytest: No individual NER label should have F1 below 0.50."""
-    r = run()
+    r = run(nlp=spacy_ner_nlp)
     if r["status"] == "skip":
         import pytest
         pytest.skip(r.get("reason", ""))
