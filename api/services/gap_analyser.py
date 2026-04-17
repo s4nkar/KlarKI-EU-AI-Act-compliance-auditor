@@ -160,12 +160,12 @@ async def analyse_article(
     except (TypeError, ValueError):
         score = 50.0
 
-    # Parse gaps
+    # Parse gaps — skip any gap with an empty title or description
     gaps: list[GapItem] = []
     for raw_gap in result.get("gaps", []):
         if isinstance(raw_gap, dict):
             gap = _parse_gap_item(raw_gap, article_num)
-            if gap:
+            if gap and gap.title.strip() and gap.description.strip():
                 gaps.append(gap)
 
     # Parse recommendations
