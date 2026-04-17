@@ -1,0 +1,45 @@
+ARTICLE: 3
+REGULATION: eu_ai_act
+DOMAIN: definitions
+TITLE_EN: Article 3 — Definitions (Actor Roles)
+TITLE_DE: Artikel 3 — Begriffsbestimmungen (Akteursrollen)
+
+=== EN ===
+Article 3 — Definitions
+
+For the purposes of this Regulation, the following definitions apply:
+
+(1) 'AI system' means a machine-based system that is designed to operate with varying levels of autonomy and that may exhibit adaptiveness after deployment, and that, for explicit or implicit objectives, infers, from the input it receives, how to generate outputs such as predictions, content, recommendations, or decisions that can influence physical or virtual environments.
+
+(3) 'provider' means a natural or legal person, public authority, agency or other body that develops an AI system or a general-purpose AI model and places it on the market or puts it into service under its own name or trademark, whether for payment or free of charge.
+
+(4) 'deployer' means a natural or legal person, public authority, agency or other body that uses an AI system under its authority, except where the AI system is used in the course of a personal non-professional activity.
+
+(6) 'importer' means a natural or legal person established in the Union that places on the market an AI system that bears the name or trademark of a natural or legal person established outside the Union.
+
+(7) 'distributor' means a natural or legal person in the supply chain, other than the provider or the importer, that makes an AI system available on the Union market without affecting its properties.
+
+(8) 'operator' means the provider, the product manufacturer, the authorised representative, the importer, the distributor or the deployer.
+
+(9) 'intended purpose' means the use for which an AI system is intended by the provider, including the specific context and conditions of use, as specified in the information supplied by the provider in the instructions for use, promotional or sales materials and statements, and in the technical documentation.
+
+(68) 'high-risk AI system' means an AI system referred to in Article 6.
+
+=== DE ===
+Artikel 3 — Begriffsbestimmungen
+
+Für die Zwecke dieser Verordnung bezeichnet der Ausdruck:
+
+(1) „KI-System" ein maschinenbasiertes System, das für den Betrieb mit unterschiedlichem Grad an Autonomie ausgelegt ist und das nach seiner Einführung Anpassungsfähigkeit aufweisen kann und das für explizite oder implizite Ziele aus den empfangenen Eingaben ableitet, wie Ausgaben wie Vorhersagen, Inhalte, Empfehlungen oder Entscheidungen erzeugt werden, die physische oder virtuelle Umgebungen beeinflussen können.
+
+(3) „Anbieter" eine natürliche oder juristische Person, Behörde, Einrichtung oder sonstige Stelle, die ein KI-System oder ein KI-Modell mit allgemeinem Verwendungszweck entwickelt oder entwickeln lässt und es unter ihrem eigenen Namen oder ihrer eigenen Marke in Verkehr bringt oder in Betrieb nimmt, entgeltlich oder unentgeltlich.
+
+(4) „Betreiber" eine natürliche oder juristische Person, Behörde, Einrichtung oder sonstige Stelle, die ein KI-System in eigener Verantwortung verwendet, es sei denn, das KI-System wird im Rahmen einer persönlichen, nicht beruflichen Tätigkeit verwendet.
+
+(6) „Einführer" eine in der Union niedergelassene natürliche oder juristische Person, die ein KI-System in Verkehr bringt, das den Namen oder die Marke einer außerhalb der Union niedergelassenen natürlichen oder juristischen Person trägt.
+
+(7) „Händler" eine natürliche oder juristische Person in der Lieferkette, die kein Anbieter oder Einführer ist und ein KI-System auf dem Unionsmarkt bereitstellt, ohne seine Eigenschaften zu verändern.
+
+(8) „Akteur" den Anbieter, den Produkthersteller, den Bevollmächtigten, den Einführer, den Händler oder den Betreiber.
+
+(68) „Hochrisiko-KI-System" ein KI-System gemäß Artikel 6.

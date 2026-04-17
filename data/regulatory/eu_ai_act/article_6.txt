@@ -1,0 +1,33 @@
+ARTICLE: 6
+REGULATION: eu_ai_act
+DOMAIN: high_risk_classification
+TITLE_EN: Article 6 — Classification Rules for High-Risk AI Systems
+TITLE_DE: Artikel 6 — Klassifizierungsregeln für Hochrisiko-KI-Systeme
+
+=== EN ===
+Article 6 — Classification Rules for High-Risk AI Systems
+
+1. Irrespective of whether an AI system is placed on the market or put into service independently from the products referred to in this paragraph, that AI system shall be considered to be a high-risk AI system where both of the following conditions are fulfilled:
+(a) the AI system is intended to be used as a safety component of a product, or the AI system is itself a product, covered by the Union harmonisation legislation listed in Annex I;
+(b) the product whose safety component pursuant to point (a) is the AI system, or the AI system itself as a product, is required to undergo a third-party conformity assessment with a view to the placing on the market or putting into service of that product pursuant to the Union harmonisation legislation listed in Annex I.
+
+2. In addition to the high-risk AI systems referred to in paragraph 1, AI systems referred to in Annex III shall also be considered to be high-risk.
+
+3. By way of derogation from paragraph 2, an AI system referred to in Annex III shall not be considered to be high-risk where it does not pose a significant risk of harm to the health, safety or fundamental rights of natural persons, including by not materially influencing the outcome of decision-making.
+
+4. A provider who considers that an AI system referred to in Annex III is not high-risk shall document its assessment before that system is placed on the market or put into service. Such provider shall be subject to the registration obligation laid down in Article 49(2). Upon request of national competent authorities, the provider shall provide the documentation of the assessment.
+
+5. The Commission shall, after consulting the European Artificial Intelligence Board, and no later than 2 years after the date of application of this Regulation, provide guidelines specifying the practical implementation of this Article in line with the technical guidance referred to in Article 96 and addressing the interaction of this Article with other relevant provisions of this Regulation.
+
+=== DE ===
+Artikel 6 — Klassifizierungsregeln für Hochrisiko-KI-Systeme
+
+1. Unabhängig davon, ob ein KI-System unabhängig von den in diesem Absatz genannten Produkten in Verkehr gebracht oder in Betrieb genommen wird, gilt dieses KI-System als Hochrisiko-KI-System, wenn beide folgenden Bedingungen erfüllt sind:
+(a) Das KI-System ist als Sicherheitsbauteil eines Produkts vorgesehen oder ist selbst ein Produkt, das unter die in Anhang I aufgeführten Harmonisierungsrechtsvorschriften der Union fällt;
+(b) Das Produkt, dessen Sicherheitsbauteil gemäß Buchstabe a das KI-System ist, oder das KI-System selbst als Produkt muss zum Zweck des Inverkehrbringens oder der Inbetriebnahme dieses Produkts gemäß den in Anhang I aufgeführten Harmonisierungsrechtsvorschriften der Union einer Konformitätsbewertung durch Dritte unterzogen werden.
+
+2. Zusätzlich zu den in Absatz 1 genannten Hochrisiko-KI-Systemen gelten auch die in Anhang III genannten KI-Systeme als Hochrisiko-KI-Systeme.
+
+3. Abweichend von Absatz 2 gilt ein in Anhang III genanntes KI-System nicht als Hochrisiko-KI-System, wenn es kein erhebliches Risiko einer Beeinträchtigung der Gesundheit, der Sicherheit oder der Grundrechte natürlicher Personen darstellt.
+
+4. Ein Anbieter, der der Ansicht ist, dass ein in Anhang III genanntes KI-System kein Hochrisiko-KI-System ist, hat seine Beurteilung vor dem Inverkehrbringen oder der Inbetriebnahme dieses Systems zu dokumentieren.
