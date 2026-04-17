@@ -10,11 +10,14 @@ from datetime import datetime, timezone
 import structlog
 
 from models.schemas import (
+    ActorClassification,
+    ApplicabilityResult,
     ArticleDomain,
     ArticleScore,
     ComplianceReport,
     DocumentChunk,
     EmotionFlag,
+    EvidenceMap,
     RiskTier,
 )
 
@@ -64,18 +67,25 @@ async def score_audit(
     emotion_flag: EmotionFlag | None = None,
     classifier_backend: str = "ollama/phi3:mini",
     wizard_risk_tier: RiskTier | None = None,
+    actor: ActorClassification | None = None,
+    applicability: ApplicabilityResult | None = None,
+    evidence_map: EvidenceMap | None = None,
 ) -> ComplianceReport:
     """Aggregate per-article scores into a full ComplianceReport.
 
-    Overall score is the equally-weighted average across all 7 articles.
-    Risk tier is derived from classify_risk_tier() keyword scan.
+    Risk tier precedence (Phase 3):
+      1. applicability engine result (Article 6 + Annex III pattern gate) — authoritative.
+      2. Old keyword scan fallback — used only when applicability is not available.
+    wizard_risk_tier is stored separately as a user self-assessment for comparison.
 
     Args:
         article_scores: List of ArticleScore objects (one per article 9–15).
-        chunks: All document chunks (used for risk tier classification).
+        chunks: All document chunks (used for fallback risk tier classification).
         audit_id: Unique audit identifier (generated if not provided).
         source_files: Filenames of uploaded documents.
         language: Primary detected language.
+        actor: Article 3 actor classification result.
+        applicability: Article 6 + Annex III applicability gate result.
 
     Returns:
         ComplianceReport with overall_score, risk_tier, and all article detail.
@@ -94,7 +104,17 @@ async def score_audit(
     final_scores = list(scored_articles.values())
     overall = sum(s.score for s in final_scores) * _ARTICLE_WEIGHT
 
-    risk_tier = classify_risk_tier(chunks)
+    # Phase 3: applicability engine is authoritative for risk_tier
+    if applicability is not None:
+        if applicability.is_prohibited:
+            risk_tier = RiskTier.PROHIBITED
+        elif applicability.is_high_risk:
+            risk_tier = RiskTier.HIGH
+        else:
+            risk_tier = RiskTier.MINIMAL
+    else:
+        risk_tier = classify_risk_tier(chunks)
+
     classified = sum(1 for c in chunks if c.domain is not None)
 
     report = ComplianceReport(
@@ -110,6 +130,9 @@ async def score_audit(
         total_chunks=len(chunks),
         classified_chunks=classified,
         classifier_backend=classifier_backend,
+        actor=actor,
+        applicability=applicability,
+        evidence_map=evidence_map,
     )
 
     logger.info(

@@ -270,6 +270,8 @@ async def retrieve_requirements(
     embedding_service: EmbeddingService,
     chroma_client: ChromaClient,
     top_k: int = 5,
+    applicable_articles: list[int] | None = None,
+    regulation: str | None = None,
 ) -> list[dict]:
     """Retrieve relevant regulatory passages using hybrid BM25 + vector + re-ranking.
 
@@ -280,21 +282,44 @@ async def retrieve_requirements(
       4. Cross-encoder re-ranks the pool
       5. Return top_k results
 
-    When chunk.domain is known the same article_num metadata filter is applied
-    to both BM25 and vector search. When domain is None (e.g. eval queries)
-    the full corpus is searched.
+    Phase 3 additions:
+      - applicable_articles: if provided and chunk's article_num is not in this
+        list, retrieval is skipped (returns []) — enforces the applicability gate.
+      - regulation: if provided (e.g. "eu_ai_act"), added as a metadata filter
+        so only passages from the relevant regulation are retrieved.
 
     Args:
         chunk: Source document chunk to find regulatory matches for.
         embedding_service: Local embedding model instance.
         chroma_client: ChromaDB async client.
         top_k: Number of passages to return after re-ranking.
+        applicable_articles: From ApplicabilityResult — skip retrieval for
+                             articles not in this list. None = no restriction.
+        regulation: Metadata filter value for the 'regulation' field in ChromaDB.
 
     Returns:
         List of dicts with keys: id, text, metadata, distance.
     """
     article_num = _DOMAIN_TO_ARTICLE.get(chunk.domain) if chunk.domain else None
-    where_filter = {"article_num": article_num} if article_num is not None else None
+
+    # Phase 3: applicability gate — skip retrieval for non-applicable articles
+    if applicable_articles is not None and article_num is not None:
+        if article_num not in applicable_articles:
+            logger.debug(
+                "rag_skipped_non_applicable_article",
+                article_num=article_num,
+                chunk_id=chunk.chunk_id,
+            )
+            return []
+
+    # Build metadata where-filter: article_num + optional regulation
+    where_filter: dict | None = None
+    if article_num is not None:
+        where_filter = {"article_num": article_num}
+        if regulation:
+            where_filter["regulation"] = regulation
+    elif regulation:
+        where_filter = {"regulation": regulation}
 
     # ── Stage 1: Vector search ────────────────────────────────────────────────
     vectors = await embedding_service.embed([chunk.text])
@@ -325,6 +350,12 @@ async def retrieve_requirements(
                     top_k=_CANDIDATES_PER_RETRIEVER,
                 )
             )
+            # Post-filter BM25 results by regulation (BM25 index doesn't support metadata filter natively)
+            if regulation:
+                bm25_results = [
+                    r for r in bm25_results
+                    if r["metadata"].get("regulation", "") == regulation
+                ]
     else:
         logger.warning("bm25_index_not_ready_falling_back_to_vector_only")
 
@@ -351,6 +382,7 @@ async def retrieve_requirements(
         merged_candidates=len(candidates),
         returned=len(final),
         article_filter=article_num,
+        regulation_filter=regulation,
     )
 
     return final

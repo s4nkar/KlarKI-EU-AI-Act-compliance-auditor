@@ -24,11 +24,14 @@ from models.schemas import (
     AuditStatus,
     RiskTier,
 )
+from services.actor_classifier import classify_actor
+from services.applicability_engine import check_applicability
 from services.classifier import classify_chunks
 from services.emotion_module import check_emotion_recognition
 from services.compliance_scorer import ARTICLE_DOMAINS, score_audit
 from services.document_parser import parse_document, SUPPORTED_EXTENSIONS
-from services.chunker import chunk_text
+from services.chunker import legal_chunk_text
+from services.evidence_mapper import map_evidence
 from services.gap_analyser import analyse_article
 from services.language_detector import detect_language
 from services.ollama_client import OllamaClient
@@ -184,6 +187,7 @@ async def _run_pipeline(
         embeddings,
         chroma,
         ollama,
+        applicable_articles,
     ):
         art_chunks = domain_chunks.get(domain, [])
         query_chunks = art_chunks[:3]
@@ -197,13 +201,13 @@ async def _run_pipeline(
                     embedding_service=embeddings,
                     chroma_client=chroma,
                     top_k=5,
+                    applicable_articles=applicable_articles,
+                    regulation="eu_ai_act",
                 )
                 reg_passages.extend(passages)
 
-        # deduplicate
         seen = set()
         unique_passages = []
-
         for p in reg_passages:
             key = p.get("id") or p.get("text")
             if key not in seen:
@@ -226,16 +230,31 @@ async def _run_pipeline(
         chroma = request.app.state.chroma
         embeddings = request.app.state.embeddings
 
-        # Parse → chunk → detect language
+        # Parse → chunk (legal-unit) → detect language
         _set_status(AuditStatus.PARSING)
         raw_text = await parse_document(file_path, filename)
-        chunks = await chunk_text(raw_text, source_file=filename)
+        chunks = await legal_chunk_text(raw_text, source_file=filename)
         language = await detect_language(raw_text)
         for chunk in chunks:
             chunk.language = language
 
-        # Classify each chunk into an ArticleDomain
+        # Phase 3 — legal decision hierarchy (must run before gap analysis)
+        # Step 1: detect actor role (Article 3)
+        # Step 2: applicability gate (Article 6 + Annex III) — determines if 9–15 apply
         _set_status(AuditStatus.CLASSIFYING)
+        actor_result = await asyncio.to_thread(classify_actor, raw_text)
+        applicability_result = await asyncio.to_thread(check_applicability, chunks)
+
+        logger.info(
+            "applicability_determined",
+            audit_id=audit_id,
+            actor=actor_result.actor_type.value,
+            is_high_risk=applicability_result.is_high_risk,
+            is_prohibited=applicability_result.is_prohibited,
+            annex_iii_categories=[m.category.value for m in applicability_result.annex_iii_matches],
+        )
+
+        # Classify each chunk into an ArticleDomain
         chunks = await classify_chunks(chunks, ollama)
         classifier_backend = (
             "triton/gbert-base"
@@ -252,6 +271,8 @@ async def _run_pipeline(
             if chunk.domain:
                 domain_chunks[chunk.domain].append(chunk)
 
+        applicable_articles = applicability_result.applicable_articles
+
         tasks = []
         for article_num, domain in ARTICLE_DOMAINS.items():
             tasks.append(
@@ -262,10 +283,19 @@ async def _run_pipeline(
                     embeddings,
                     chroma,
                     ollama,
+                    applicable_articles,
                 )
             )
 
         article_scores = await asyncio.gather(*tasks)
+
+        # Phase 3 — evidence mapping (deterministic, runs before LLM scoring)
+        evidence_map = await asyncio.to_thread(
+            map_evidence,
+            chunks,
+            actor_result.actor_type,
+            applicable_articles,
+        )
 
         # Aggregate article scores into a ComplianceReport
         _set_status(AuditStatus.SCORING)
@@ -279,6 +309,9 @@ async def _run_pipeline(
             emotion_flag=emotion_flag,
             classifier_backend=classifier_backend,
             wizard_risk_tier=wizard_risk_tier,
+            actor=actor_result,
+            applicability=applicability_result,
+            evidence_map=evidence_map,
         )
 
         _audits[audit_id] = AuditResponse(

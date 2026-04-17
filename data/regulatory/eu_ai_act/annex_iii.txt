@@ -1,0 +1,75 @@
+ARTICLE: 0
+REGULATION: eu_ai_act
+DOMAIN: high_risk_classification
+TITLE_EN: Annex III — High-Risk AI Systems (Article 6(2))
+TITLE_DE: Anhang III — Hochrisiko-KI-Systeme (Artikel 6 Absatz 2)
+
+=== EN ===
+Annex III — High-Risk AI Systems referred to in Article 6(2)
+
+1. Biometric identification and categorisation of natural persons
+AI systems intended to be used for the real-time and post-remote biometric identification of natural persons, biometric categorisation of natural persons according to sensitive or protected attributes or characteristics, or emotion recognition of natural persons.
+Keywords: biometric identification, facial recognition, fingerprint recognition, iris scan, gait recognition, voice identification, biometric categorisation, emotion recognition, real-time biometric, remote biometric.
+
+2. Management and operation of critical infrastructure
+AI systems intended to be used as safety components in the management and operation of critical digital infrastructure, road traffic, or in the supply of water, gas, heating or electricity.
+Keywords: critical infrastructure, road traffic management, water supply, gas supply, electricity grid, heating network, digital infrastructure, SCADA, industrial control system.
+
+3. Education and vocational training
+AI systems intended to be used for the purpose of determining access or assigning natural persons to educational and vocational training institutions or programmes, at all levels of education, evaluating learning outcomes of natural persons in educational and vocational training institutions, assessing the appropriate level of education for an individual and materially influencing the level of education and training that person will receive, monitoring and detecting prohibited behaviour of students during tests.
+Keywords: student admission, educational assessment, exam monitoring, learning outcomes, academic performance, student evaluation, vocational training assignment, educational institution access.
+
+4. Employment, workers management and access to self-employment
+AI systems intended to be used for recruitment or selection of natural persons, notably for advertising vacancies, screening or filtering applications, evaluating candidates in the course of interviews or tests; for making decisions on promotion and termination of work-related contractual relationships, for task allocation, monitoring or evaluating performance and behaviour of persons in such relationships.
+Keywords: recruitment, hiring decision, job application screening, candidate evaluation, HR automation, performance monitoring, workforce management, employee promotion, termination decision, task allocation.
+
+5. Access to and enjoyment of essential private services and public services and benefits
+AI systems intended to be used by public authorities or on behalf of public authorities to evaluate the eligibility of natural persons for essential public assistance benefits and services, including healthcare services, as well as to grant, reduce, revoke, or reclaim such benefits and services; AI systems intended to be used to evaluate the creditworthiness of natural persons or establish their credit score, with the exception of AI systems used for the purpose of detecting financial fraud; AI systems intended to be used for risk assessment and pricing in relation to natural persons in the case of life and health insurance.
+Keywords: credit scoring, creditworthiness, benefits eligibility, social assistance, healthcare access, insurance pricing, welfare assessment, loan application, public service eligibility.
+
+6. Law enforcement
+AI systems intended to be used by or on behalf of law enforcement authorities or by Union institutions, bodies, offices or agencies in support of law enforcement authorities for individual risk assessments; as polygraphs and similar tools; for the evaluation of the reliability of evidence; for predicting the occurrence or recurrence of actual or potential criminal activity; for profiling of natural persons; for crime analytics.
+Keywords: law enforcement, police, crime prediction, criminal profiling, evidence evaluation, risk assessment of suspects, predictive policing, criminal justice AI, forensic analysis.
+
+7. Migration, asylum and border control management
+AI systems intended to be used by or on behalf of competent public authorities or by Union institutions, bodies, offices or agencies in the fields of migration, asylum and border control management as polygraphs and similar tools; for risk assessment of natural persons; for the examination of applications for asylum, visa and residence permits and associated complaints; for the detection, recognition or identification of natural persons in the fields of border management.
+Keywords: asylum application, visa processing, border control, migration management, refugee assessment, residency permit, immigration risk, border identification.
+
+8. Administration of justice and democratic processes
+AI systems intended to be used by or on behalf of competent authorities to assist a judicial authority in researching and interpreting facts and the law and in applying the law to a concrete set of facts, or to be used in a similar way in alternative dispute resolution; AI systems intended to be used for influencing the outcome of an election or referendum or the voting behaviour of natural persons in the exercise of their vote in elections or referenda.
+Keywords: judicial decision support, court AI, legal research AI, election influence, democratic process AI, voting behaviour, alternative dispute resolution AI, legal AI.
+
+=== DE ===
+Anhang III — Hochrisiko-KI-Systeme gemäß Artikel 6 Absatz 2
+
+1. Biometrische Identifizierung und Kategorisierung natürlicher Personen
+KI-Systeme zur biometrischen Echtzeit- oder nachträglichen Fernidentifizierung natürlicher Personen; zur biometrischen Kategorisierung nach sensiblen oder geschützten Merkmalen; zur Emotionserkennung.
+Schlüsselwörter: biometrische Identifizierung, Gesichtserkennung, Fingerabdruckerkennung, Iris-Scan, Ganganalyse, Stimmidentifikation, Emotionserkennung, Echtzeit-Biometrie.
+
+2. Verwaltung und Betrieb kritischer Infrastrukturen
+KI-Systeme als Sicherheitsbauteile in der Verwaltung kritischer digitaler Infrastrukturen, Straßenverkehr oder Versorgung mit Wasser, Gas, Wärme oder Strom.
+Schlüsselwörter: kritische Infrastruktur, Straßenverkehrsmanagement, Wasserversorgung, Gasversorgung, Stromnetz, digitale Infrastruktur.
+
+3. Allgemeine und berufliche Bildung
+KI-Systeme zur Bestimmung des Zugangs zu Bildungseinrichtungen oder zur Zuweisung von Personen zu Bildungs- und Berufsbildungsprogrammen; zur Bewertung von Lernergebnissen; zur Überwachung von Prüflingen.
+Schlüsselwörter: Studierendenauswahl, Bildungsbewertung, Prüfungsüberwachung, Lernergebnisse, Bildungszugang.
+
+4. Beschäftigung, Personalmanagement und Zugang zur Selbstständigkeit
+KI-Systeme für Einstellung, Auswahl, Beförderung, Kündigung und Leistungsüberwachung von Arbeitnehmern.
+Schlüsselwörter: Einstellung, Personalentscheidung, Bewerbungsscreening, Leistungsüberwachung, Personalmanagement.
+
+5. Zugang zu wesentlichen privaten und öffentlichen Dienstleistungen
+KI-Systeme zur Bewertung der Anspruchsberechtigung für Sozialleistungen, Kreditwürdigkeitsprüfung, Versicherungspreisgestaltung.
+Schlüsselwörter: Kreditwürdigkeitsprüfung, Sozialleistungen, Versicherungsbewertung, öffentliche Dienstleistungen.
+
+6. Strafverfolgung
+KI-Systeme zur Risikobewertung, Kriminalitätsvorhersage, Profilierung im Strafverfolgungsbereich.
+Schlüsselwörter: Strafverfolgung, Polizei, Kriminalitätsvorhersage, kriminelle Profilierung.
+
+7. Migration, Asyl und Grenzkontrolle
+KI-Systeme für Asyl- und Visaverfahren, Grenzkontrolle, Migrationsverwaltung.
+Schlüsselwörter: Asylantrag, Visaverfahren, Grenzkontrolle, Migrationsverwaltung.
+
+8. Rechtspflege und demokratische Prozesse
+KI-Systeme zur Unterstützung von Justizbehörden oder zur Beeinflussung von Wahlen.
+Schlüsselwörter: Justiz-KI, Wahlbeeinflussung, demokratische Prozesse, Rechtsprechungsunterstützung.
