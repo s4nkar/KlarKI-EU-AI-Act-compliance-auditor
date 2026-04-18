@@ -1,0 +1,41 @@
+ARTICLE: 53
+REGULATION: eu_ai_act
+DOMAIN: gpai
+TITLE_EN: Article 53 — Obligations for Providers of General-Purpose AI Models
+TITLE_DE: Artikel 53 — Pflichten der Anbieter von KI-Modellen mit allgemeinem Verwendungszweck
+
+=== EN ===
+Article 53 — Obligations for Providers of General-Purpose AI Models
+
+1. Providers of general-purpose AI models shall:
+   (a) draw up and keep up-to-date the technical documentation of the model, including its training and testing process and the results of its evaluation, which shall contain, at a minimum, the information set out in Annex XI for the purpose of providing it, upon request, to the AI Office and the national competent authorities;
+   (b) draw up, keep up-to-date and make available information and documentation to providers of AI systems who intend to integrate the general-purpose AI model into their AI systems. Without prejudice to the need to observe and protect intellectual property rights and confidential business information or trade secrets in accordance with Union and national law, the information and documentation shall:
+      (i) enable providers of AI systems to have a good understanding of the capabilities and limitations of the general-purpose AI model and to comply with their obligations under this Regulation; and
+      (ii) contain, at a minimum, the elements set out in Annex XII;
+   (c) put in place a policy to comply with Union law on copyright and related rights, and in particular to identify and comply with, including through state-of-the-art technologies, a reservation of rights expressed pursuant to Article 4(3) of Directive (EU) 2019/790;
+   (d) draw up and make publicly available a sufficiently detailed summary about the content used for training of the general-purpose AI model, according to a template provided by the AI Office.
+
+2. The obligations set out in paragraph 1, points (a) and (b), shall not apply to providers of general-purpose AI models that are released under a free and open-source licence that allows for the access, usage, modification, and distribution of the model, and whose parameters, including the weights, the information on the model architecture, and the information on model usage, are made publicly available. This exception shall not apply to general-purpose AI models with systemic risk.
+
+3. Providers of general-purpose AI models shall cooperate with the Commission and national competent authorities in the exercise of their competences and powers pursuant to this Regulation.
+
+4. Providers of general-purpose AI models may rely on codes of practice within the meaning of Article 56 to demonstrate compliance with the obligations set out in paragraph 1 of this Article, until a harmonised standard is published.
+
+5. The information and documentation referred to in this Article shall be kept for the period of the availability of the general-purpose AI model on the market, and for 10 years after the general-purpose AI model is withdrawn from the market or from service.
+
+=== DE ===
+Artikel 53 — Pflichten der Anbieter von KI-Modellen mit allgemeinem Verwendungszweck
+
+1. Anbieter von KI-Modellen mit allgemeinem Verwendungszweck haben:
+   a) die technische Dokumentation des Modells, einschließlich seines Trainings- und Testprozesses und der Ergebnisse seiner Evaluierung, zu erstellen und auf dem neuesten Stand zu halten;
+   b) Informationen und Dokumentation für Anbieter von KI-Systemen, die beabsichtigen, das KI-Modell mit allgemeinem Verwendungszweck in ihre KI-Systeme zu integrieren, zu erstellen, auf dem neuesten Stand zu halten und bereitzustellen;
+   c) eine Strategie zur Einhaltung des Unionsrechts zum Urheberrecht und verwandten Schutzrechten umzusetzen;
+   d) eine ausreichend detaillierte Zusammenfassung über die für das Training des KI-Modells verwendeten Inhalte zu erstellen und öffentlich zugänglich zu machen.
+
+2. Die in Absatz 1 Buchstaben a und b festgelegten Pflichten gelten nicht für Anbieter von KI-Modellen mit allgemeinem Verwendungszweck, die unter einer freien und quelloffenen Lizenz veröffentlicht werden, sofern es sich nicht um KI-Modelle mit allgemeinem Verwendungszweck mit systemischem Risiko handelt.
+
+3. Anbieter von KI-Modellen mit allgemeinem Verwendungszweck haben mit der Kommission und den nationalen zuständigen Behörden bei der Ausübung ihrer Zuständigkeiten und Befugnisse zusammenzuarbeiten.
+
+4. Anbieter von KI-Modellen mit allgemeinem Verwendungszweck können sich auf Verhaltenskodizes im Sinne von Artikel 56 stützen, um die Einhaltung der in Absatz 1 festgelegten Pflichten nachzuweisen.
+
+5. Die in diesem Artikel genannten Informationen und Dokumentationen sind für den Zeitraum der Verfügbarkeit des KI-Modells mit allgemeinem Verwendungszweck auf dem Markt und 10 Jahre nach seinem Rückzug vom Markt oder aus dem Dienst aufzubewahren.

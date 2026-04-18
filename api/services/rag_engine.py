@@ -18,6 +18,7 @@ import asyncio
 import re
 import structlog
 
+from config import settings
 from models.schemas import ArticleDomain, DocumentChunk
 from services.chroma_client import ChromaClient
 from services.embedding_service import EmbeddingService
@@ -340,7 +341,26 @@ async def retrieve_requirements(
 
     # ── Stage 2: BM25 search ──────────────────────────────────────────────────
     bm25_results: list[dict] = []
-    if _bm25.ready:
+    chunk_lang = chunk.language or "en"
+
+    if settings.use_opensearch:
+        # Server-side BM25 via OpenSearch (supports native metadata filtering)
+        from services.opensearch_client import OpenSearchClient
+        os_client = OpenSearchClient(
+            host=settings.opensearch_host,
+            port=settings.opensearch_port,
+        )
+        for collection in _COLLECTIONS:
+            hits = await os_client.search(
+                index=collection,
+                query=chunk.text,
+                article_num=article_num,
+                regulation=regulation,
+                lang=chunk_lang,
+                top_k=_CANDIDATES_PER_RETRIEVER,
+            )
+            bm25_results.extend(hits)
+    elif _bm25.ready:
         for collection in _COLLECTIONS:
             bm25_results.extend(
                 _bm25.search(
@@ -350,7 +370,6 @@ async def retrieve_requirements(
                     top_k=_CANDIDATES_PER_RETRIEVER,
                 )
             )
-            # Post-filter BM25 results by regulation (BM25 index doesn't support metadata filter natively)
             if regulation:
                 bm25_results = [
                     r for r in bm25_results
@@ -361,7 +380,6 @@ async def retrieve_requirements(
 
     # ── Stage 3: RRF merge ────────────────────────────────────────────────────
     # Prefer same-language results within each list before merging
-    chunk_lang = chunk.language or "en"
     for result_list in (vector_results, bm25_results):
         result_list.sort(key=lambda r: (
             0 if r["metadata"].get("lang") == chunk_lang else 1,

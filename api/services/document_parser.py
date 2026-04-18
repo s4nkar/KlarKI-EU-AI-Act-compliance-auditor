@@ -51,19 +51,84 @@ async def parse_document(file_path: str, filename: str) -> str:
 
 
 def _parse_pdf(file_path: str) -> str:
-    """Extract text from PDF using PyMuPDF (fitz).
+    """Extract text from PDF using PyMuPDF (fitz) + pdfplumber for tables.
 
-    Preserves paragraph structure; joins pages with double newlines.
-    German ligatures and special characters handled by fitz natively.
+    Strategy:
+      1. fitz extracts running prose text per page.
+      2. pdfplumber extracts tables (compliance evidence often lives in tables).
+         Tables are appended after the prose as tab-separated rows.
+      3. If both extractors produce < 100 chars (scanned/image PDF), falls back
+         to pytesseract OCR on rasterised page images.
+
+    German ligatures and special characters handled natively by fitz.
     """
     import fitz  # PyMuPDF
 
     doc = fitz.open(file_path)
-    pages = []
-    for page in doc:
-        pages.append(page.get_text("text"))
+    page_parts: list[str] = []
+
+    for page_idx, page in enumerate(doc):
+        prose = page.get_text("text").strip()
+        page_parts.append(prose)
+
     doc.close()
-    return "\n\n".join(pages)
+
+    # ── Table extraction via pdfplumber ───────────────────────────────────────
+    table_parts: list[str] = []
+    try:
+        import pdfplumber
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                for table in page.extract_tables():
+                    if not table:
+                        continue
+                    rows = []
+                    for row in table:
+                        cells = [str(c).strip() if c else "" for c in row]
+                        row_text = "\t".join(c for c in cells if c)
+                        if row_text:
+                            rows.append(row_text)
+                    if rows:
+                        table_parts.append("\n".join(rows))
+    except ImportError:
+        pass  # pdfplumber optional — prose-only extraction is fine
+    except Exception:
+        pass  # malformed tables are not fatal
+
+    full_text = "\n\n".join(page_parts)
+    if table_parts:
+        full_text = full_text + "\n\n" + "\n\n".join(table_parts)
+
+    # ── OCR fallback for scanned PDFs ─────────────────────────────────────────
+    if len(full_text.strip()) < 100:
+        full_text = _ocr_pdf(file_path) or full_text
+
+    return full_text
+
+
+def _ocr_pdf(file_path: str) -> str | None:
+    """Rasterise PDF pages and run pytesseract OCR. Returns None if unavailable."""
+    try:
+        import fitz
+        import pytesseract
+        from PIL import Image
+        import io
+    except ImportError:
+        return None  # pytesseract + Pillow are optional
+
+    try:
+        doc = fitz.open(file_path)
+        pages_text: list[str] = []
+        for page in doc:
+            # Render at 200 DPI for reliable OCR
+            pix = page.get_pixmap(dpi=200)
+            img = Image.open(io.BytesIO(pix.tobytes("png")))
+            text = pytesseract.image_to_string(img, lang="eng+deu")
+            pages_text.append(text.strip())
+        doc.close()
+        return "\n\n".join(pages_text)
+    except Exception:
+        return None
 
 
 def _parse_docx(file_path: str) -> str:

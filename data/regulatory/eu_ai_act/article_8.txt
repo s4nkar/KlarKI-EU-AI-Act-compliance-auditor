@@ -1,0 +1,31 @@
+ARTICLE: 8
+REGULATION: eu_ai_act
+DOMAIN: compliance_requirements
+TITLE_EN: Article 8 — Compliance with the Requirements
+TITLE_DE: Artikel 8 — Einhaltung der Anforderungen
+
+=== EN ===
+Article 8 — Compliance with the Requirements
+
+1. High-risk AI systems shall comply with the requirements laid down in this Section, taking into account their intended purpose as well as the generally acknowledged state of the art on AI and AI-related technologies at the time of their placing on the market or putting into service. High-risk AI systems which are AI systems referred to in Article 6(1) shall comply with the requirements laid down in this Section to the extent that the respective requirements concern the AI system and are not fully addressed by the Union harmonisation legislation applicable to the product in which the AI system is embedded.
+
+2. Where a high-risk AI system is related to a product covered by the Union harmonisation legislation listed in Annex I, Section A, only the manufacturer of that product shall be subject to the requirements set out in this Section where the high-risk AI system is integrated in the product as placed on the market or put into service.
+
+3. High-risk AI systems shall be accompanied by instructions for use which include concise, complete, correct and clear information that is relevant, accessible and comprehensible to deployers.
+
+4. Providers of high-risk AI systems shall demonstrate the conformity of those systems with the requirements of this Section through a conformity assessment procedure prior to their being placed on the market or put into service, and shall keep the relevant technical documentation up to date.
+
+5. Obligations of providers and deployers of high-risk AI systems under this Chapter shall be proportionate to their role in the AI value chain and their level of control over the AI system concerned, taking into account that the provider retains overall responsibility for compliance.
+
+=== DE ===
+Artikel 8 — Einhaltung der Anforderungen
+
+1. Hochrisiko-KI-Systeme haben die in diesem Abschnitt festgelegten Anforderungen einzuhalten, wobei ihr Verwendungszweck sowie der allgemein anerkannte Stand der Technik auf dem Gebiet der KI und KI-bezogener Technologien zum Zeitpunkt ihrer Markteinführung oder Inbetriebnahme zu berücksichtigen sind. Hochrisiko-KI-Systeme gemäß Artikel 6 Absatz 1 müssen die Anforderungen dieses Abschnitts insoweit einhalten, als diese Anforderungen das KI-System betreffen und nicht vollständig durch die geltenden Harmonisierungsrechtsvorschriften der Union für das Produkt abgedeckt werden, in das das KI-System eingebettet ist.
+
+2. Betrifft ein Hochrisiko-KI-System ein Produkt, das unter die in Anhang I Abschnitt A aufgeführten Harmonisierungsrechtsvorschriften der Union fällt, so unterliegt nur der Hersteller dieses Produkts den in diesem Abschnitt festgelegten Anforderungen, wenn das Hochrisiko-KI-System als Teil des in Verkehr gebrachten oder in Betrieb genommenen Produkts eingebunden ist.
+
+3. Hochrisiko-KI-Systeme sind mit Gebrauchsanweisungen zu begleiten, die präzise, vollständige, korrekte und klare Informationen enthalten, die für die Betreiber relevant, zugänglich und verständlich sind.
+
+4. Anbieter von Hochrisiko-KI-Systemen haben die Konformität dieser Systeme mit den Anforderungen dieses Abschnitts im Rahmen eines Konformitätsbewertungsverfahrens nachzuweisen, bevor sie in Verkehr gebracht oder in Betrieb genommen werden, und die einschlägige technische Dokumentation auf dem neuesten Stand zu halten.
+
+5. Die Pflichten der Anbieter und Betreiber von Hochrisiko-KI-Systemen gemäß diesem Kapitel sind proportional zu ihrer Rolle in der KI-Wertschöpfungskette und ihrem Grad der Kontrolle über das betreffende KI-System, wobei zu berücksichtigen ist, dass der Anbieter die Gesamtverantwortung für die Konformität trägt.

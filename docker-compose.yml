@@ -19,6 +19,9 @@ services:
       - USE_TRITON=${USE_TRITON:-false}
       - TRITON_HOST=${TRITON_HOST:-klarki-triton}
       - TRITON_GRPC_PORT=${TRITON_GRPC_PORT:-8001}
+      - USE_OPENSEARCH=${USE_OPENSEARCH:-false}
+      - OPENSEARCH_HOST=klarki-opensearch
+      - OPENSEARCH_PORT=${OPENSEARCH_PORT:-9200}
     volumes:
       - upload_data:/data/uploads
       - chroma_data:/data/chroma
@@ -93,6 +96,28 @@ services:
       - klarki-net
     restart: unless-stopped
 
+  klarki-opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    container_name: klarki-opensearch
+    profiles:
+      - opensearch
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    networks:
+      - klarki-net
+    restart: unless-stopped
+
   klarki-triton:
     build:
       context: .
@@ -125,6 +150,7 @@ volumes:
   upload_data:
   chroma_data:
   ollama_data:
+  opensearch_data:
 
 networks:
   klarki-net:

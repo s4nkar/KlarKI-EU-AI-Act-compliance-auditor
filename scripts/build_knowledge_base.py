@@ -805,6 +805,114 @@ def build_knowledge_base(chroma_host: str, chroma_port: int, rebuild: bool = Fal
     log.info("=" * 60)
 
 
+def build_opensearch_index(
+    os_host: str,
+    os_port: int,
+    rebuild: bool,
+    eu_ai_act_articles: list[dict],
+    gdpr_articles: list[dict],
+) -> None:
+    """Index regulatory passages into OpenSearch for server-side BM25 retrieval.
+
+    Requires opensearch-py: pip install opensearch-py
+    Called when --opensearch flag is set.
+    """
+    try:
+        from opensearchpy import OpenSearch
+        from opensearchpy.helpers import bulk
+    except ImportError:
+        log.error("opensearch-py not installed. Run: pip install opensearch-py")
+        sys.exit(1)
+
+    log.info(f"Connecting to OpenSearch at {os_host}:{os_port}")
+    client = OpenSearch(
+        hosts=[{"host": os_host, "port": os_port}],
+        http_compress=True,
+        use_ssl=False,
+        verify_certs=False,
+        timeout=10,
+    )
+
+    INDEX_MAPPING = {
+        "mappings": {
+            "properties": {
+                "text":        {"type": "text", "analyzer": "standard"},
+                "regulation":  {"type": "keyword"},
+                "article_num": {"type": "integer"},
+                "domain":      {"type": "keyword"},
+                "lang":        {"type": "keyword"},
+                "chunk_index": {"type": "integer"},
+                "title":       {"type": "text"},
+                "doc_id":      {"type": "keyword"},
+            }
+        },
+        "settings": {"number_of_shards": 1, "number_of_replicas": 0},
+    }
+
+    def _ensure_index(name: str) -> None:
+        if rebuild and client.indices.exists(index=name):
+            client.indices.delete(index=name)
+            log.info(f"Deleted index: {name}")
+        if not client.indices.exists(index=name):
+            client.indices.create(index=name, body=INDEX_MAPPING)
+            log.info(f"Created index: {name}")
+
+    def _index_articles(index: str, articles: list[dict]) -> None:
+        actions = []
+        for article in articles:
+            chunks = chunk_text(article["text"])
+            for i, chunk_body in enumerate(chunks):
+                cid = make_chunk_id(chunk_body, prefix=f"{index}_{article['article_num']}_{article['lang']}")
+                actions.append({
+                    "_index": index,
+                    "_id": cid,
+                    "_source": {
+                        "text":        chunk_body,
+                        "doc_id":      cid,
+                        "regulation":  article.get("regulation", index),
+                        "article_num": article["article_num"],
+                        "domain":      article["domain"],
+                        "lang":        article["lang"],
+                        "chunk_index": i,
+                        "title":       article["title"],
+                    },
+                })
+        success, _ = bulk(client, actions, raise_on_error=False)
+        log.info(f"  Indexed {success}/{len(actions)} docs into '{index}'")
+
+    _ensure_index("eu_ai_act")
+    _ensure_index("gdpr")
+    _ensure_index("compliance_checklist")
+
+    log.info("Indexing EU AI Act articles...")
+    _index_articles("eu_ai_act", eu_ai_act_articles)
+
+    log.info("Indexing GDPR articles...")
+    _index_articles("gdpr", gdpr_articles)
+
+    log.info("Indexing compliance checklist...")
+    checklist_actions = [
+        {
+            "_index": "compliance_checklist",
+            "_id": r["requirement_id"],
+            "_source": {
+                "text":        r["description"],
+                "doc_id":      r["requirement_id"],
+                "regulation":  "eu_ai_act",
+                "article_num": r["article_num"],
+                "domain":      r["domain"],
+                "lang":        "en",
+                "chunk_index": 0,
+                "title":       f"Requirement {r['requirement_id']}",
+            },
+        }
+        for r in COMPLIANCE_REQUIREMENTS
+    ]
+    success, _ = bulk(client, checklist_actions, raise_on_error=False)
+    log.info(f"  Indexed {success}/{len(checklist_actions)} requirements")
+    log.info("OpenSearch indexing complete.")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build KlarKI ChromaDB knowledge base")
     parser.add_argument(
@@ -823,5 +931,31 @@ if __name__ == "__main__":
         action="store_true",
         help="Delete and rebuild all collections",
     )
+    parser.add_argument(
+        "--opensearch",
+        action="store_true",
+        help="Also index into OpenSearch (requires --profile opensearch and opensearch-py)",
+    )
+    parser.add_argument(
+        "--opensearch-host",
+        default="localhost",
+        help="OpenSearch hostname (default: localhost)",
+    )
+    parser.add_argument(
+        "--opensearch-port",
+        type=int,
+        default=9200,
+        help="OpenSearch port (default: 9200)",
+    )
     args = parser.parse_args()
     build_knowledge_base(chroma_host=args.host, chroma_port=args.port, rebuild=args.rebuild)
+    if args.opensearch:
+        eu_ai_act_articles = load_regulatory_directory(REGULATORY_DIR / "eu_ai_act", EU_AI_ACT_ARTICLES)
+        gdpr_articles      = load_regulatory_directory(REGULATORY_DIR / "gdpr",      GDPR_ARTICLES)
+        build_opensearch_index(
+            os_host=args.opensearch_host,
+            os_port=args.opensearch_port,
+            rebuild=args.rebuild,
+            eu_ai_act_articles=eu_ai_act_articles,
+            gdpr_articles=gdpr_articles,
+        )

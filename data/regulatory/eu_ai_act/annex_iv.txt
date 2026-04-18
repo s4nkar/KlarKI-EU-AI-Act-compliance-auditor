@@ -1,0 +1,77 @@
+ARTICLE: 4
+REGULATION: eu_ai_act
+DOMAIN: technical_documentation
+TITLE_EN: Annex IV — Technical Documentation
+TITLE_DE: Anhang IV — Technische Dokumentation
+
+=== EN ===
+Annex IV — Technical Documentation referred to in Article 11(1)
+
+The technical documentation referred to in Article 11(1) shall contain at least the following information, as applicable to the relevant AI system:
+
+1. A general description of the AI system including:
+   (a) its intended purpose, the persons or groups of persons who are intended to use the AI system, and the conditions under which it is intended to be used;
+   (b) the level of accuracy, robustness and cybersecurity referred to in Article 15 against which the high-risk AI system has been tested and validated;
+   (c) any known or foreseeable circumstance, related to the use of the high-risk AI system in accordance with its intended purpose or under conditions of reasonably foreseeable misuse, which may lead to risks to health and safety or fundamental rights;
+   (d) where applicable, the specifications for the input data, or any other relevant information in terms of the training, validation and testing data sets used.
+
+2. A detailed description of the elements of the AI system and of the process for its development including:
+   (a) the methods and steps performed for the development of the AI system, including, where relevant, recourse to pre-trained systems or tools provided by third parties and how these have been used, integrated or modified by the provider;
+   (b) the design specifications of the system, namely the general logic of the AI system and of the algorithms; the key design choices including the rationale and assumptions made, also with regard to persons or groups of persons on whom the system is intended to be used; the main classification choices; what the system is designed to optimise for and the relevance of the different parameters;
+   (c) the description of the system architecture explaining how software components build on or feed into each other and integrate into the overall processing; the computational resources used to develop, train, test and validate the AI system;
+   (d) where relevant, the data requirements in terms of datasheets describing the training methodologies and techniques and the training data sets used, including information about the provenance of those data sets, their scope and main characteristics; how the data was obtained and selected; labelling procedures; data cleaning methodologies;
+   (e) assessment of the human oversight measures needed in accordance with Article 14, including an assessment of the technical measures needed to facilitate the interpretation of the outputs of AI systems by the deployers.
+
+3. Detailed information about the monitoring, functioning and control of the AI system, in particular with regard to:
+   (a) the capabilities and limitations of the AI system's performance, including the degrees of accuracy for specific persons or groups of persons on whom the system is intended to be used and the overall expected level of accuracy in relation to its intended purpose;
+   (b) the foreseeable unintended outcomes and sources of risks to health and safety, fundamental rights and discrimination in view of the intended purpose of the AI system;
+   (c) the human oversight measures needed in accordance with Article 14;
+   (d) specifications on input data, or any other relevant information in terms of the training, validation and testing data sets used, taking into account the intended purpose of the AI system.
+
+4. A description of the appropriateness of the performance metrics for the specific AI system.
+
+5. A detailed description of the risk management system in accordance with Article 9.
+
+6. A description of any change made to the system through its lifecycle.
+
+7. A list of the harmonised standards applied in full or in part; where no such harmonised standards have been applied, a description of the solutions adopted to meet the requirements set out in Section 2 of Chapter III, including a list of other relevant standards and technical specifications applied.
+
+8. A copy of the EU declaration of conformity referred to in Article 47.
+
+9. A detailed description of the system in place to evaluate the AI system performance in the post-market phase in accordance with Article 72.
+
+=== DE ===
+Anhang IV — Technische Dokumentation gemäß Artikel 11 Absatz 1
+
+Die in Artikel 11 Absatz 1 genannte technische Dokumentation enthält mindestens die folgenden Informationen, soweit sie für das betreffende KI-System relevant sind:
+
+1. Eine allgemeine Beschreibung des KI-Systems einschließlich:
+   a) seines Verwendungszwecks, der Personen oder Personengruppen, die das KI-System nutzen sollen, und der Bedingungen, unter denen es genutzt werden soll;
+   b) des Grades an Genauigkeit, Robustheit und Cybersicherheit gemäß Artikel 15, anhand dessen das Hochrisiko-KI-System getestet und validiert wurde;
+   c) aller bekannten oder vorhersehbaren Umstände im Zusammenhang mit der bestimmungsgemäßen Verwendung des Hochrisiko-KI-Systems oder seiner vernünftigerweise vorhersehbaren Zweckentfremdung, die zu Risiken für die Gesundheit und Sicherheit oder die Grundrechte führen können;
+   d) gegebenenfalls der Spezifikationen für die Eingabedaten oder andere relevante Informationen zu den verwendeten Trainings-, Validierungs- und Testdatensätzen.
+
+2. Eine detaillierte Beschreibung der Elemente des KI-Systems und des Prozesses seiner Entwicklung, einschließlich:
+   a) der Methoden und Schritte, die für die Entwicklung des KI-Systems durchgeführt wurden;
+   b) der Designspezifikationen des Systems, nämlich der allgemeinen Logik des KI-Systems und der Algorithmen; der wichtigsten Designentscheidungen einschließlich der Begründung und der gemachten Annahmen;
+   c) der Beschreibung der Systemarchitektur, die erklärt, wie die Softwarekomponenten aufeinander aufbauen oder in die Gesamtverarbeitung einfließen;
+   d) der Datenanforderungen in Bezug auf Datenblätter, die die Trainingsmethoden und -techniken sowie die verwendeten Trainingsdatensätze beschreiben;
+   e) einer Bewertung der gemäß Artikel 14 erforderlichen menschlichen Aufsichtsmaßnahmen.
+
+3. Detaillierte Informationen zur Überwachung, Funktionsweise und Kontrolle des KI-Systems, insbesondere hinsichtlich:
+   a) der Fähigkeiten und Grenzen der Leistung des KI-Systems;
+   b) der vorhersehbaren unbeabsichtigten Ergebnisse und Risikoquellen;
+   c) der gemäß Artikel 14 erforderlichen menschlichen Aufsichtsmaßnahmen;
+   d) der Spezifikationen für Eingabedaten.
+
+4. Eine Beschreibung der Angemessenheit der Leistungsmetriken für das jeweilige KI-System.
+
+5. Eine detaillierte Beschreibung des Risikomanagementsystems gemäß Artikel 9.
+
+6. Eine Beschreibung aller Änderungen am System während seines Lebenszyklus.
+
+7. Eine Liste der vollständig oder teilweise angewandten harmonisierten Normen.
+
+8. Eine Kopie der EU-Konformitätserklärung gemäß Artikel 47.
+
+9. Eine detaillierte Beschreibung des Systems zur Bewertung der KI-Systemleistung in der Nachmarktphase gemäß Artikel 72.

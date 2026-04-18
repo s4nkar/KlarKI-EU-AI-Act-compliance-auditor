@@ -1,0 +1,27 @@
+ARTICLE: 54
+REGULATION: eu_ai_act
+DOMAIN: gpai
+TITLE_EN: Article 54 — Authorised Representatives of Providers of General-Purpose AI Models
+TITLE_DE: Artikel 54 — Bevollmächtigte von Anbietern von KI-Modellen mit allgemeinem Verwendungszweck
+
+=== EN ===
+Article 54 — Authorised Representatives of Providers of General-Purpose AI Models
+
+1. Prior to making their general-purpose AI models available on the Union market, providers of general-purpose AI models established in third countries shall, by written mandate, appoint an authorised representative established in the Union.
+
+2. The provider shall enable its authorised representative to perform the tasks specified in the mandate received from the provider.
+
+3. The authorised representative shall perform the tasks specified in the mandate received from the provider. It shall provide a copy of the mandate to the AI Office upon request, in one of the official languages of the institutions of the Union.
+
+4. The authorised representative shall be the contact person with competent authorities on all issues related to the general-purpose AI model's compliance with this Regulation.
+
+=== DE ===
+Artikel 54 — Bevollmächtigte von Anbietern von KI-Modellen mit allgemeinem Verwendungszweck
+
+1. Vor der Bereitstellung ihrer KI-Modelle mit allgemeinem Verwendungszweck auf dem Unionsmarkt haben Anbieter von KI-Modellen mit allgemeinem Verwendungszweck, die in Drittländern niedergelassen sind, durch schriftlichen Auftrag einen in der Union niedergelassenen Bevollmächtigten zu benennen.
+
+2. Der Anbieter hat es seinem Bevollmächtigten zu ermöglichen, die im erhaltenen Mandat festgelegten Aufgaben zu erfüllen.
+
+3. Der Bevollmächtigte führt die im erhaltenen Mandat festgelegten Aufgaben aus. Er stellt dem KI-Büro auf Anfrage eine Kopie des Mandats in einer der Amtssprachen der Institutionen der Union zur Verfügung.
+
+4. Der Bevollmächtigte ist der Ansprechpartner für die zuständigen Behörden in allen Fragen im Zusammenhang mit der Konformität des KI-Modells mit allgemeinem Verwendungszweck mit dieser Verordnung.
