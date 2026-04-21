@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import ArticleDetail from './pages/ArticleDetail'
 import RiskWizard from './pages/RiskWizard'
 import ClassifierMetrics from './pages/ClassifierMetrics'
+import Monitoring from './pages/Monitoring'
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/audit/:auditId" element={<Dashboard />} />
         <Route path="/audit/:auditId/article/:articleNum" element={<ArticleDetail />} />
         <Route path="/metrics" element={<ClassifierMetrics />} />
+        <Route path="/monitoring" element={<Monitoring />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

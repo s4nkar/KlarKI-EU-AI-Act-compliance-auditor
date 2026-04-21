@@ -24,6 +24,58 @@ export type AuditStatus =
   | 'complete'
   | 'failed'
 
+// ── Phase 3 — Actor & Applicability types ─────────────────────────────────────
+
+export type ActorType = 'provider' | 'deployer' | 'importer' | 'distributor' | 'unknown'
+
+export interface ActorClassification {
+  actor_type: ActorType
+  confidence: number
+  matched_signals: string[]
+  reasoning: string
+}
+
+export interface AnnexIIIMatch {
+  category: number          // AnnexIIICategory int value 1–8
+  category_name: string
+  matched_keywords: string[]
+  obligation_id: string
+  evidence_required: string[]
+}
+
+export interface ApplicabilityResult {
+  is_high_risk: boolean
+  is_prohibited: boolean
+  annex_iii_matches: AnnexIIIMatch[]
+  annex_i_triggered: boolean
+  applicable_articles: number[]
+  reasoning: string
+}
+
+// ── Phase 3 — Evidence mapping types ─────────────────────────────────────────
+
+export interface EvidenceItem {
+  obligation_id: string
+  article: string
+  requirement: string
+  evidence_required: string[]
+  satisfied_by_chunks: string[]
+  satisfied_evidence: string[]
+  missing_evidence: string[]
+  coverage: number
+}
+
+export interface EvidenceMap {
+  total_obligations: number
+  fully_satisfied: number
+  partially_satisfied: number
+  missing: number
+  overall_coverage: number
+  items: EvidenceItem[]
+}
+
+// ── Core report types ─────────────────────────────────────────────────────────
+
 export interface GapItem {
   title: string
   description: string
@@ -69,6 +121,12 @@ export interface ComplianceReport {
   total_chunks: number
   classified_chunks: number
   classifier_backend: string
+  // Phase 3 fields
+  actor: ActorClassification | null
+  applicability: ApplicabilityResult | null
+  evidence_map: EvidenceMap | null
+  confidence_score: number
+  requires_human_review: boolean
 }
 
 export interface AuditResponse {
