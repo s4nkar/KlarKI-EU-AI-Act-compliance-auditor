@@ -4,7 +4,7 @@ Tests cover all 8 entity labels:
   ARTICLE, OBLIGATION, ACTOR, AI_SYSTEM, RISK_TIER, PROCEDURE, REGULATION, PROHIBITED_USE
 
 Skipped automatically if the trained model is not found at
-training/spacy_ner_model/model-final (i.e. before setup completes).
+training/artifacts/spacy_ner_model/model-final (i.e. before setup completes).
 
 These are unit tests (no Ollama / ChromaDB required).
 """
@@ -18,8 +18,8 @@ import pytest
 REPO_ROOT  = Path(__file__).resolve().parent.parent
 MODEL_PATH = next(
     (p for p in [
-        REPO_ROOT / "training" / "spacy_ner_model" / "model-final",
-        Path("/training/spacy_ner_model/model-final"),
+        REPO_ROOT / "training" / "artifacts" / "spacy_ner_model" / "model-final",
+        Path("/training/artifacts/spacy_ner_model/model-final"),
     ] if p.exists()),
     None,
 )

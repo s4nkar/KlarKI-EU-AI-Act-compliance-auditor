@@ -30,8 +30,8 @@ from pathlib import Path
 
 REPO_ROOT   = Path(__file__).resolve().parent.parent.parent
 MODEL_PATH  = next(
-    (p for p in [REPO_ROOT / "training" / "bert_classifier", Path("/training/bert_classifier")] if p.exists()),
-    Path("/training/bert_classifier"),
+    (p for p in [REPO_ROOT / "training" / "artifacts" / "bert_classifier", Path("/training/artifacts/bert_classifier")] if p.exists()),
+    Path("/training/artifacts/bert_classifier"),
 )
 RESULTS_DIR = Path(__file__).parent / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
