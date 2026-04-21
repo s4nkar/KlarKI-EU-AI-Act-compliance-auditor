@@ -29,8 +29,8 @@ RESULTS_DIR.mkdir(exist_ok=True)
 
 MODEL_PATH = next(
     (p for p in [
-        REPO_ROOT / "training" / "spacy_ner_model" / "model-final",
-        Path("/training/spacy_ner_model/model-final"),
+        REPO_ROOT / "training" / "artifacts" / "spacy_ner_model" / "model-final",
+        Path("/training/artifacts/spacy_ner_model/model-final"),
     ] if p.exists()),
     None,
 )

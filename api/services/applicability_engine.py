@@ -27,8 +27,12 @@ from models.schemas import (
     AnnexIIICategory,
     AnnexIIIMatch,
     ApplicabilityResult,
-    RiskTier,
 )
+from services.ml_classifiers import predict_high_risk as _ml_high_risk
+from services.ml_classifiers import predict_prohibited as _ml_prohibited
+
+# ML confidence threshold — if ML model is confident, augment pattern result
+_ML_CONFIDENCE_THRESHOLD = 0.85
 
 logger = structlog.get_logger()
 
@@ -256,10 +260,16 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
     full_text = " ".join(c.text for c in chunks)
 
     # ── Step 1: Article 5 prohibited practice check ───────────────────────────
+    # ML model augments pattern matching when available.
+    # Either ML (high confidence) OR pattern match triggers prohibited.
     prohibited_hits: list[str] = []
     for pattern, label in _PROHIBITED_PATTERNS:
         if re.search(pattern, full_text, re.IGNORECASE):
             prohibited_hits.append(label)
+
+    ml_prohibited = _ml_prohibited(full_text[:2000])  # truncate for inference speed
+    if ml_prohibited and ml_prohibited.label == "prohibited" and ml_prohibited.confidence >= _ML_CONFIDENCE_THRESHOLD:
+        prohibited_hits.append(f"ML model ({ml_prohibited.confidence:.0%} confidence)")
 
     if prohibited_hits:
         return ApplicabilityResult(
@@ -303,7 +313,16 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
             annex_i_hits.append(label)
     annex_i_triggered = len(annex_i_hits) >= 2  # require at least 2 signals to avoid false positives
 
-    is_high_risk = bool(annex_iii_matches) or annex_i_triggered
+    # ── Step 4: ML high-risk augmentation ────────────────────────────────────
+    # ML model can catch Annex III cases where keyword patterns missed.
+    ml_risk = _ml_high_risk(full_text[:2000])
+    ml_high_risk_triggered = (
+        ml_risk is not None
+        and ml_risk.label == "high_risk"
+        and ml_risk.confidence >= _ML_CONFIDENCE_THRESHOLD
+    )
+
+    is_high_risk = bool(annex_iii_matches) or annex_i_triggered or ml_high_risk_triggered
 
     # ── Build reasoning ───────────────────────────────────────────────────────
     reasoning_parts: list[str] = []
@@ -317,6 +336,12 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
         reasoning_parts.append(
             f"HIGH-RISK: Article 6(1) safety-component signals detected: "
             f"{', '.join(annex_i_hits[:3])}. Third-party conformity assessment required."
+        )
+    if ml_high_risk_triggered and not annex_iii_matches and not annex_i_triggered:
+        reasoning_parts.append(
+            f"HIGH-RISK: ML risk classifier detected high-risk use case "
+            f"({ml_risk.confidence:.0%} confidence) — no keyword match found. "  # type: ignore[union-attr]
+            "Manual review of Annex III category is recommended."
         )
     if not is_high_risk:
         reasoning_parts.append(

@@ -285,6 +285,24 @@ class ComplianceReport(BaseModel):
         default=None,
         description="[Phase 3] Document section → obligation evidence mapping (high-risk audits only)",
     )
+    # Phase 3 — Production Hardening
+    confidence_score: float = Field(
+        default=1.0,
+        ge=0.0, le=1.0,
+        description="Overall confidence in the audit results. Low confidence triggers human review.",
+    )
+    requires_human_review: bool = Field(
+        default=False,
+        description="True if the audit falls below the confidence threshold or encounters edge cases.",
+    )
+    model_versions: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Active model versions used for this audit. "
+            "Keys: bert, actor, risk, prohibited, ner, chunk_classifier. "
+            "Values: version strings (e.g. 'v2') or backend identifiers (e.g. 'ollama/phi3:mini')."
+        ),
+    )
 
 
 # ── API envelope models ────────────────────────────────────────────────────────

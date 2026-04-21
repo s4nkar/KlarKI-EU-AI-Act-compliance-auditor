@@ -9,7 +9,7 @@ import ReportDownload from '../components/ReportDownload'
 import EmotionWarning from '../components/EmotionWarning'
 import { fetchReport } from '../hooks/useReport'
 import { riskTierLabel, formatDate } from '../utils/formatters'
-import type { ComplianceReport, RiskTier } from '../types'
+import type { ActorClassification, ApplicabilityResult, ComplianceReport, EvidenceMap, RiskTier } from '../types'
 
 export default function Dashboard() {
   const { auditId } = useParams<{ auditId: string }>()
@@ -67,6 +67,23 @@ export default function Dashboard() {
     <Layout>
       <EmotionWarning flag={report.emotion_flag} />
 
+      {/* ── Human Review Warning ──────────────────────────────────────────── */}
+      {report.requires_human_review && (
+        <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <p className="text-sm font-bold text-amber-800">Manual Human Review Required</p>
+              <p className="text-sm text-amber-700 mt-0.5">
+                Audit confidence is {Math.round((report.confidence_score ?? 1) * 100)}%. A compliance expert should verify these findings before relying on them for regulatory decisions.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {report.wizard_risk_tier && (
         <RiskTierComparison
           wizardTier={report.wizard_risk_tier}
@@ -87,12 +104,13 @@ export default function Dashboard() {
             <p className="text-sm text-slate-400 mb-4">{formatDate(report.created_at)}</p>
 
             {/* Stats row */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
               <StatBox label="Total Chunks"    value={report.total_chunks} />
               <StatBox label="Classified"      value={report.classified_chunks} />
               <StatBox label="Language"        value={report.language.toUpperCase()} />
               <StatBox label="Source Files"    value={report.source_files.length} />
               <StatBox label="Classifier"      value={report.classifier_backend} mono />
+              <StatBox label="Confidence"      value={`${Math.round((report.confidence_score ?? 1) * 100)}%`} />
             </div>
           </div>
 
@@ -123,6 +141,15 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ── Phase 3 panels ───────────────────────────────────────────────── */}
+      {(report.actor || report.applicability || report.evidence_map) && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          {report.actor && <ActorPanel actor={report.actor} />}
+          {report.applicability && <ApplicabilityPanel applicability={report.applicability} />}
+          {report.evidence_map && <EvidencePanel evidence={report.evidence_map} />}
+        </div>
+      )}
+
       {/* ── Article grid ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="section-label mb-0">Article Scores — EU AI Act Art. 9–15</h2>
@@ -141,6 +168,82 @@ export default function Dashboard() {
         </div>
       )}
     </Layout>
+  )
+}
+
+const ACTOR_LABELS: Record<string, string> = {
+  provider: 'Provider', deployer: 'Deployer', importer: 'Importer',
+  distributor: 'Distributor', unknown: 'Unknown',
+}
+
+function ActorPanel({ actor }: { actor: ActorClassification }) {
+  const confidencePct = Math.round(actor.confidence * 100)
+  return (
+    <div className="card p-4">
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Article 3 — Actor Role</p>
+      <p className="text-base font-bold text-slate-900 mb-1">{ACTOR_LABELS[actor.actor_type] ?? actor.actor_type}</p>
+      <div className="flex items-center gap-2 mb-2">
+        <div className="flex-1 h-1.5 rounded-full bg-slate-100">
+          <div className="h-1.5 rounded-full bg-blue-500" style={{ width: `${confidencePct}%` }} />
+        </div>
+        <span className="text-xs text-slate-500 shrink-0">{confidencePct}%</span>
+      </div>
+      {actor.reasoning && <p className="text-xs text-slate-500 leading-relaxed">{actor.reasoning}</p>}
+    </div>
+  )
+}
+
+function ApplicabilityPanel({ applicability }: { applicability: ApplicabilityResult }) {
+  const categoryNames = applicability.annex_iii_matches.map(m => m.category_name)
+  return (
+    <div className="card p-4">
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Article 6 — Applicability Gate</p>
+      {applicability.is_prohibited ? (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 mb-2">Prohibited Use</span>
+      ) : applicability.is_high_risk ? (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700 mb-2">High-Risk — Art. 9–15 Apply</span>
+      ) : (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 mb-2">Minimal Risk</span>
+      )}
+      {categoryNames.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {categoryNames.map(name => (
+            <span key={name} className="px-1.5 py-0.5 rounded bg-slate-100 text-xs text-slate-600">{name}</span>
+          ))}
+        </div>
+      )}
+      {applicability.reasoning && <p className="text-xs text-slate-500 leading-relaxed">{applicability.reasoning}</p>}
+    </div>
+  )
+}
+
+function EvidencePanel({ evidence }: { evidence: EvidenceMap }) {
+  const coveragePct = Math.round(evidence.overall_coverage * 100)
+  return (
+    <div className="card p-4">
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Evidence Coverage</p>
+      <p className="text-2xl font-bold text-slate-900 mb-1">{coveragePct}%</p>
+      <div className="h-1.5 rounded-full bg-slate-100 mb-2">
+        <div
+          className={`h-1.5 rounded-full ${coveragePct >= 70 ? 'bg-emerald-500' : coveragePct >= 40 ? 'bg-amber-400' : 'bg-red-500'}`}
+          style={{ width: `${coveragePct}%` }}
+        />
+      </div>
+      <div className="grid grid-cols-3 gap-1 text-center">
+        <div className="rounded bg-emerald-50 px-1 py-1">
+          <p className="text-xs font-bold text-emerald-700">{evidence.fully_satisfied}</p>
+          <p className="text-[10px] text-emerald-600">Satisfied</p>
+        </div>
+        <div className="rounded bg-amber-50 px-1 py-1">
+          <p className="text-xs font-bold text-amber-700">{evidence.partially_satisfied}</p>
+          <p className="text-[10px] text-amber-600">Partial</p>
+        </div>
+        <div className="rounded bg-red-50 px-1 py-1">
+          <p className="text-xs font-bold text-red-700">{evidence.missing}</p>
+          <p className="text-[10px] text-red-600">Missing</p>
+        </div>
+      </div>
+    </div>
   )
 }
 

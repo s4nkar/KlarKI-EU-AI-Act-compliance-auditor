@@ -30,12 +30,14 @@ from services.classifier import classify_chunks
 from services.emotion_module import check_emotion_recognition
 from services.compliance_scorer import ARTICLE_DOMAINS, score_audit
 from services.document_parser import parse_document, SUPPORTED_EXTENSIONS
-from services.chunker import legal_chunk_text
+from services.chunker import proposition_chunk_text
 from services.evidence_mapper import map_evidence
 from services.gap_analyser import analyse_article
 from services.language_detector import detect_language
+from services.ner_service import enrich_chunks_with_ner
 from services.ollama_client import OllamaClient
 from services.rag_engine import retrieve_requirements
+from services.monitoring_stats import stats as _monitor
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/audit", tags=["audit"])
@@ -101,6 +103,7 @@ async def upload_document(
 
     # Register audit as UPLOADING
     _audits[audit_id] = AuditResponse(audit_id=audit_id, status=AuditStatus.UPLOADING)
+    _monitor.audit_started(audit_id)
 
     # Parse wizard tier if provided
     parsed_wizard_tier: RiskTier | None = None
@@ -222,19 +225,24 @@ async def _run_pipeline(
             user_chunks=art_chunks,
             regulatory_passages=reg_passages,
             ollama=ollama,
+            applicable_articles=applicable_articles,
         )
 
         return score
 
     try:
+        import time as _time
+
         chroma = request.app.state.chroma
         embeddings = request.app.state.embeddings
 
         # Parse → chunk (legal-unit) → detect language
         _set_status(AuditStatus.PARSING)
+        _t0 = _time.time()
         raw_text = await parse_document(file_path, filename)
-        chunks = await legal_chunk_text(raw_text, source_file=filename)
+        chunks = await proposition_chunk_text(raw_text, source_file=filename)
         language = await detect_language(raw_text)
+        _monitor.record_stage("parsing", _time.time() - _t0)
         for chunk in chunks:
             chunk.language = language
 
@@ -242,8 +250,10 @@ async def _run_pipeline(
         # Step 1: detect actor role (Article 3)
         # Step 2: applicability gate (Article 6 + Annex III) — determines if 9–15 apply
         _set_status(AuditStatus.CLASSIFYING)
+        _t0 = _time.time()
         actor_result = await asyncio.to_thread(classify_actor, raw_text)
         applicability_result = await asyncio.to_thread(check_applicability, chunks)
+        _monitor.record_stage("classifying", _time.time() - _t0)
 
         logger.info(
             "applicability_determined",
@@ -262,8 +272,13 @@ async def _run_pipeline(
             else f"ollama/{settings.ollama_model}"
         )
 
+        # NER enrichment — adds entity metadata to each chunk and corrects domain
+        # for UNRELATED chunks that contain explicit Article references (9–15).
+        chunks = await asyncio.to_thread(enrich_chunks_with_ner, chunks)
+
         # RAG retrieval + per-article gap analysis
         _set_status(AuditStatus.ANALYSING)
+        _t0 = _time.time()
 
         # Group chunks by domain
         domain_chunks: dict[ArticleDomain, list] = {d: [] for d in ArticleDomain}
@@ -288,6 +303,7 @@ async def _run_pipeline(
             )
 
         article_scores = await asyncio.gather(*tasks)
+        _monitor.record_stage("analysing", _time.time() - _t0)
 
         # Phase 3 — evidence mapping (deterministic, runs before LLM scoring)
         evidence_map = await asyncio.to_thread(
@@ -312,6 +328,7 @@ async def _run_pipeline(
             actor=actor_result,
             applicability=applicability_result,
             evidence_map=evidence_map,
+            model_versions=getattr(request.app.state, "model_versions", {}),
         )
 
         _audits[audit_id] = AuditResponse(
@@ -319,10 +336,12 @@ async def _run_pipeline(
             status=AuditStatus.COMPLETE,
             report=report,
         )
+        _monitor.audit_completed(audit_id)
         logger.info("audit_complete", audit_id=audit_id, score=report.overall_score)
 
     except Exception as exc:
         logger.error("audit_failed", audit_id=audit_id, error=str(exc), exc_info=True)
+        _monitor.audit_failed(audit_id)
         _set_status(AuditStatus.FAILED)
 
     finally:

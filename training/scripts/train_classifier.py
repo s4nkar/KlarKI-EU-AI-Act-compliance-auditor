@@ -8,7 +8,7 @@ Usage:
     pip install transformers datasets scikit-learn torch
     python training/train_classifier.py \
         --data training/data/clause_labels.jsonl \
-        --output training/bert_classifier \
+        --output training/artifacts/bert_classifier \
         --epochs 5 \
         --batch-size 16
 
@@ -201,7 +201,7 @@ def compute_metrics(eval_pred) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fine-tune gbert-base for EU AI Act clause classification")
     parser.add_argument("--data", default="training/data/clause_labels.jsonl")
-    parser.add_argument("--output", default="training/bert_classifier")
+    parser.add_argument("--output", default="training/artifacts/bert_classifier")
     parser.add_argument("--base-model", default=BASE_MODEL)
     parser.add_argument("--epochs", type=int, default=12,
                         help="Max epochs — early stopping triggers before this (default: 12)")
@@ -212,6 +212,8 @@ def main() -> None:
     parser.add_argument("--max-length", type=int, default=256,
                         help="Max token length for tokeniser (default: 256)")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--data-version", default=None,
+                        help="Data version tag to record in model registry (e.g. 'v2')")
     args = parser.parse_args()
 
     print(f"Loading data from {args.data}")
@@ -375,7 +377,20 @@ def main() -> None:
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics_payload, f, indent=2)
     print(f"Metrics saved to {metrics_path}")
-    print("Next step: python scripts/export_onnx.py --model-path training/bert_classifier \\")
+
+    # Version management — snapshot this trained model and promote if best
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent))
+        from version_manager import VersionManager
+        vm = VersionManager()
+        data_ver = args.data_version if hasattr(args, "data_version") else None
+        new_ver = vm.save_and_promote("bert", output_path, metrics_payload, data_version=data_ver)
+        print(f"Version recorded: bert@{new_ver}")
+    except Exception as ve:
+        print(f"[version] Skipped (version_manager error): {ve}")
+
+    print("Next step: python scripts/export_onnx.py --model-path training/artifacts/bert_classifier \\")
     print("           --output-path model_repository/bert_clause_classifier/1/model.onnx")
 
 

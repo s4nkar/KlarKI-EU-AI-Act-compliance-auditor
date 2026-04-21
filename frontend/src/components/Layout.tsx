@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/', label: 'Risk Assessment', exact: true },
   { to: '/upload', label: 'Upload Docs', exact: false },
   { to: '/metrics', label: 'Model Metrics', exact: false },
+  { to: '/monitoring', label: 'Monitoring', exact: false },
 ]
 
 export default function Layout({ children }: LayoutProps) {

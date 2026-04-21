@@ -22,3 +22,11 @@ structlog==24.2.0
 tritonclient[grpc]==2.44.0  # Phase 5: gRPC client for Triton Inference Server
 numpy==1.26.4               # Phase 5: required by tritonclient + tokenizer encoding
 rank-bm25==0.2.2            # Hybrid RAG: BM25 keyword search index
+pdfplumber==0.11.4          # Phase 3D: PDF table extraction for compliance evidence
+# pytesseract and Pillow are optional OCR deps — install only if scanned PDFs needed:
+#   pip install pytesseract Pillow  +  system: apt install tesseract-ocr tesseract-ocr-deu
+# opensearch-py==2.6.0      # Phase 3D: server-side BM25 — install when USE_OPENSEARCH=true
+langgraph>=0.0.30           # Phase 3B: Multi-Agent Workflow
+langchain-core>=0.1.40      # Phase 3B: LangGraph dependencies
+spacy>=3.7.0                # NER enrichment — model: training/spacy_ner_model/model-final
+psutil==6.0.0               # Monitoring: CPU/memory stats for /api/v1/monitoring

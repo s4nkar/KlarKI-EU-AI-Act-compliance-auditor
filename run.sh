@@ -46,8 +46,8 @@ abort()   { echo ""; echo "ERROR: $*" >&2; exit 1; }
 # ── Commands ──────────────────────────────────────────────────────────────────
 
 cmd_setup() {
-  info "Starting containers..."
-  docker compose up -d
+  info "Building and starting containers..."
+  docker compose up --build -d
 
   info "Installing training dependencies..."
   python -m pip install -r training/requirements-training.txt -q \
@@ -71,7 +71,7 @@ cmd_up() {
     sed -i 's/USE_TRITON=true/USE_TRITON=false/' .env
     echo "Switched to Ollama mode (USE_TRITON=false)"
   fi
-  docker compose up -d
+  docker compose up --build -d
 }
 
 cmd_retrain() {
@@ -144,7 +144,7 @@ cmd_help() {
 
   KlarKI -- available commands
 
-    ./run.sh setup    Complete init: containers + models + training + ONNX export.
+    ./run.sh setup    Complete init: containers + models + knowledge graph + training + ONNX export.
                       Re-running is safe: long stages are skipped if outputs exist.
 
     ./run.sh up       Start all containers in Ollama mode (day-to-day)

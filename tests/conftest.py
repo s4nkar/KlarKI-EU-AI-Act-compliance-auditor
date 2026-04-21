@@ -21,8 +21,8 @@ def spacy_ner_nlp():
     """Return the loaded spaCy NER model, or None if unavailable."""
     model_path = next(
         (p for p in [
-            _REPO_ROOT / "training" / "spacy_ner_model" / "model-final",
-            Path("/training/spacy_ner_model/model-final"),
+            _REPO_ROOT / "training" / "artifacts" / "spacy_ner_model" / "model-final",
+            Path("/training/artifacts/spacy_ner_model/model-final"),
         ] if p.exists()),
         None,
     )

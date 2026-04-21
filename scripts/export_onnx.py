@@ -6,7 +6,7 @@ outputs match PyTorch inference within a tolerance of 1e-4.
 
 Usage:
     python scripts/export_onnx.py \
-        --model-path training/bert_classifier \
+        --model-path training/artifacts/bert_classifier \
         --output-path model_repository/bert_clause_classifier/1/model.onnx
 
     # Also export e5 embeddings model:

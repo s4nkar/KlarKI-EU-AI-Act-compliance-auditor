@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     triton_host: str = "klarki-triton"
     triton_grpc_port: int = 8001
 
+    # OpenSearch (opt-in BM25 replacement — requires --profile opensearch)
+    use_opensearch: bool = False
+    opensearch_host: str = "klarki-opensearch"
+    opensearch_port: int = 9200
+
     @property
     def upload_max_bytes(self) -> int:
         """Maximum upload size in bytes."""

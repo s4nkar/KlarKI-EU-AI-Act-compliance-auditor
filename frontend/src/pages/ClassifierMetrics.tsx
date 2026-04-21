@@ -1,5 +1,5 @@
-// Premium classifier metrics dashboard: BERT macro F1 + confusion matrix + spaCy NER metrics.
-// Falls back to /static-metrics/bert.json when the backend API is not running.
+// Model metrics dashboard: BERT, NER, specialist classifiers, version registry, eval suite.
+// Falls back to /static-metrics/bert.json for BERT when the backend API is not running.
 
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -42,35 +42,71 @@ interface NerMetricsData {
   final_loss: number
 }
 
+interface SpecialistMetric {
+  classifier_type: string
+  macro_f1: number
+  per_class: PerClassMetric[]
+  train_size: number
+  val_size: number
+  base_model: string
+}
+
+type SpecialistMetricsData = Record<string, SpecialistMetric>
+
+interface ModelVersionEntry {
+  version: string
+  created_at: string
+  score: number | null
+  data_version: string | null
+  is_active: boolean
+}
+
+interface ModelVersionInfo {
+  active: string | null
+  metric_key: string
+  active_dir: string
+  versions: ModelVersionEntry[]
+}
+
+interface DataVersionEntry {
+  version: string
+  created_at: string
+  record_count: number | null
+  is_active: boolean
+}
+
+interface DataVersionInfo {
+  active: string | null
+  versions: DataVersionEntry[]
+}
+
+interface VersionsData {
+  models: Record<string, ModelVersionInfo>
+  data: Record<string, DataVersionInfo>
+}
+
 interface EvalResult {
   eval: string
   status: 'pass' | 'warn' | 'fail' | 'skip'
   reason?: string
-  // classifier
   macro_f1?: number
   accuracy?: number
   per_class?: Record<string, { precision: number; recall: number; f1: number; support: number }>
-  // rag
   'recall@1'?: number
   'recall@3'?: number
   'recall@5'?: number
   mrr?: number
   n_queries?: number
-  // adversarial
   adversarial_accuracy?: number
   n_examples?: number
   n_correct?: number
-  // consistency
   bert?: { consistency_rate: number; n_probes: number }
   ollama?: { consistency_rate: number; n_probes: number }
-  // hallucination
   citation_rate?: number
   n_articles?: number
-  // pipeline
   checks?: Record<string, boolean>
   checks_passed?: number
   checks_total?: number
-  // ner
   overall_f1?: number
   per_label?: Record<string, { precision: number; recall: number; f1: number; tp: number; fp: number; fn: number }>
   weak_labels?: Record<string, number>
@@ -81,23 +117,26 @@ interface EvalResult {
 type EvalResultsMap = Record<string, EvalResult>
 
 export default function ClassifierMetrics() {
-  const [data, setData]         = useState<ClassifierMetricsData | null>(null)
-  const [nerData, setNerData]   = useState<NerMetricsData | null>(null)
-  const [evalData, setEvalData] = useState<EvalResultsMap | null>(null)
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState<string | null>(null)
-  const [fromStatic, setFromStatic] = useState(false)
+  const [data, setData]                   = useState<ClassifierMetricsData | null>(null)
+  const [nerData, setNerData]             = useState<NerMetricsData | null>(null)
+  const [specialistData, setSpecialist]   = useState<SpecialistMetricsData>({})
+  const [versionsData, setVersions]       = useState<VersionsData | null>(null)
+  const [evalData, setEvalData]           = useState<EvalResultsMap | null>(null)
+  const [loading, setLoading]             = useState(true)
+  const [error, setError]                 = useState<string | null>(null)
+  const [fromStatic, setFromStatic]       = useState(false)
 
   useEffect(() => {
     Promise.allSettled([
       apiClient.get<{ status: string; data: ClassifierMetricsData }>('/api/v1/metrics/classifier'),
       apiClient.get<{ status: string; data: NerMetricsData }>('/api/v1/metrics/ner'),
+      apiClient.get<{ status: string; data: SpecialistMetricsData }>('/api/v1/metrics/specialists'),
+      apiClient.get<{ status: string; data: VersionsData }>('/api/v1/metrics/versions'),
       apiClient.get<{ status: string; data: EvalResultsMap }>('/api/v1/metrics/evaluation'),
-    ]).then(async ([bertResult, nerResult, evalResult]) => {
+    ]).then(async ([bertResult, nerResult, specialistResult, versionsResult, evalResult]) => {
       if (bertResult.status === 'fulfilled') {
         setData(bertResult.value.data.data)
       } else {
-        // Try static fallback (works even when backend is offline)
         try {
           const r = await fetch('/static-metrics/bert.json')
           if (!r.ok) throw new Error('Static fallback not found')
@@ -111,6 +150,8 @@ export default function ClassifierMetrics() {
         }
       }
       if (nerResult.status === 'fulfilled') setNerData(nerResult.value.data.data)
+      if (specialistResult.status === 'fulfilled') setSpecialist(specialistResult.value.data.data)
+      if (versionsResult.status === 'fulfilled') setVersions(versionsResult.value.data.data)
       if (evalResult.status === 'fulfilled') {
         const map = evalResult.value.data.data
         if (Object.keys(map).length > 0) setEvalData(map)
@@ -338,6 +379,12 @@ export default function ClassifierMetrics() {
       {/* NER metrics section */}
       {nerData && <NerMetricsSection data={nerData} />}
 
+      {/* Phase 3 specialist classifiers */}
+      <SpecialistSection data={specialistData} />
+
+      {/* Model version registry */}
+      {versionsData && <VersionRegistrySection data={versionsData} />}
+
       {/* Evaluation suite results */}
       <EvaluationSection data={evalData} />
     </Layout>
@@ -450,6 +497,263 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
     </div>
   )
 }
+
+const SPECIALIST_META: Record<string, { label: string; desc: string; purpose: string }> = {
+  actor:      { label: 'Actor Classifier',      desc: 'Article 3 role detection', purpose: 'Provider / Deployer / Importer / Distributor' },
+  risk:       { label: 'Risk Classifier',       desc: 'Article 6 + Annex III gate', purpose: 'High-risk vs Not high-risk' },
+  prohibited: { label: 'Prohibited Classifier', desc: 'Article 5 prohibition gate', purpose: 'Prohibited vs Not prohibited' },
+}
+
+function SpecialistSection({ data }: { data: SpecialistMetricsData }) {
+  const allKeys = Object.keys(SPECIALIST_META)
+  const anyTrained = allKeys.some(k => k in data)
+
+  return (
+    <div className="border-t border-slate-200 pt-8 mb-7">
+      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">
+        Phase 3 Specialist Classifiers
+      </h1>
+      <p className="text-sm text-slate-500 mb-6">
+        Lightweight BERT classifiers for deterministic legal decision-making — no LLM calls.
+        {!anyTrained && (
+          <span className="ml-2 text-amber-600">
+            Not yet trained. Run{' '}
+            <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded-md font-mono text-slate-700">
+              ./run.sh setup
+            </code>{' '}
+            to train them.
+          </span>
+        )}
+      </p>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-7">
+        {allKeys.map(key => {
+          const meta = SPECIALIST_META[key]
+          const m = data[key]
+          if (!m) return (
+            <div key={key} className="card p-6 opacity-60 flex flex-col gap-2">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{meta.label}</p>
+              <p className="text-xs text-slate-400">{meta.desc}</p>
+              <p className="text-xs text-slate-400 italic mt-1">{meta.purpose}</p>
+              <div className="mt-4 text-sm text-slate-400">Not yet trained</div>
+            </div>
+          )
+
+          const theme = m.macro_f1 >= 0.85
+            ? { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', bar: '#10b981' }
+            : m.macro_f1 >= 0.70
+              ? { text: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-200',  bar: '#f59e0b' }
+              : { text: 'text-red-600',    bg: 'bg-red-50',    border: 'border-red-200',    bar: '#ef4444' }
+
+          return (
+            <div key={key} className={`card p-6 border-2 ${theme.border} ${theme.bg}`}>
+              <div className="mb-4">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{meta.label}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{meta.desc}</p>
+                <p className="text-xs text-slate-400 mt-0.5 italic">{meta.purpose}</p>
+              </div>
+
+              <div className="flex items-baseline gap-2 mb-4">
+                <span className={`text-4xl font-extrabold tabular-nums ${theme.text}`}>
+                  {(m.macro_f1 * 100).toFixed(1)}%
+                </span>
+                <span className="text-xs text-slate-400 font-medium">Macro F1</span>
+              </div>
+
+              <div className="text-xs text-slate-400 mb-4">
+                {m.train_size.toLocaleString()} train · {m.val_size} val ·{' '}
+                {m.per_class.length} classes
+              </div>
+
+              <div className="space-y-2">
+                {m.per_class.map((cls, i) => {
+                  const barColor = cls.f1 >= 0.85 ? '#10b981' : cls.f1 >= 0.70 ? '#f59e0b' : '#ef4444'
+                  return (
+                    <div key={i}>
+                      <div className="flex justify-between text-xs mb-0.5">
+                        <span className="text-slate-600 font-medium capitalize">{cls.label.replace(/_/g, ' ')}</span>
+                        <span className="text-slate-500 tabular-nums">{(cls.f1 * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="h-1.5 bg-white/60 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${cls.f1 * 100}%`, backgroundColor: barColor }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+
+function VersionRegistrySection({ data }: { data: VersionsData }) {
+  const MODEL_LABELS: Record<string, string> = {
+    bert:       'BERT Domain Classifier',
+    ner:        'spaCy NER',
+    actor:      'Actor Classifier',
+    risk:       'Risk Classifier',
+    prohibited: 'Prohibited Classifier',
+  }
+
+  const modelEntries = Object.entries(data.models)
+  const dataEntries  = Object.entries(data.data)
+
+  if (modelEntries.length === 0) return null
+
+  function fmtDate(iso: string) {
+    try { return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) }
+    catch { return iso }
+  }
+
+  return (
+    <div className="border-t border-slate-200 pt-8 mb-7">
+      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Model Version Registry</h1>
+      <p className="text-sm text-slate-500 mb-6">
+        Active model versions, training history, and data-version traceability across all five classifiers.
+      </p>
+
+      {/* Models table */}
+      <h2 className="section-label">Active Models</h2>
+      <div className="card overflow-hidden mb-6">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50/80">
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Model</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Active Ver.</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Score</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Metric</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Data Ver.</th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Versions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {modelEntries.map(([key, info]) => {
+              const active = info.versions.find(v => v.is_active)
+              const scoreVal = active?.score ?? null
+              const scoreTheme = scoreVal == null ? 'text-slate-400'
+                : scoreVal >= 0.85 ? 'text-emerald-600 font-bold'
+                : scoreVal >= 0.70 ? 'text-amber-600 font-bold'
+                : 'text-red-600 font-bold'
+              return (
+                <tr key={key} className="hover:bg-slate-50/70 transition-colors">
+                  <td className="px-5 py-3.5">
+                    <span className="font-semibold text-slate-800">{MODEL_LABELS[key] ?? key}</span>
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    {info.active
+                      ? <span className="badge bg-brand-50 text-brand-700 border border-brand-200">{info.active}</span>
+                      : <span className="text-slate-400 text-xs italic">untrained</span>}
+                  </td>
+                  <td className={`px-4 py-3.5 text-center tabular-nums ${scoreTheme}`}>
+                    {scoreVal != null ? `${(scoreVal * 100).toFixed(1)}%` : '—'}
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    <code className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
+                      {info.metric_key}
+                    </code>
+                  </td>
+                  <td className="px-4 py-3.5 text-center text-slate-500 text-xs">
+                    {active?.data_version ?? <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums">
+                    {info.versions.length}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Version history per model */}
+      <h2 className="section-label">Version History</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
+        {modelEntries.map(([key, info]) => (
+          <div key={key} className="card p-4">
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+              {MODEL_LABELS[key] ?? key}
+            </p>
+            {info.versions.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">No versions recorded</p>
+            ) : (
+              <div className="space-y-2">
+                {[...info.versions].reverse().map(v => {
+                  const scoreStr = v.score != null ? `${(v.score * 100).toFixed(1)}%` : '—'
+                  return (
+                    <div key={v.version} className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${v.is_active ? 'bg-brand-50 border border-brand-200' : 'bg-slate-50'}`}>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-bold ${v.is_active ? 'text-brand-700' : 'text-slate-500'}`}>
+                          {v.version}
+                        </span>
+                        {v.is_active && (
+                          <span className="badge bg-brand-100 text-brand-700 text-[10px] py-0 px-1.5">active</span>
+                        )}
+                      </div>
+                      <div className="text-right text-slate-500">
+                        <div className="tabular-nums font-semibold">{scoreStr}</div>
+                        <div className="text-slate-400 text-[10px]">{fmtDate(v.created_at)}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Training data versions */}
+      {dataEntries.length > 0 && (
+        <>
+          <h2 className="section-label">Training Data Versions</h2>
+          <div className="card overflow-hidden mb-2">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/80">
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Dataset</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Active Ver.</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Records</th>
+                  <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Snapshots</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {dataEntries.map(([key, info]) => {
+                  const active = info.versions.find(v => v.is_active)
+                  return (
+                    <tr key={key} className="hover:bg-slate-50/70 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <span className="font-semibold text-slate-800 capitalize">{key.replace(/_/g, ' ')} labels</span>
+                      </td>
+                      <td className="px-4 py-3.5 text-center">
+                        {info.active
+                          ? <span className="badge bg-slate-100 text-slate-600 border border-slate-200">{info.active}</span>
+                          : <span className="text-slate-400 text-xs italic">none</span>}
+                      </td>
+                      <td className="px-4 py-3.5 text-center text-slate-600 tabular-nums">
+                        {active?.record_count?.toLocaleString() ?? '—'}
+                      </td>
+                      <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums">
+                        {info.versions.length}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 
 function NerMetricsSection({ data }: { data: NerMetricsData }) {
   const theme = data.overall_f1 >= 0.80

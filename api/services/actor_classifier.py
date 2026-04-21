@@ -18,6 +18,10 @@ the strength of the winning class relative to all classes.
 
 import re
 from models.schemas import ActorClassification, ActorType
+from services.ml_classifiers import predict_actor as _ml_predict_actor
+
+# ML confidence threshold — if ML model is confident enough, skip pattern matching
+_ML_CONFIDENCE_THRESHOLD = 0.80
 
 # ── Signal dictionaries ────────────────────────────────────────────────────────
 # Each list contains regex patterns (case-insensitive). More specific patterns
@@ -87,12 +91,31 @@ _ALL_PATTERNS = {
 def classify_actor(full_text: str) -> ActorClassification:
     """Detect the EU AI Act Article 3 actor role from document text.
 
+    Phase 3 ensemble: tries ML model first. If the model is trained and
+    returns confidence ≥ _ML_CONFIDENCE_THRESHOLD, uses that result.
+    Falls back to pattern matching otherwise.
+
     Args:
         full_text: Full raw text of the uploaded document.
 
     Returns:
         ActorClassification with detected actor type and matched signals.
     """
+    # ── ML path (if model is trained) ────────────────────────────────────────
+    ml = _ml_predict_actor(full_text)
+    if ml is not None and ml.confidence >= _ML_CONFIDENCE_THRESHOLD:
+        try:
+            actor_type = ActorType(ml.label)
+        except ValueError:
+            actor_type = ActorType.UNKNOWN
+        return ActorClassification(
+            actor_type=actor_type,
+            confidence=ml.confidence,
+            matched_signals=[],
+            reasoning=f"ML model (actor_classifier): {ml.label} with {ml.confidence:.0%} confidence.",
+        )
+
+    # ── Pattern fallback ──────────────────────────────────────────────────────
     text_lower = full_text.lower()
 
     hits: dict[ActorType, list[str]] = {actor: [] for actor in _ALL_PATTERNS}
