@@ -131,7 +131,7 @@ services:
       - "8004:8002"
     volumes:
       - ./model_repository:/models
-      - ./training/spacy_ner_model:/spacy_model
+      - ./training/artifacts/spacy_ner_model:/spacy_model
     environment:
       - SPACY_MODEL_PATH=/spacy_model/model-final
     command: tritonserver --model-repository=/models --exit-on-error=false
