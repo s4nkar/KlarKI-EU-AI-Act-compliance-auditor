@@ -13,7 +13,7 @@ Install backbone:
 Usage:
     python training/train_ner.py \
         --data training/data/ner_annotations.jsonl \
-        --output training/spacy_ner_model
+        --output training/artifacts/spacy_ner_model
 
 The trained model is saved as a spaCy pipeline and wrapped in a Triton
 Python backend at model_repository/spacy_ner/1/model.py.
@@ -134,7 +134,7 @@ def build_doc_bin(records: list[dict], nlp) -> DocBin:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train spaCy NER for EU AI Act entities")
     parser.add_argument("--data", default="training/data/ner_annotations.jsonl")
-    parser.add_argument("--output", default="training/spacy_ner_model")
+    parser.add_argument("--output", default="training/artifacts/spacy_ner_model")
     parser.add_argument("--epochs", type=int, default=60,
                         help="Max epochs — early stopping may trigger earlier (default: 60)")
     parser.add_argument("--batch-size", type=int, default=32,

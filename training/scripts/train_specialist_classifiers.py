@@ -5,15 +5,15 @@ Three classifier types, each a separate run:
 
   actor      — 4-class: provider / deployer / importer / distributor
                Input:  training/data/actor_labels.jsonl
-               Output: training/actor_classifier/
+               Output: training/artifacts/actor_classifier/
 
   risk       — binary:  high_risk / not_high_risk (Article 6 + Annex III gate)
                Input:  training/data/risk_labels.jsonl
-               Output: training/risk_classifier/
+               Output: training/artifacts/risk_classifier/
 
   prohibited — binary:  prohibited / not_prohibited (Article 5 gate)
                Input:  training/data/prohibited_labels.jsonl
-               Output: training/prohibited_classifier/
+               Output: training/artifacts/prohibited_classifier/
 
 Usage:
     python training/train_specialist_classifiers.py --type actor
@@ -70,21 +70,21 @@ def _bar(current: int, total: int, width: int = 20) -> str:
 CLASSIFIER_CONFIGS: dict[str, dict] = {
     "actor": {
         "data_file": "training/data/actor_labels.jsonl",
-        "output_dir": "training/actor_classifier",
+        "output_dir": "training/artifacts/actor_classifier",
         "labels": ["provider", "deployer", "importer", "distributor"],
         "description": "Article 3 actor role classifier (4-class)",
         "f1_target": 0.90,  # slightly lower target — importer/distributor are rare in practice
     },
     "risk": {
         "data_file": "training/data/risk_labels.jsonl",
-        "output_dir": "training/risk_classifier",
+        "output_dir": "training/artifacts/risk_classifier",
         "labels": ["high_risk", "not_high_risk"],
         "description": "Article 6 + Annex III high-risk binary classifier",
         "f1_target": 0.93,
     },
     "prohibited": {
         "data_file": "training/data/prohibited_labels.jsonl",
-        "output_dir": "training/prohibited_classifier",
+        "output_dir": "training/artifacts/prohibited_classifier",
         "labels": ["prohibited", "not_prohibited"],
         "description": "Article 5 prohibited-practice binary classifier",
         "f1_target": 0.95,  # higher bar — false negatives here are legally dangerous
@@ -192,6 +192,7 @@ def train(
     lr: float,
     max_length: int,
     seed: int,
+    base_model: str = BASE_MODEL,
 ) -> None:
     cfg = CLASSIFIER_CONFIGS[classifier_type]
     labels: list[str] = cfg["labels"]
@@ -226,7 +227,7 @@ def train(
     train_ds = Dataset.from_list(train_data)
     val_ds   = Dataset.from_list(val_data)
 
-    tokenizer = BertTokenizer.from_pretrained(BASE_MODEL)
+    tokenizer = BertTokenizer.from_pretrained(base_model)
     train_ds = train_ds.map(lambda b: tokenize(b, tokenizer, max_length), batched=True)
     val_ds   = val_ds.map(  lambda b: tokenize(b, tokenizer, max_length), batched=True)
     train_ds = train_ds.rename_column("label", "labels")
@@ -235,7 +236,7 @@ def train(
     val_ds.set_format("torch")
 
     model = BertForSequenceClassification.from_pretrained(
-        BASE_MODEL,
+        base_model,
         num_labels=len(labels),
         id2label=id2label,
         label2id=label2id,
@@ -355,7 +356,7 @@ def train(
         "labels": labels,
         "val_size": len(val_data),
         "train_size": len(train_data),
-        "base_model": BASE_MODEL,
+        "base_model": base_model,
     }
     metrics_path = out_path / "metrics.json"
     with open(metrics_path, "w", encoding="utf-8") as f:
@@ -381,10 +382,6 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
-    # Allow overriding base model globally
-    global BASE_MODEL
-    BASE_MODEL = args.base_model
-
     train(
         classifier_type=args.type,
         epochs=args.epochs,
@@ -392,6 +389,7 @@ def main() -> None:
         lr=args.lr,
         max_length=args.max_length,
         seed=args.seed,
+        base_model=args.base_model,
     )
 
 
