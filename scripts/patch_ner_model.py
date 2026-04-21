@@ -9,7 +9,7 @@ The NER model still runs first and catches entities the ruler doesn't cover.
 
 Usage:
     python scripts/patch_ner_model.py
-    python scripts/patch_ner_model.py --model training/spacy_ner_model/model-final
+    python scripts/patch_ner_model.py --model training/artifacts/spacy_ner_model/model-final
 """
 
 import argparse

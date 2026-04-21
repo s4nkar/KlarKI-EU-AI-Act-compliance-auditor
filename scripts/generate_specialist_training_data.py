@@ -195,6 +195,39 @@ CLASSIFIER_CONFIGS: dict[str, dict] = {
 
 # ── Ollama async generation ───────────────────────────────────────────────────
 
+def _repair_json_array(raw: str) -> list[str]:
+    """Extract and repair a JSON string array from a potentially truncated LLM response."""
+    # Find the outermost [...] using a greedy match
+    match = re.search(r"\[.*\]", raw, re.DOTALL)
+    if not match:
+        # Try to salvage individual quoted strings even without a wrapper
+        items = re.findall(r'"((?:[^"\\]|\\.)*)"\s*[,\]]?', raw)
+        return [t.strip() for t in items if t.strip()]
+
+    text = match.group()
+
+    # Attempt direct parse first
+    try:
+        result = json.loads(text)
+        if isinstance(result, list):
+            return [s for s in result if isinstance(s, str)]
+    except json.JSONDecodeError:
+        pass
+
+    # Repair: remove trailing comma before ] and re-try
+    repaired = re.sub(r",\s*\]", "]", text)
+    try:
+        result = json.loads(repaired)
+        if isinstance(result, list):
+            return [s for s in result if isinstance(s, str)]
+    except json.JSONDecodeError:
+        pass
+
+    # Last resort: extract all quoted strings from whatever we have
+    items = re.findall(r'"((?:[^"\\]|\\.)*)"', text)
+    return [t.strip() for t in items if t.strip()]
+
+
 async def _call_ollama(
     client: httpx.AsyncClient,
     ollama_host: str,
@@ -218,12 +251,7 @@ async def _call_ollama(
         resp = await client.post(f"{ollama_host}/api/generate", json=payload, timeout=120.0)
         resp.raise_for_status()
         raw = resp.json().get("response", "")
-
-        # Extract JSON array from response
-        match = re.search(r"\[.*?\]", raw, re.DOTALL)
-        if not match:
-            return []
-        return json.loads(match.group())
+        return _repair_json_array(raw)
     except Exception as exc:
         print(f"    [warn] Ollama call failed: {exc}")
         return []
@@ -367,8 +395,8 @@ async def main() -> None:
     )
     parser.add_argument("--n-per-class", type=int, default=200,
                         help="Target examples per class per language (default: 200)")
-    parser.add_argument("--batch-size", type=int, default=25,
-                        help="Sentences per Ollama call (default: 25)")
+    parser.add_argument("--batch-size", type=int, default=5,
+                        help="Sentences per Ollama call (default: 5; phi3:mini reliable at ≤5)")
     parser.add_argument("--languages", default="en,de",
                         help="Comma-separated language codes (default: en,de)")
     parser.add_argument("--ollama-host", default="http://localhost:11434")

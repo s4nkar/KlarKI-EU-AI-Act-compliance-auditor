@@ -4,15 +4,19 @@
 
 Runs every initialisation step in order:
 
-  Stage 1  seed-ollama       - pull phi3:mini into the Ollama container
-  Stage 2  knowledge-base    - chunk + embed EU AI Act / GDPR -> ChromaDB
-  Stage 3  generate-data     - generate synthetic BERT training data via Ollama
-  Stage 4  train-bert        - fine-tune deepset/gbert-base (GPU recommended)
-  Stage 5  generate-ner-data - generate NER training data via deterministic templates
-  Stage 6  train-ner         - train spaCy NER model
-  Stage 7  export-bert       - export fine-tuned BERT -> ONNX
-  Stage 8  export-e5         - export multilingual-e5-small -> ONNX
-  Stage 9  benchmark         - latency comparison Ollama vs Triton
+  Stage 1    seed-ollama              - pull phi3:mini into the Ollama container
+  Stage 1.5  seed-nli                 - download NLI cross-encoder to cache
+  Stage 2    knowledge-base           - chunk + embed EU AI Act / GDPR -> ChromaDB
+  Stage 2.5  build-graph              - generate obligation JSONL from regulatory text
+  Stage 3    generate-data            - generate synthetic BERT training data via Ollama
+  Stage 4    train-bert               - fine-tune deepset/gbert-base (GPU recommended)
+  Stage 3.5  generate-specialist-data - generate actor/risk/prohibited training data
+  Stage 4.5  train-specialist         - fine-tune actor/risk/prohibited classifiers
+  Stage 5    generate-ner-data        - generate NER training data via deterministic templates
+  Stage 6    train-ner                - train spaCy NER model
+  Stage 7    export-bert              - export fine-tuned BERT -> ONNX
+  Stage 8    export-e5                - export multilingual-e5-small -> ONNX
+  Stage 9    benchmark                - latency comparison Ollama vs Triton
 
 Re-running is safe: each long-running stage auto-skips if its outputs exist.
 Use --retrain to force full regeneration of data + models + exports.
@@ -49,6 +53,56 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+# VersionManager — optional; gracefully disabled if training deps not installed
+try:
+    sys.path.insert(0, str(Path(__file__).parent.parent / "training"))
+    from version_manager import VersionManager as _VersionManager  # type: ignore
+    _VM: "_VersionManager | None" = _VersionManager()
+except Exception:
+    _VM = None
+
+
+# Populated by generate stages; read by train stages to wire data_version into the model registry.
+_DATA_VERSIONS: dict[str, str] = {}
+
+
+def _vm_snapshot_data(data_type: str, path: Path) -> str | None:
+    """Snapshot data if content changed. Returns version string (no-op returns None)."""
+    if _VM and path.exists():
+        try:
+            version, changed = _VM.snapshot_data(data_type, path)
+            _DATA_VERSIONS[data_type] = version
+            if not changed:
+                print(_c(DIM, f"     [version] {data_type} data unchanged — training skip eligible"))
+            return version
+        except Exception as exc:
+            print(_c(DIM, f"     [version] snapshot skipped: {exc}"))
+    return None
+
+
+def _vm_save_model(model_type: str, model_dir: Path, metrics_path: Path, data_type: str | None = None) -> None:
+    """Save versioned model copy and promote if best (no-op if VM unavailable)."""
+    if _VM and model_dir.is_dir():
+        try:
+            metrics: dict = {}
+            if metrics_path.exists():
+                with open(metrics_path, encoding="utf-8") as f:
+                    metrics = json.load(f)
+            data_version = _DATA_VERSIONS.get(data_type) if data_type else None
+            _VM.save_and_promote(model_type, model_dir, metrics, data_version=data_version)
+        except Exception as exc:
+            print(_c(DIM, f"     [version] model save skipped: {exc}"))
+
+
+def _should_retrain(model_type: str, data_type: str) -> bool:
+    """Return True if VersionManager says data changed since last model training."""
+    if _VM:
+        try:
+            return _VM.should_retrain(model_type, data_type)
+        except Exception:
+            pass
+    return True  # can't determine — safe default
 
 # Windows cp1252 stdout can't encode UTF-8 output from subprocesses (German
 # characters, progress bars). Reconfigure to UTF-8 so streamed output renders.
@@ -201,6 +255,20 @@ def stage_seed_ollama(args: argparse.Namespace) -> bool:
         return False
 
 
+def stage_seed_nli(args: argparse.Namespace) -> bool:
+    """Stage 1.5 - download NLI model to cache."""
+    step("Seeding NLI model (cross-encoder/nli-deberta-v3-small)")
+    if args.dry_run:
+        return True
+    
+    cmd = [
+        sys.executable,
+        "-c",
+        "from sentence_transformers import CrossEncoder; CrossEncoder('cross-encoder/nli-deberta-v3-small')"
+    ]
+    return run(cmd, args.dry_run) == 0
+
+
 def stage_knowledge_base(args: argparse.Namespace) -> bool:
     """Stage 2 - build ChromaDB knowledge base."""
     step("Building ChromaDB knowledge base")
@@ -220,6 +288,23 @@ def stage_knowledge_base(args: argparse.Namespace) -> bool:
     ]
     if args.rebuild_kb:
         cmd.append("--rebuild")
+    return run(cmd, args.dry_run) == 0
+
+
+def stage_build_graph(args: argparse.Namespace) -> bool:
+    """Stage 2.5 - Generate JSONL Knowledge Graph from raw text via Ollama."""
+    step("Building structured Knowledge Graph via Ollama")
+    graph_dir = ROOT / "data" / "obligations"
+    
+    if not args.gen_overwrite and not args.dry_run and graph_dir.exists() and any(graph_dir.glob("*/*.jsonl")):
+        print(_c(YELLOW, "  --  data/obligations/ already contains .jsonl files -- skipping graph generation."))
+        print(_c(DIM, "      Pass --gen-overwrite to force regeneration."))
+        return True
+
+    cmd = [
+        sys.executable,
+        str(ROOT / "scripts" / "build_structured_obligations.py")
+    ]
     return run(cmd, args.dry_run) == 0
 
 
@@ -254,7 +339,10 @@ def stage_generate_data(args: argparse.Namespace) -> bool:
     ]
     if args.gen_overwrite:
         cmd.append("--overwrite")
-    return run(cmd, args.dry_run) == 0
+    ok = run(cmd, args.dry_run) == 0
+    if ok:
+        _vm_snapshot_data("bert", ROOT / "training" / "data" / "clause_labels.jsonl")
+    return ok
 
 
 def stage_train_bert(args: argparse.Namespace) -> bool:
@@ -264,24 +352,35 @@ def stage_train_bert(args: argparse.Namespace) -> bool:
     Pass --retrain to force retraining.
     """
     step("Training BERT classifier (deepset/gbert-base)")
-    bert_dir = ROOT / "training" / "bert_classifier"
+    bert_dir = ROOT / "training" / "artifacts" / "bert_classifier"
     model_exists = (bert_dir / "config.json").exists() and (
         (bert_dir / "model.safetensors").exists() or (bert_dir / "pytorch_model.bin").exists()
     )
-    if not args.gen_overwrite and not args.dry_run and model_exists:
-        print(_c(YELLOW,
-            f"  --  bert_classifier/ already exists -- skipping BERT training."))
-        print(_c(DIM, "      Run './run.sh retrain' to force retraining."))
-        return True
+    if not args.dry_run and model_exists:
+        if args.force_retrain:
+            pass  # always train a new version
+        elif args.retrain:
+            if not _should_retrain("bert", "bert"):
+                print(_c(YELLOW, "  --  bert data unchanged since last training — skipping BERT retrain."))
+                return True
+        else:
+            print(_c(YELLOW, "  --  artifacts/bert_classifier/ already exists -- skipping BERT training."))
+            print(_c(DIM, "      Run with --retrain (data-change-aware) or --force-retrain."))
+            return True
     cmd = [
         sys.executable,
-        str(ROOT / "training" / "train_classifier.py"),
+        str(ROOT / "training" / "scripts" / "train_classifier.py"),
         "--data",       str(ROOT / "training" / "data" / "clause_labels.jsonl"),
-        "--output",     str(ROOT / "training" / "bert_classifier"),
+        "--output",     str(ROOT / "training" / "artifacts" / "bert_classifier"),
         "--epochs",     str(args.bert_epochs),
         "--batch-size", str(args.bert_batch),
     ]
-    return run(cmd, args.dry_run) == 0
+    ok = run(cmd, args.dry_run) == 0
+    if ok:
+        _vm_save_model("bert", ROOT / "training" / "artifacts" / "bert_classifier",
+                       ROOT / "training" / "artifacts" / "bert_classifier" / "metrics.json",
+                       data_type="bert")
+    return ok
 
 
 def stage_generate_ner_data(args: argparse.Namespace) -> bool:
@@ -311,7 +410,10 @@ def stage_generate_ner_data(args: argparse.Namespace) -> bool:
     ]
     if args.gen_overwrite:
         cmd.append("--overwrite")
-    return run(cmd, args.dry_run) == 0
+    ok = run(cmd, args.dry_run) == 0
+    if ok:
+        _vm_snapshot_data("ner", ROOT / "training" / "data" / "ner_annotations.jsonl")
+    return ok
 
 
 def stage_train_ner(args: argparse.Namespace) -> bool:
@@ -321,21 +423,124 @@ def stage_train_ner(args: argparse.Namespace) -> bool:
     Pass --retrain to force retraining.
     """
     step("Training spaCy NER model")
-    ner_model = ROOT / "training" / "spacy_ner_model" / "model-final"
-    if not args.gen_overwrite and not args.dry_run and ner_model.exists():
-        print(_c(YELLOW, "  --  spacy_ner_model/model-final already exists -- skipping NER training."))
-        print(_c(DIM, "      Run './run.sh retrain' to force retraining."))
-        return True
+    ner_model = ROOT / "training" / "artifacts" / "spacy_ner_model" / "model-final"
+    if not args.dry_run and ner_model.exists():
+        if args.force_retrain:
+            pass
+        elif args.retrain:
+            if not _should_retrain("ner", "ner"):
+                print(_c(YELLOW, "  --  NER data unchanged since last training — skipping NER retrain."))
+                return True
+        else:
+            print(_c(YELLOW, "  --  artifacts/spacy_ner_model/model-final already exists -- skipping NER training."))
+            print(_c(DIM, "      Run with --retrain (data-change-aware) or --force-retrain."))
+            return True
     cmd = [
         sys.executable,
-        str(ROOT / "training" / "train_ner.py"),
+        str(ROOT / "training" / "scripts" / "train_ner.py"),
         "--data",       str(ROOT / "training" / "data" / "ner_annotations.jsonl"),
-        "--output",     str(ROOT / "training" / "spacy_ner_model"),
+        "--output",     str(ROOT / "training" / "artifacts" / "spacy_ner_model"),
         "--epochs",     str(args.ner_epochs),
         "--batch-size", str(args.ner_batch),
         "--patience",   str(args.ner_patience),
     ]
-    return run(cmd, args.dry_run) == 0
+    ok = run(cmd, args.dry_run) == 0
+    if ok:
+        _vm_save_model("ner", ROOT / "training" / "artifacts" / "spacy_ner_model",
+                       ROOT / "training" / "artifacts" / "spacy_ner_model" / "metrics.json",
+                       data_type="ner")
+    return ok
+
+
+def stage_generate_specialist_data(args: argparse.Namespace) -> bool:
+    """Stage 3.5 - generate specialist classifier training data (actor / risk / prohibited).
+
+    Auto-skips if all three JSONL files already exist with sufficient records.
+    Pass --gen-overwrite to force regeneration.
+    """
+    step("Generating specialist classifier training data via Ollama")
+    data_dir = ROOT / "training" / "data"
+    needed_files = ["actor_labels.jsonl", "risk_labels.jsonl", "prohibited_labels.jsonl"]
+
+    if not args.gen_overwrite and not args.dry_run:
+        if all((data_dir / f).exists() for f in needed_files):
+            print(_c(YELLOW, "  --  actor/risk/prohibited label files already exist -- skipping."))
+            print(_c(DIM, "      Pass --gen-overwrite to force regeneration."))
+            return True
+
+    script = ROOT / "scripts" / "generate_specialist_training_data.py"
+    if not args.dry_run and not script.exists():
+        print(_c(RED, f"     ERROR: {script} not found"))
+        return False
+
+    cmd = [
+        sys.executable,
+        str(script),
+        "--type",       "all",
+        "--ollama-host", args.ollama_host,
+        "--model",       args.ollama_model,
+        "--batch-size",  "5",
+        "--n-per-class", str(args.gen_per_class),
+    ]
+    if args.gen_overwrite:
+        cmd.append("--overwrite")
+    ok = run(cmd, args.dry_run) == 0
+    if ok:
+        for dt in ("actor", "risk", "prohibited"):
+            _vm_snapshot_data(dt, ROOT / "training" / "data" / f"{dt}_labels.jsonl")
+    return ok
+
+
+def stage_train_specialist(args: argparse.Namespace) -> bool:
+    """Stage 4.5 - fine-tune all three specialist classifiers (actor / risk / prohibited).
+
+    Auto-skips if all three model directories already exist.
+    Pass --retrain to force retraining.
+    """
+    step("Training specialist classifiers (actor / risk / prohibited)")
+    artifacts_dir = ROOT / "training" / "artifacts"
+    model_dirs = ["actor_classifier", "risk_classifier", "prohibited_classifier"]
+
+    script = ROOT / "training" / "scripts" / "train_specialist_classifiers.py"
+    if not args.dry_run and not script.exists():
+        print(_c(RED, f"     ERROR: {script} not found"))
+        return False
+
+    all_ok = True
+    for classifier_type in ("actor", "risk", "prohibited"):
+        model_dir = artifacts_dir / f"{classifier_type}_classifier"
+        model_exists = (model_dir / "config.json").exists()
+
+        if not args.dry_run and model_exists:
+            if args.force_retrain:
+                pass
+            elif args.retrain:
+                if not _should_retrain(classifier_type, classifier_type):
+                    print(_c(YELLOW, f"  --  {classifier_type} data unchanged — skipping {classifier_type} retrain."))
+                    continue
+            else:
+                print(_c(YELLOW, f"  --  {classifier_type}_classifier already trained -- skipping."))
+                continue
+
+        cmd = [
+            sys.executable,
+            str(script),
+            "--type", classifier_type,
+            "--epochs", str(args.bert_epochs),
+            "--batch-size", str(args.bert_batch),
+        ]
+        if run(cmd, args.dry_run) != 0:
+            print(_c(RED, f"     WARNING: {classifier_type} classifier training failed, continuing"))
+            all_ok = False
+        else:
+            _vm_save_model(classifier_type, model_dir, model_dir / "metrics.json",
+                           data_type=classifier_type)
+
+    if not args.dry_run and all(
+        (artifacts_dir / d / "config.json").exists() for d in model_dirs
+    ) and all_ok:
+        print(_c(DIM, "      Run with --retrain (data-change-aware) or --force-retrain to train new versions."))
+    return all_ok
 
 
 def stage_export_bert(args: argparse.Namespace) -> bool:
@@ -344,7 +549,7 @@ def stage_export_bert(args: argparse.Namespace) -> bool:
     Auto-skips if the ONNX model already exists and --retrain was not passed.
     """
     step("Exporting BERT classifier to ONNX")
-    bert_dir = ROOT / "training" / "bert_classifier"
+    bert_dir = ROOT / "training" / "artifacts" / "bert_classifier"
     onnx_path = ROOT / "model_repository" / "bert_clause_classifier" / "1" / "model.onnx"
 
     if not args.gen_overwrite and not args.dry_run and onnx_path.exists():
@@ -404,27 +609,35 @@ def stage_benchmark(args: argparse.Namespace) -> bool:
 
 STAGES: list[tuple[str, str, bool]] = [
     # (id, description, skip_with_skip_phase5)
-    ("seed-ollama",       "Seed Ollama model",                   False),
-    ("knowledge-base",    "Build ChromaDB knowledge base",       False),
-    ("generate-data",     "Generate BERT training data",         True),
-    ("train-bert",        "Train BERT classifier",               True),
-    ("generate-ner-data", "Generate NER training data",          True),
-    ("train-ner",         "Train spaCy NER",                     True),
-    ("export-bert",       "Export BERT to ONNX",                 True),
-    ("export-e5",         "Export e5-small to ONNX",             True),
-    ("benchmark",         "Benchmark Triton vs Ollama",          True),
+    ("seed-ollama",              "Seed Ollama model",                          False),
+    ("seed-nli",                 "Seed NLI model",                             False),
+    ("knowledge-base",           "Build ChromaDB knowledge base",              False),
+    ("build-graph",              "Generate structured Knowledge Graph",        False),
+    ("generate-data",            "Generate BERT training data",                True),
+    ("train-bert",               "Train BERT classifier",                      True),
+    ("generate-specialist-data", "Generate specialist classifier training data", True),
+    ("train-specialist",         "Train specialist classifiers (actor/risk/prohibited)", True),
+    ("generate-ner-data",        "Generate NER training data",                 True),
+    ("train-ner",                "Train spaCy NER",                            True),
+    ("export-bert",              "Export BERT to ONNX",                        True),
+    ("export-e5",                "Export e5-small to ONNX",                    True),
+    ("benchmark",                "Benchmark Triton vs Ollama",                 True),
 ]
 
 STAGE_FNS = {
-    "seed-ollama":       stage_seed_ollama,
-    "knowledge-base":    stage_knowledge_base,
-    "generate-data":     stage_generate_data,
-    "train-bert":        stage_train_bert,
-    "generate-ner-data": stage_generate_ner_data,
-    "train-ner":         stage_train_ner,
-    "export-bert":       stage_export_bert,
-    "export-e5":         stage_export_e5,
-    "benchmark":         stage_benchmark,
+    "seed-ollama":              stage_seed_ollama,
+    "seed-nli":                 stage_seed_nli,
+    "knowledge-base":           stage_knowledge_base,
+    "build-graph":              stage_build_graph,
+    "generate-data":            stage_generate_data,
+    "train-bert":               stage_train_bert,
+    "generate-specialist-data": stage_generate_specialist_data,
+    "train-specialist":         stage_train_specialist,
+    "generate-ner-data":        stage_generate_ner_data,
+    "train-ner":                stage_train_ner,
+    "export-bert":              stage_export_bert,
+    "export-e5":                stage_export_e5,
+    "benchmark":                stage_benchmark,
 }
 
 def parse_args() -> argparse.Namespace:
@@ -472,7 +685,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--ner-templates", type=int, default=5000,
                    help="Template-generated NER records to produce (default: 5000)")
     p.add_argument("--retrain", action="store_true",
-                   help="Force full retrain: overwrite training data, retrain BERT + NER, re-export ONNX")
+                   help="Regenerate data and retrain only if data content changed (hash-aware)")
+    p.add_argument("--force-retrain", action="store_true",
+                   help="Always train a new model version regardless of data changes")
 
     # Training hyper-params
     p.add_argument("--bert-epochs",   type=int, default=12)
@@ -498,17 +713,31 @@ def main() -> None:
     skip_set: set[str] = set()
     if args.skip_seed:      skip_set.add("seed-ollama")
     if args.skip_kb:        skip_set.add("knowledge-base")
-    if args.skip_generate:  skip_set.update({"generate-data", "generate-ner-data"})
-    if args.skip_train:     skip_set.update({"train-bert", "train-ner"})
+    if args.skip_generate:  skip_set.update({"generate-data", "generate-specialist-data", "generate-ner-data"})
+    if args.skip_train:     skip_set.update({"train-bert", "train-specialist", "train-ner"})
     if args.skip_export:    skip_set.update({"export-bert", "export-e5"})
     if args.skip_benchmark: skip_set.add("benchmark")
     if args.skip_phase5:
         skip_set.update(s[0] for s in STAGES if s[2])  # phase5_only=True
 
-    if args.retrain:
-        # Force regenerate data + retrain + re-export; skip infra stages
+    if args.force_retrain:
+        # force-retrain: regenerate data unconditionally + always train new version
         args.gen_overwrite = True
-        run_ids = ["generate-data", "train-bert", "generate-ner-data", "train-ner", "export-bert", "export-e5"]
+        run_ids = [
+            "generate-data", "train-bert",
+            "generate-specialist-data", "train-specialist",
+            "generate-ner-data", "train-ner",
+            "export-bert", "export-e5",
+        ]
+    elif args.retrain:
+        # retrain: regenerate data, then train only if data content actually changed
+        args.gen_overwrite = True
+        run_ids = [
+            "generate-data", "train-bert",
+            "generate-specialist-data", "train-specialist",
+            "generate-ner-data", "train-ner",
+            "export-bert", "export-e5",
+        ]
     elif args.only_stages:
         run_ids = list(args.only_stages)
     else:
