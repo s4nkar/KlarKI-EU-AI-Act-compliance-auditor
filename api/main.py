@@ -1,6 +1,8 @@
 """KlarKI FastAPI application factory with lifespan, CORS, and health check."""
 
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 import structlog
@@ -15,6 +17,35 @@ from services.ollama_client import OllamaClient
 from services.rag_engine import build_bm25_index
 
 logger = structlog.get_logger()
+
+_TRAINING_DIR = Path(__file__).parent.parent / "training"
+
+
+def _load_model_versions(chunk_classifier_backend: str) -> dict[str, str]:
+    """Read active model versions from the training registry.
+
+    Returns a dict with keys: bert, actor, risk, prohibited, ner, chunk_classifier.
+    Falls back to 'unknown' for each entry if the registry is unavailable.
+    """
+    versions: dict[str, str] = {
+        "bert":            "unknown",
+        "actor":           "unknown",
+        "risk":            "unknown",
+        "prohibited":      "unknown",
+        "ner":             "unknown",
+        "chunk_classifier": chunk_classifier_backend,
+    }
+    try:
+        if str(_TRAINING_DIR) not in sys.path:
+            sys.path.insert(0, str(_TRAINING_DIR))
+        from version_manager import VersionManager  # type: ignore
+        vm = VersionManager()
+        for model_type in ("bert", "actor", "risk", "prohibited", "ner"):
+            ver = vm.get_active_version(model_type)
+            versions[model_type] = ver or "untrained"
+    except Exception as exc:
+        logger.warning("model_version_registry_unavailable", error=str(exc))
+    return versions
 
 
 @asynccontextmanager
@@ -33,6 +64,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # BM25 index — built from ChromaDB corpus once at startup
     # Also pre-loads the cross-encoder to avoid cold-start on first request
     await build_bm25_index(chroma)
+
+    # Read and log which model versions are active — appears in every audit's log context
+    chunk_backend = "triton/bert" if settings.use_triton else f"ollama/{settings.ollama_model}"
+    model_versions = _load_model_versions(chunk_backend)
+    app.state.model_versions = model_versions
+    logger.info("klarki_model_versions", **model_versions)
 
     logger.info("klarki_ready")
     yield
@@ -80,11 +117,13 @@ def create_app() -> FastAPI:
     from routers.reports import router as reports_router
     from routers.wizard import router as wizard_router
     from routers.metrics import router as metrics_router
+    from routers.monitoring import router as monitoring_router
 
     app.include_router(audit_router)
     app.include_router(reports_router)
     app.include_router(wizard_router)
     app.include_router(metrics_router)
+    app.include_router(monitoring_router)
 
     return app
 

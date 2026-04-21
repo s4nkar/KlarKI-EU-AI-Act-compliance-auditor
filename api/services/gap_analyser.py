@@ -40,34 +40,6 @@ _SEVERITY_MAP = {
 }
 
 
-def _load_prompt() -> str:
-    return _PROMPT_PATH.read_text(encoding="utf-8")
-
-
-def _build_prompt(
-    article_num: int,
-    domain: ArticleDomain,
-    user_chunks: list[DocumentChunk],
-    regulatory_passages: list[dict],
-) -> str:
-    domain_label = _DOMAIN_LABELS.get(domain, domain.value)
-
-    user_text = "\n\n".join(c.text for c in user_chunks[:10]) or "(no relevant documentation found)"
-    reg_text = "\n\n".join(
-        f"[{p['metadata'].get('title', p['metadata'].get('requirement_id', ''))}]\n{p['text']}"
-        for p in regulatory_passages[:8]
-    ) or "(no regulatory passages retrieved)"
-
-    template = _load_prompt()
-    return (
-        template
-        .replace("{article_num}", str(article_num))
-        .replace("{domain_label}", domain_label)
-        .replace("{user_text}", user_text[:3000])
-        .replace("{regulatory_text}", reg_text[:3000])
-    )
-
-
 def _parse_gap_item(raw: dict, article_num: int) -> GapItem | None:
     """Parse a single gap dict from LLM output into a GapItem."""
     try:
@@ -90,6 +62,7 @@ async def analyse_article(
     user_chunks: list[DocumentChunk],
     regulatory_passages: list[dict],
     ollama: OllamaClient,
+    applicable_articles: list[int] | None = None,
 ) -> ArticleScore:
     """Perform gap analysis for a single EU AI Act article.
 
@@ -102,10 +75,28 @@ async def analyse_article(
         user_chunks: Document chunks classified to this domain.
         regulatory_passages: Top-k passages from ChromaDB for this domain.
         ollama: OllamaClient instance.
+        applicable_articles: Articles that apply per Article 6 gate. When provided
+            and non-empty, articles outside this list are skipped (not applicable).
 
     Returns:
         ArticleScore with score, gaps, and recommendations populated.
     """
+    # Phase 3: skip LLM for articles outside the applicability gate
+    if applicable_articles and article_num not in applicable_articles:
+        logger.info("gap_not_applicable", article_num=article_num)
+        return ArticleScore(
+            article_num=article_num,
+            domain=domain,
+            score=100.0,
+            gaps=[],
+            recommendations=[],
+            chunk_count=0,
+            score_reasoning=(
+                "Article not applicable — Article 6 gate determined this system "
+                "does not require compliance with this article."
+            ),
+        )
+
     # If no user chunks for this domain, return zero score with a single gap
     if not user_chunks:
         logger.info("gap_no_chunks", article_num=article_num, domain=domain.value)
@@ -131,12 +122,29 @@ async def analyse_article(
             chunk_count=0,
         )
 
-    prompt = _build_prompt(article_num, domain, user_chunks, regulatory_passages)
+    # Filter out header/boilerplate chunks (< 80 chars) — they add noise without
+    # contributing evidence. Fall back to the original list if filtering removes everything.
+    meaningful_chunks = [c for c in user_chunks if len(c.text.strip()) >= 80]
+    if not meaningful_chunks:
+        meaningful_chunks = user_chunks
+
+    # Phase 3 Option B: Invoke LangGraph Multi-Agent Workflow
+    from services.agent_graph import build_audit_graph
+
+    graph = build_audit_graph()
+
+    initial_state = {
+        "article_num": article_num,
+        "domain": domain,
+        "user_chunks": meaningful_chunks,
+        "regulatory_passages": regulatory_passages,
+        "ollama_client": ollama,
+    }
 
     try:
-        result = await ollama.generate_json(prompt)
+        final_state = await graph.ainvoke(initial_state)
     except Exception as exc:
-        logger.error("gap_llm_failed", article_num=article_num, error=str(exc))
+        logger.error("gap_langgraph_failed", article_num=article_num, error=str(exc))
         # Fallback: return partial score without LLM analysis
         return ArticleScore(
             article_num=article_num,
@@ -144,25 +152,24 @@ async def analyse_article(
             score=30.0,
             gaps=[GapItem(
                 title="Analysis failed — review manually",
-                description=f"LLM analysis could not be completed: {str(exc)[:200]}",
+                description=f"LangGraph analysis could not be completed: {str(exc)[:200]}",
                 severity=Severity.MAJOR,
                 article_num=article_num,
             )],
             recommendations=["Retry the audit or review documentation manually."],
             chunk_count=len(user_chunks),
-            score_reasoning="LLM analysis failed — manual review required.",
+            score_reasoning="LangGraph analysis failed — manual review required.",
         )
 
-    # Parse score
-    try:
-        score = float(result.get("score", 50))
-        score = max(0.0, min(100.0, score))
-    except (TypeError, ValueError):
-        score = 50.0
+    # Parse final_state output
+    score = final_state.get("final_score", 50.0)
+    score = max(0.0, min(100.0, float(score)))
+    
+    score_reasoning = str(final_state.get("reasoning", "")).strip()
 
     # Parse gaps — skip any gap with an empty title or description
     gaps: list[GapItem] = []
-    for raw_gap in result.get("gaps", []):
+    for raw_gap in final_state.get("gaps", []):
         if isinstance(raw_gap, dict):
             gap = _parse_gap_item(raw_gap, article_num)
             if gap and gap.title.strip() and gap.description.strip():
@@ -170,12 +177,9 @@ async def analyse_article(
 
     # Parse recommendations
     recommendations: list[str] = [
-        str(r) for r in result.get("recommendations", [])
+        str(r) for r in final_state.get("recommendations", [])
         if isinstance(r, str) and r.strip()
     ]
-
-    # Parse score reasoning
-    score_reasoning = str(result.get("reasoning", "")).strip()
 
     # Build regulatory passage objects from retrieved ChromaDB results
     passages: list[RegulatoryPassage] = []

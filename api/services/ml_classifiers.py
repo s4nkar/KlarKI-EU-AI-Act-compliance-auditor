@@ -1,9 +1,9 @@
 """Phase 3 ML inference wrapper for specialist classifiers.
 
 Provides lazy-loaded inference for three trained GBERT models:
-  - actor      → training/actor_classifier/
-  - risk       → training/risk_classifier/
-  - prohibited → training/prohibited_classifier/
+  - actor      → training/artifacts/actor_classifier/
+  - risk       → training/artifacts/risk_classifier/
+  - prohibited → training/artifacts/prohibited_classifier/
 
 Each model is loaded once on first call and cached. If a model directory
 does not exist (not yet trained), the function returns None — callers fall
@@ -28,10 +28,12 @@ logger = structlog.get_logger()
 
 _ROOT = Path(__file__).parent.parent.parent
 
+_ARTIFACTS = _ROOT / "training" / "artifacts"
+
 _MODEL_PATHS = {
-    "actor":      _ROOT / "training" / "actor_classifier",
-    "risk":       _ROOT / "training" / "risk_classifier",
-    "prohibited": _ROOT / "training" / "prohibited_classifier",
+    "actor":      _ARTIFACTS / "actor_classifier",
+    "risk":       _ARTIFACTS / "risk_classifier",
+    "prohibited": _ARTIFACTS / "prohibited_classifier",
 }
 
 

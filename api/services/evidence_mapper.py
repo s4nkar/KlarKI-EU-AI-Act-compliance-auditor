@@ -31,7 +31,22 @@ from models.schemas import (
     EvidenceMap,
 )
 
+try:
+    from sentence_transformers import CrossEncoder
+except ImportError:
+    CrossEncoder = None
+
 logger = structlog.get_logger()
+
+_NLI_MODEL = None
+
+def _get_nli_model():
+    """Lazily load the NLI Cross-Encoder model to avoid overhead if unused."""
+    global _NLI_MODEL
+    if _NLI_MODEL is None and CrossEncoder is not None:
+        logger.info("loading_nli_model", model="cross-encoder/nli-deberta-v3-small")
+        _NLI_MODEL = CrossEncoder("cross-encoder/nli-deberta-v3-small")
+    return _NLI_MODEL
 
 _OBLIGATIONS_DIR = Path(__file__).parent.parent.parent / "data" / "obligations"
 
@@ -181,20 +196,48 @@ def _load_all_obligations() -> list[dict]:
 def _evidence_present(evidence_term: str, chunks: list[DocumentChunk]) -> list[str]:
     """Return chunk_ids where evidence_term (or a synonym) appears.
 
-    Uses pre-compiled regex patterns from _EVIDENCE_PATTERNS. Falls back to
-    simple substring match if the term has no registered synonyms.
+    Fast path: pre-compiled regex synonym patterns (no model needed).
+    Slow path: single batched NLI call for all chunks that didn't match via regex.
+               Batching is ~10x faster than one predict() call per chunk.
     """
     pattern = _EVIDENCE_PATTERNS.get(evidence_term)
     matched_ids: list[str] = []
+    nli_candidates: list[DocumentChunk] = []
 
+    # Fast path — regex
     for chunk in chunks:
-        if pattern:
-            if pattern.search(chunk.text):
-                matched_ids.append(chunk.chunk_id)
+        if pattern and pattern.search(chunk.text):
+            matched_ids.append(chunk.chunk_id)
+        elif not pattern and evidence_term.lower() in chunk.text.lower():
+            matched_ids.append(chunk.chunk_id)
         else:
-            # Fallback: literal substring match (case-insensitive)
-            if evidence_term.lower() in chunk.text.lower():
+            nli_candidates.append(chunk)
+
+    if not nli_candidates:
+        return matched_ids
+
+    # Slow path — batch NLI over all remaining candidates in one call
+    nli_model = _get_nli_model()
+    if nli_model is None:
+        return matched_ids
+
+    hypothesis = f"This document contains a {evidence_term}."
+    pairs = [(c.text, hypothesis) for c in nli_candidates]
+
+    try:
+        batch_scores = nli_model.predict(pairs)  # shape: (N, num_labels)
+        labels: dict = getattr(
+            nli_model.model.config,
+            "id2label",
+            {0: "CONTRADICTION", 1: "ENTAILMENT", 2: "NEUTRAL"},
+        )
+        for chunk, scores in zip(nli_candidates, batch_scores):
+            predicted_label = labels.get(int(scores.argmax()), "").upper()
+            if "ENTAILMENT" in predicted_label:
+                logger.debug("nli_entailment_match", term=evidence_term, chunk_id=chunk.chunk_id)
                 matched_ids.append(chunk.chunk_id)
+    except Exception as exc:
+        logger.warning("nli_batch_failed", term=evidence_term, error=str(exc))
 
     return matched_ids
 

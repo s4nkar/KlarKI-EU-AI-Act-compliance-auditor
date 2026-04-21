@@ -70,6 +70,7 @@ async def score_audit(
     actor: ActorClassification | None = None,
     applicability: ApplicabilityResult | None = None,
     evidence_map: EvidenceMap | None = None,
+    model_versions: dict[str, str] | None = None,
 ) -> ComplianceReport:
     """Aggregate per-article scores into a full ComplianceReport.
 
@@ -102,7 +103,20 @@ async def score_audit(
             )
 
     final_scores = list(scored_articles.values())
-    overall = sum(s.score for s in final_scores) * _ARTICLE_WEIGHT
+
+    # Phase 3: average only applicable articles so minimal-risk systems are not
+    # penalised for Articles 9–15 they do not need to satisfy.
+    if applicability is not None and applicability.applicable_articles:
+        scored_applicable = [
+            s for s in final_scores
+            if s.article_num in applicability.applicable_articles
+        ]
+        overall = (
+            sum(s.score for s in scored_applicable) / len(scored_applicable)
+            if scored_applicable else 100.0
+        )
+    else:
+        overall = sum(s.score for s in final_scores) * _ARTICLE_WEIGHT
 
     # Phase 3: applicability engine is authoritative for risk_tier
     if applicability is not None:
@@ -116,6 +130,29 @@ async def score_audit(
         risk_tier = classify_risk_tier(chunks)
 
     classified = sum(1 for c in chunks if c.domain is not None)
+
+    # Phase 3: Calculate Confidence Score & Human Review Flag
+    confidences = []
+    
+    # 1. Actor classification confidence
+    if actor is not None:
+        confidences.append(actor.confidence)
+        
+    # 2. Evidence map density
+    if evidence_map is not None and evidence_map.total_obligations > 0:
+        # A very sparse document might mean poor mapping or actual non-compliance
+        # We weigh it lightly
+        confidences.append(0.5 + (evidence_map.overall_coverage / 2))
+        
+    # 3. Chunk classification ratio
+    if chunks:
+        confidences.append(classified / len(chunks))
+        
+    overall_confidence = sum(confidences) / len(confidences) if confidences else 1.0
+    
+    requires_human_review = overall_confidence < 0.70
+    if actor is not None and actor.actor_type.value == "unknown":
+        requires_human_review = True
 
     report = ComplianceReport(
         audit_id=audit_id or str(uuid.uuid4()),
@@ -133,6 +170,9 @@ async def score_audit(
         actor=actor,
         applicability=applicability,
         evidence_map=evidence_map,
+        confidence_score=round(overall_confidence, 2),
+        requires_human_review=requires_human_review,
+        model_versions=model_versions or {},
     )
 
     logger.info(

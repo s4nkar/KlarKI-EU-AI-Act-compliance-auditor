@@ -1,18 +1,26 @@
 """Text chunking service.
 
-Two strategies are provided:
+Three strategies are provided:
 
-chunk_text()        — original 512-char RecursiveCharacterTextSplitter (used by
-                      tests and any caller that needs deterministic behaviour).
+chunk_text()            — original 512-char RecursiveCharacterTextSplitter (used
+                          by tests and callers that need deterministic behaviour).
 
-legal_chunk_text()  — [Phase 3] heading-aware splitter for user-uploaded policy
-                      documents. Detects section headings, keeps paragraphs
-                      together within a section, and stores section_heading /
-                      section_index in chunk metadata. Falls back to paragraph
-                      splitting when no headings are found.
+legal_chunk_text()      — [Phase 3] heading-aware splitter. Kept for test
+                          backwards-compatibility.
 
-Use legal_chunk_text() in the audit pipeline. chunk_text() is kept for
-backwards-compatibility with tests.
+proposition_chunk_text() — [Phase 3+] heading-aware + colon-enumeration splitter.
+                           Use this in the audit pipeline.
+
+                           Splits colon-introduced lists so each obligation
+                           becomes its own chunk with the preamble inherited:
+
+                             "The provider shall:        → Chunk A: "The provider shall: maintain logs"
+                                maintain logs;              Chunk B: "The provider shall: ensure traceability"
+                                ensure traceability."
+
+                           Conditional clauses ("shall X if Y", "provided that")
+                           are NEVER split — they stay in the same chunk.
+                           No overlap is used; propositions are atomic.
 """
 
 import re
@@ -40,6 +48,25 @@ _HEADING_PATTERNS: list[tuple[re.Pattern, int]] = [
 _MAX_LEGAL_CHUNK = 800
 # Min characters — chunks smaller than this are merged with the next
 _MIN_LEGAL_CHUNK = 80
+
+# ── Enumeration detection (proposition chunker only) ──────────────────────────
+# Matches a line ending with a colon — the preamble of a list.
+_COLON_INTRO_RE = re.compile(r'^([^\n]+:)\s*\n', re.MULTILINE)
+
+# Matches the start of a canonical legal/numbered list item.
+# Ordered by specificity: letter-parens before digits, bullets last.
+_LIST_ITEM_RE = re.compile(
+    r'^\s*(?:'
+    r'\([a-z]{1,3}\)'           # (a)  (b)  (ab)
+    r'|\([0-9]{1,3}\)'          # (1)  (2)
+    r'|\([ivxlcdIVXLCD]{1,6}\)' # (i)  (ii)  (iv)
+    r'|[•·▪▸]\s'                # bullet  ·  ▪  ▸
+    r'|[-]\s{1,3}'              # -  (dash-space)
+    r'|[0-9]{1,3}\.\s'          # 1.  2.  12.
+    r'|[a-z]\)\s'               # a)  b)  c)
+    r')',
+    re.MULTILINE,
+)
 
 
 def _detect_sections(text: str) -> list[tuple[str, str]]:
@@ -177,6 +204,120 @@ async def legal_chunk_text(
         sections=len(sections),
         chunks=len(chunks),
         headings_detected=sum(1 for h, _ in sections if h),
+    )
+    return chunks
+
+
+def _split_enumeration(body: str) -> list[str] | None:
+    """Detect a colon-introduced list and return preamble-prefixed items.
+
+    Only splits when ALL of these hold:
+      - A line ending with ':' is found (the obligation preamble)
+      - At least 2 items follow with canonical list markers
+
+    Trailing semicolons are stripped from each item (they are list
+    punctuation, not part of the obligation text).
+
+    Returns None when the body doesn't contain a canonical list structure
+    so the caller can fall back to paragraph splitting safely.
+    """
+    m = _COLON_INTRO_RE.search(body)
+    if not m:
+        return None
+
+    preamble = m.group(1).strip()
+    remainder = body[m.end():]
+
+    item_positions = [mm.start() for mm in _LIST_ITEM_RE.finditer(remainder)]
+    if len(item_positions) < 2:
+        return None  # single item — not a list, don't split
+
+    items: list[str] = []
+    for i, start in enumerate(item_positions):
+        end = item_positions[i + 1] if i + 1 < len(item_positions) else len(remainder)
+        raw = remainder[start:end].strip().rstrip(';').strip()
+        if raw:
+            items.append(f"{preamble} {raw}")
+
+    return items if len(items) >= 2 else None
+
+
+async def proposition_chunk_text(
+    raw_text: str,
+    source_file: str,
+    max_chunk_size: int = _MAX_LEGAL_CHUNK,
+) -> list[DocumentChunk]:
+    """[Phase 3+] Heading-aware proposition chunker for compliance documents.
+
+    Extends legal_chunk_text() with safe enumeration splitting: when a
+    section body contains a colon-introduced list, each list item becomes
+    its own chunk with the preamble prepended.  All other bodies are handled
+    identically to legal_chunk_text() — no overlap, paragraph-then-size split.
+
+    Conditional clauses ("shall X if Y", "provided that …") are never split
+    because they are not at list-item boundaries.  This preserves legal
+    context and avoids producing false obligations.
+
+    Stores section_heading, section_index, and is_proposition (bool) in
+    chunk.metadata for downstream services.
+    """
+    if not raw_text.strip():
+        logger.warning("proposition_chunker_empty_text", source_file=source_file)
+        return []
+
+    sections = _detect_sections(raw_text)
+    chunks: list[DocumentChunk] = []
+    chunk_index = 0
+
+    for section_idx, (heading, body) in enumerate(sections):
+        if not body.strip():
+            continue
+
+        propositions = _split_enumeration(body)
+        is_enum = propositions is not None
+
+        if not is_enum:
+            # Fallback: keep body whole or sub-split by size — no overlap.
+            propositions = [body] if len(body) <= max_chunk_size else _split_long_body(body, max_chunk_size, overlap=0)
+
+        for prop_text in (propositions or []):
+            if not prop_text.strip():
+                continue
+
+            # Merge tiny trailing fragments into the preceding chunk.
+            if len(prop_text) < _MIN_LEGAL_CHUNK and chunks:
+                prev = chunks[-1]
+                chunks[-1] = DocumentChunk(
+                    chunk_id=prev.chunk_id,
+                    text=prev.text + " " + prop_text,
+                    source_file=prev.source_file,
+                    chunk_index=prev.chunk_index,
+                    language=prev.language,
+                    domain=prev.domain,
+                    metadata=prev.metadata,
+                )
+                continue
+
+            chunks.append(DocumentChunk(
+                chunk_id=str(uuid.uuid4()),
+                text=prop_text,
+                source_file=source_file,
+                chunk_index=chunk_index,
+                metadata={
+                    "section_heading": heading,
+                    "section_index": section_idx,
+                    "is_proposition": is_enum,
+                },
+            ))
+            chunk_index += 1
+
+    enum_count = sum(1 for c in chunks if c.metadata.get("is_proposition"))
+    logger.info(
+        "proposition_chunker_done",
+        source_file=source_file,
+        sections=len(sections),
+        chunks=len(chunks),
+        enumeration_chunks=enum_count,
     )
     return chunks
 
