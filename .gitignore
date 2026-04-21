@@ -40,22 +40,23 @@ yarn-error.log*
 chroma_data/
 model_repository/*/1/*.onnx
 
-# Ignore trained models
-training/bert_classifier/
-training/spacy_ner_model/
+# All trained model artifacts — one rule covers everything
+training/artifacts/
 
-# Ignore all data first
+# Ignore all generated training data; keep committed source datasets
 training/data/*
-
-# keep the synthetic datasets
 !training/data/clause_labels.jsonl
 !training/data/ner_annotations.jsonl
+!training/data/actor_labels.jsonl
+!training/data/risk_labels.jsonl
+!training/data/prohibited_labels.jsonl
 
 # Test Reports
 tests/reports/
 tests/evaluation/results/*
 tests/pytest.ini
 
+api/templates/*
 
 # IDE
 .vscode/*
