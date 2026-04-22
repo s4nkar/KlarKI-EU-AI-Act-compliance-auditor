@@ -1,7 +1,7 @@
-# KlarKI — EU AI Act + GDPR Compliance Auditor
+# KlarKI | EU AI Act + GDPR Compliance Auditor
 
 > **Local-first. Privacy-preserving. Fully open-source.**
-> Upload a policy document and receive a scored gap analysis against EU AI Act Articles 3–15 and GDPR — entirely on your own hardware. No data ever leaves your machine.
+> Upload a policy document and receive a scored gap analysis against EU AI Act Articles 3–15 and GDPR entirely on your own hardware. No data ever leaves your machine.
 
 ---
 
@@ -52,7 +52,7 @@ KlarKI is a **local-first EU AI Act + GDPR compliance auditor** for organisation
 
 ## Key Features
 
-### Phase 3 Legal Decision Hierarchy (Deterministic — No LLM)
+### Legal Decision Hierarchy (Deterministic – No LLM)
 
 | Feature | Detail |
 |---|---|
@@ -66,7 +66,7 @@ KlarKI is a **local-first EU AI Act + GDPR compliance auditor** for organisation
 
 | Feature | Detail |
 |---|---|
-| **3-Node LangGraph per Article** | `legal_agent → technical_agent → synthesis_agent` — runs concurrently across all applicable articles |
+| **3-Node LangGraph per Article** | `legal_agent → technical_agent → synthesis_agent` - runs concurrently across all applicable articles |
 | **Hybrid RAG Retrieval** | BM25 + ChromaDB vector + Reciprocal Rank Fusion + cross-encoder re-ranking, filtered by article and regulation |
 | **Optional OpenSearch BM25** | Drop-in server-side BM25 replacement (`USE_OPENSEARCH=true`, `--profile opensearch`) |
 | **Deterministic Outputs** | `temperature=0, seed=42, top_k=1` on all LLM calls — same document always gives same result |
@@ -89,15 +89,15 @@ KlarKI is a **local-first EU AI Act + GDPR compliance auditor** for organisation
 | **Obligation Coverage** | Per-obligation evidence: fully satisfied / partially satisfied / missing |
 | **Confidence Score** | Mean of actor confidence + evidence coverage + chunk classification ratio |
 | **Human Review Flag** | Auto-triggered when confidence < 70% or actor is unknown |
-| **Applicable-Articles-Only Scoring** | Overall score averages only applicable articles — minimal-risk systems score 100% |
+| **Applicable-Articles-Only Scoring** | Overall score averages only applicable articles - minimal-risk systems score 100% |
 
 ### ML Training & Data Pipeline
 
 | Feature | Detail |
 |---|---|
-| **BERT Domain Classifier** | Fine-tuned `deepset/gbert-base` (8 classes: Articles 9–15 + unrelated) |
+| **BERT Domain Classifier** | Fine-tuned `deepset/gbert-base` (8 classes: Articles 9-15 + unrelated) |
 | **spaCy NER** | 8 compliance entity types (ARTICLE, OBLIGATION, ACTOR, AI_SYSTEM, RISK_TIER, PROCEDURE, REGULATION, PROHIBITED_USE) |
-| **Weak Supervision Pipeline** | Regex-based auto-labeling from regulatory text — no LLM, runs in seconds |
+| **Weak Supervision Pipeline** | Regex-based auto-labeling from regulatory text - no LLM, runs in seconds |
 | **Synthetic Data Generation** | Async Ollama-grounded generation for BERT + specialist classifiers (bilingual EN/DE) |
 | **ONNX Export for Triton** | BERT + e5-small exported to ONNX for GPU-accelerated Triton inference |
 | **Version Management** | VersionManager tracks data, model, and metric versions for reproducibility |
@@ -109,27 +109,27 @@ KlarKI is a **local-first EU AI Act + GDPR compliance auditor** for organisation
 | **6 Docker services** | API, ChromaDB, Ollama, Frontend, Triton (GPU opt-in), OpenSearch (opt-in) |
 | **Structured Logging** | structlog with per-request context |
 | **Prometheus-style Metrics** | `/monitoring` endpoint for real-time system health |
-| **Classifier Metrics Dashboard** | `/metrics` — BERT, NER, specialist classifier F1 / precision / recall, confusion matrices |
+| **Classifier Metrics Dashboard** | `/metrics` - BERT, NER, specialist classifier F1 / precision / recall, confusion matrices |
 | **6 Claude Code Agents** | code-reviewer, compliance-reviewer, architecture-reviewer, doc-generator, test-writer, agent-watcher |
 
 ---
 
 ## How It Works
 
-### Step 1 — Risk Assessment Wizard
+### Step 1 - Risk Assessment Wizard
 
 Answer 9 plain-language yes/no questions covering all Annex III categories. KlarKI uses a decision-tree classifier to determine if your AI system is **Prohibited**, **High**, **Limited**, or **Minimal** risk. This self-assessment is compared against the automated determination from the audit pipeline.
 
-### Step 2 — Document Ingestion & Parsing
+### Step 2 - Document Ingestion & Parsing
 
 Upload a PDF, DOCX, TXT, or MD policy document (max 10 MB). The pipeline runs:
 
 - **PyMuPDF** prose extraction → **pdfplumber** table extraction (tab-separated rows appended) → **pytesseract** OCR for scanned PDFs (optional, guarded by `ImportError`)
 - **Legal-unit chunker** splits on headings first, then paragraphs, then sentences (512 chars, 50 overlap, UUID4 per chunk)
 - **Language detection** (EN/DE via langdetect; fallback to EN for < 100 chars)
-- **NER enrichment** — spaCy `de_core_news_lg` extracts 8 entity types; domain correction for UNRELATED chunks referencing explicit article numbers
+- **NER enrichment** - spaCy `de_core_news_lg` extracts 8 entity types; domain correction for UNRELATED chunks referencing explicit article numbers
 
-### Step 3 — Legal Decision Hierarchy (Deterministic, Runs in Parallel)
+### Step 3 - Legal Decision Hierarchy (Deterministic, Runs in Parallel)
 
 No LLM is called in this stage. Two tasks run concurrently via `asyncio.to_thread`:
 
@@ -154,12 +154,12 @@ Step 1 (Article 5 Prohibited):
   + ML predict_prohibited() at confidence ≥ 0.85
   → is_prohibited=True → applicable_articles=[5] → STOP
 
-Step 2 (Annex III — 8 Categories, 60+ patterns):
+Step 2 (Annex III - 8 Categories, 60+ patterns):
   BIOMETRIC | CRITICAL_INFRASTRUCTURE | EDUCATION | EMPLOYMENT
   ESSENTIAL_SERVICES | LAW_ENFORCEMENT | MIGRATION | JUSTICE
   → AnnexIIIMatch list with matched_keywords per category
 
-Step 3 (Article 6(1) Annex I — Safety Component Signals):
+Step 3 (Article 6(1) Annex I - Safety Component Signals):
   14 patterns (CE marking, MDR/IVDR, notified body, Class IIa/III medical devices)
   → annex_i_triggered = True if ≥ 2 signals matched
 
@@ -170,7 +170,7 @@ is_high_risk = Step2 OR Step3 OR ML
 applicable_articles = [9,10,11,12,13,14,15] if high_risk, else []
 ```
 
-### Step 4 — Chunk Classification
+### Step 4 - Chunk Classification
 
 Each document chunk is classified to one of 7 `ArticleDomain` values (Articles 9–15) via:
 - **Default**: Ollama / phi3:mini (CPU-friendly, no GPU required)
@@ -178,7 +178,7 @@ Each document chunk is classified to one of 7 `ArticleDomain` values (Articles 9
 
 Domain assignments inform which chunks are sent to each article's gap analyser.
 
-### Step 5 — Hybrid RAG + LangGraph Gap Analysis
+### Step 5 - Hybrid RAG + LangGraph Gap Analysis
 
 Runs concurrently across all applicable articles (`asyncio.gather`). For each article:
 
@@ -220,7 +220,7 @@ END → ArticleScore
 Non-applicable articles: **score=100, zero LLM calls.**
 No-chunk articles: **score=0, critical gap, zero LLM calls.**
 
-### Step 6 — Evidence Mapping (Deterministic — No LLM)
+### Step 6 - Evidence Mapping (Deterministic - No LLM)
 
 After gap analysis, obligation schemas in `data/obligations/**/*.jsonl` are filtered by actor type and applicable articles. For each required evidence artefact:
 
@@ -229,7 +229,7 @@ After gap analysis, obligation schemas in `data/obligations/**/*.jsonl` are filt
 
 Output: `EvidenceMap` with per-obligation coverage (fully satisfied / partially satisfied / missing).
 
-### Step 7 — Scoring & Confidence
+### Step 7 - Scoring & Confidence
 
 ```
 Overall score     = mean(scores of applicable_articles only)
@@ -242,7 +242,7 @@ Risk tier (authoritative from applicability engine):
   else          → MINIMAL
 ```
 
-### Step 8 — Results Dashboard
+### Step 8 - Results Dashboard
 
 | Panel | What It Shows |
 |---|---|
@@ -256,9 +256,9 @@ Risk tier (authoritative from applicability engine):
 | Classifier metrics (`/metrics`) | BERT, NER, specialist classifier F1/precision/recall, confusion matrices |
 
 Click any article card for:
-- **Why this score?** — LLM reasoning
-- **Which regulation?** — ChromaDB-retrieved regulatory passages
-- **Can I defend this in an audit?** — Remediation checklist; verdict based on Critical/Major gap count
+- **Why this score?** - LLM reasoning
+- **Which regulation?** - ChromaDB-retrieved regulatory passages
+- **Can I defend this in an audit?** - Remediation checklist; verdict based on Critical/Major gap count
 
 ---
 
@@ -291,14 +291,14 @@ Click any article card for:
 
 ## Hardware & Model Choices
 
-### Our Setup (4 GB VRAM — What We Used)
+### Our Setup (4 GB VRAM) - What We Used
 
 This project was developed and tested on a machine with **4 GB VRAM** (NVIDIA RTX 3050 Ti). With constrained hardware, we chose:
 
-- **LLM: Ollama phi3:mini (3.8B Q4)** — Runs comfortably on CPU or low-VRAM GPUs. Inference is ~5–10 s per chunk but fully deterministic. The entire audit pipeline is CPU-capable.
-- **BERT: deepset/gbert-base (110M params)** — Small enough to train on a 4 GB GPU in ~20–30 min per model.
-- **Embeddings: multilingual-e5-small** — Designed for CPU inference; ~80 MB model.
-- **NLI Cross-Encoder: nli-deberta-v3-small** — Lightweight NLI model for evidence matching.
+- **LLM: Ollama phi3:mini (3.8B Q4)** - Runs comfortably on CPU or low-VRAM GPUs. Inference is ~5–10 s per chunk but fully deterministic. The entire audit pipeline is CPU-capable.
+- **BERT: deepset/gbert-base (110M params)** - Small enough to train on a 4 GB GPU in ~20–30 min per model.
+- **Embeddings: multilingual-e5-small** - Designed for CPU inference; ~80 MB model.
+- **NLI Cross-Encoder: nli-deberta-v3-small** - Lightweight NLI model for evidence matching.
 
 ### Scale to Your Hardware
 
@@ -332,7 +332,7 @@ python scripts/setup.py --gen-per-class 1000
 OLLAMA_MODEL=llama3.1:8b python scripts/setup.py --gen-per-class 400
 ```
 
-The NER data pipeline requires **no LLM at all** — it uses deterministic template expansion and runs in seconds on any hardware.
+The NER data pipeline requires **no LLM at all** - it uses deterministic template expansion and runs in seconds on any hardware.
 
 ---
 
@@ -356,12 +356,11 @@ git clone https://github.com/s4nkar/KlarKI-EU-AI-Act-compliance-auditor.git
 cd KlarKI-EU-AI-Act-compliance-auditor
 
 cp .env.example .env           # Configure environment (defaults work out of the box)
-docker compose up -d           # Start all services
 
 ./run.sh setup                 # First-time init (safe to re-run; completed stages are skipped)
 ```
 
-Open **http://localhost** — complete the **Risk Assessment** wizard, then **Upload Docs**.
+Open **http://localhost:3000** - complete the **Risk Assessment** wizard, then **Upload Docs**.
 
 > **Windows users:** use `./run.sh` commands. **Linux/Mac:** `make` aliases are available — `make setup`, `make up`, `make test`, etc.
 
@@ -379,9 +378,9 @@ Open **http://localhost** — complete the **Risk Assessment** wizard, then **Up
 | `./run.sh bench` | Ollama vs Triton latency benchmark |
 | `./run.sh logs` | Tail API logs |
 | `./run.sh down` | Stop all containers |
-| `./run.sh clean` | Full wipe — containers, volumes, ChromaDB data |
+| `./run.sh clean` | Full wipe - containers, volumes, ChromaDB data |
 
-`setup` is **idempotent** — each stage skips itself if its outputs already exist.
+`setup` is **idempotent** - each stage skips itself if its outputs already exist.
 
 **Target a single stage:**
 ```bash
@@ -418,15 +417,15 @@ python scripts/setup.py --skip-phase5    # Infrastructure-only mode (no ML)
 
 ### Ollama / phi3:mini (Default)
 
-Active when `USE_TRITON=false`. Phi-3 Mini 3.8B (Q4) runs inside the `klarki-ollama` container — **no GPU required**. Inference is ~5–10 s per chunk. All calls use `temperature=0`, `seed=42`, `top_k=1` — fully deterministic. Works on any modern laptop.
+Active when `USE_TRITON=false`. Phi-3 Mini 3.8B (Q4) runs inside the `klarki-ollama` container - **no GPU required**. Inference is ~5–10 s per chunk. All calls use `temperature=0`, `seed=42`, `top_k=1` - fully deterministic. Works on any modern laptop.
 
 Compatible models (set `OLLAMA_MODEL` in `.env`):
 ```
-phi3:mini       # Default — 3.8B, works on 4 GB VRAM or CPU
-llama3.2:1b     # Fastest — 1B, minimal RAM
-llama3.1:8b     # Best quality — 8B, requires 8 GB+ RAM
-gemma2:2b       # Compact alternative — 2B
-mistral:7b      # Strong reasoning — 7B
+phi3:mini       # Default - 3.8B, works on 4 GB VRAM or CPU
+llama3.2:1b     # Fastest - 1B, minimal RAM
+llama3.1:8b     # Best quality - 8B, requires 8 GB+ RAM
+gemma2:2b       # Compact alternative - 2B
+mistral:7b      # Strong reasoning - 7B
 ```
 
 ### Triton / gBERT (GPU Fast-Path)
@@ -473,7 +472,7 @@ docker compose --profile triton --profile opensearch up -d
 
 ## API Reference
 
-The API is unauthenticated by design — intended for local use only. Do not expose to untrusted networks.
+The API is unauthenticated by design - intended for local use only. Do not expose to untrusted networks.
 
 All routes are prefixed `/api/v1`. Responses use the `APIResponse` envelope: `{"status", "data", "error"}`.
 
@@ -506,14 +505,14 @@ All routes are prefixed `/api/v1`. Responses use the `APIResponse` envelope: `{"
 | `GET` | `/metrics/classifier` | BERT per-class precision/recall/F1 + confusion matrix. |
 | `GET` | `/metrics/ner` | spaCy NER per-entity-label F1. |
 | `GET` | `/metrics/specialists` | Actor / risk / prohibited specialist classifier metrics. |
-| `GET` | `/metrics/versions` | Model version registry — active versions, history, data traceability. |
+| `GET` | `/metrics/versions` | Model version registry - active versions, history, data traceability. |
 | `GET` | `/metrics/evaluation` | Latest eval results from `tests/evaluation/results/`. |
 
 ### System
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/api/v1/health` | Service health — probes ChromaDB + Ollama. `{"services": {"chromadb": bool, "ollama": bool}}` |
+| `GET` | `/api/v1/health` | Service health - probes ChromaDB + Ollama. `{"services": {"chromadb": bool, "ollama": bool}}` |
 
 ---
 
@@ -524,13 +523,13 @@ All routes are prefixed `/api/v1`. Responses use the `APIResponse` envelope: `{"
   "audit_id": "...",
   "language": "en",
   "risk_tier": "high",                  // Authoritative: Article 6 + Annex III gate result
-  "wizard_risk_tier": "high",           // Self-assessed via wizard — shown in comparison panel
+  "wizard_risk_tier": "high",           // Self-assessed via wizard - shown in comparison panel
   "overall_score": 58.0,               // Average across applicable articles only (0–100)
   "confidence_score": 0.82,            // 0–1; below 0.70 triggers human review
   "requires_human_review": false,
   "classifier_backend": "ollama/phi3:mini",
 
-  // Phase 3 — Actor Classification (Article 3)
+  // Phase 3 - Actor Classification (Article 3)
   "actor": {
     "actor_type": "deployer",           // provider | deployer | importer | distributor | unknown
     "confidence": 0.91,
@@ -538,7 +537,7 @@ All routes are prefixed `/api/v1`. Responses use the `APIResponse` envelope: `{"
     "reasoning": "..."
   },
 
-  // Phase 3 — Applicability Gate (Article 6 + Annex III)
+  // Phase 3 - Applicability Gate (Article 6 + Annex III)
   "applicability": {
     "is_high_risk": true,
     "is_prohibited": false,
@@ -555,7 +554,7 @@ All routes are prefixed `/api/v1`. Responses use the `APIResponse` envelope: `{"
     "reasoning": "..."
   },
 
-  // Phase 3 — Deterministic Evidence Coverage
+  // Phase 3 - Deterministic Evidence Coverage
   "evidence_map": {
     "total_obligations": 12,
     "fully_satisfied": 4,
@@ -624,12 +623,12 @@ All routes are prefixed `/api/v1`. Responses use the `APIResponse` envelope: `{"
 
 ```bash
 ./run.sh test          # Full test suite inside the API Docker container
-make test-local        # Local Python env — faster for iteration
+make test-local        # Local Python env - faster for iteration
 ```
 
 HTML reports are written to `tests/reports/` (gitignored):
-- `tests/reports/report.html` — Pass/fail with tracebacks
-- `tests/reports/coverage/index.html` — Line-level coverage
+- `tests/reports/report.html` - Pass/fail with tracebacks
+- `tests/reports/coverage/index.html` - Line-level coverage
 
 ### Test Coverage
 
@@ -650,7 +649,7 @@ HTML reports are written to `tests/reports/` (gitignored):
 | `test_emotion_module.py` | Unit | Article 5 detection (workplace/education vs commercial contexts) |
 | `test_ner.py` | Unit | NER enrichment, domain correction for article-referencing chunks |
 
-**Hard regression gate**: Precision@3 ≥ 80% across 7 golden RAG queries (one per Article 9–15) using in-memory ChromaDB — no live services required.
+**Hard regression gate**: Precision@3 ≥ 80% across 7 golden RAG queries (one per Article 9–15) using in-memory ChromaDB - no live services required.
 
 ---
 
@@ -658,7 +657,7 @@ HTML reports are written to `tests/reports/` (gitignored):
 
 ### BERT Domain Classifier
 
-Fine-tuned `deepset/gbert-base` (110M params) — 8 classes mapping to EU AI Act articles:
+Fine-tuned `deepset/gbert-base` (110M params) - 8 classes mapping to EU AI Act articles:
 
 | Label | Article |
 |---|---|
@@ -669,7 +668,7 @@ Fine-tuned `deepset/gbert-base` (110M params) — 8 classes mapping to EU AI Act
 | `transparency` | Article 13 |
 | `human_oversight` | Article 14 |
 | `security` | Article 15 |
-| `unrelated` | — |
+| `unrelated` | - |
 
 Training data: ~6,400 bilingual examples (400 per class per language) generated via async Ollama with a semaphore of 6 concurrent requests.
 
@@ -695,7 +694,7 @@ python training/train_specialist_classifiers.py --type all
 
 ### spaCy NER Model
 
-8 entity types — `de_core_news_lg` base with custom NER head. Training uses **deterministic template expansion (no LLM)**:
+8 entity types - `de_core_news_lg` base with custom NER head. Training uses **deterministic template expansion (no LLM)**:
 
 ```
 ARTICLE | OBLIGATION | ACTOR | AI_SYSTEM | RISK_TIER | PROCEDURE | REGULATION | PROHIBITED_USE
@@ -708,7 +707,7 @@ python training/train_ner.py --epochs 60
 
 ### Weak Supervision Pipeline
 
-Automatically labels regulatory text using regex patterns — runs in seconds with no LLM:
+Automatically labels regulatory text using regex patterns - runs in seconds with no LLM:
 
 ```bash
 python scripts/build_weak_supervision_labels.py --type all
@@ -718,11 +717,11 @@ python scripts/build_weak_supervision_labels.py --type all
 
 ## Privacy
 
-- **No external API calls** — all inference runs locally (Ollama, Triton, ChromaDB, spaCy)
+- **No external API calls** - all inference runs locally (Ollama, Triton, ChromaDB, spaCy)
 - **Documents deleted immediately** after the audit pipeline completes
-- **ChromaDB stores only regulatory text** (EU AI Act + GDPR) — never user documents
-- **In-memory audit store only** — results are not persisted to disk or database
-- **PDF reports generated and served locally** — never uploaded anywhere
+- **ChromaDB stores only regulatory text** (EU AI Act + GDPR) - never user documents
+- **In-memory audit store only** - results are not persisted to disk or database
+- **PDF reports generated and served locally** - never uploaded anywhere
 
 ---
 
@@ -773,7 +772,7 @@ docker compose down --remove-orphans && docker network prune -f && docker compos
 
 **`ModuleNotFoundError: torch` during setup (Windows)**
 
-Multiple Python environments — ensure you use the right interpreter:
+Multiple Python environments - ensure you use the right interpreter:
 ```bash
 python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
 python -m pip install -r training/requirements-training.txt
@@ -785,15 +784,15 @@ Install [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-nati
 
 **ChromaDB connection error on startup**
 
-ChromaDB takes ~10 s to initialise. The API retries on startup — wait a moment and refresh.
+ChromaDB takes ~10 s to initialise. The API retries on startup - wait a moment and refresh.
 
 **Same document gives different results between runs**
 
-All LLM calls use `temperature=0` and `seed=42` — output should be identical. Ensure the Ollama container was fully restarted: `docker compose restart klarki-ollama`
+All LLM calls use `temperature=0` and `seed=42` - output should be identical. Ensure the Ollama container was fully restarted: `docker compose restart klarki-ollama`
 
 **Frontend changes not hot-reloading (Windows)**
 
-Vite uses polling on Windows Docker volumes — changes reload within ~500 ms. If stuck:
+Vite uses polling on Windows Docker volumes - changes reload within ~500 ms. If stuck:
 ```bash
 docker compose restart klarki-frontend
 ```
@@ -811,12 +810,12 @@ KlarKI is **fully open source** and free to use, modify, and build upon under th
 
 ### Ways to Contribute
 
-- **New regulatory coverage** — Add GDPR Article 2 territorial scope gate, GDPR actor normalisation (controller/processor → ActorType), or new EU AI Act articles
-- **Obligation schemas** — Expand `data/obligations/` JSONL files for Articles 9–15 and Article 5 (currently only `article_6_annex_iii.jsonl` is complete)
-- **Phase 3 tests** — Write tests for `actor_classifier.py`, `applicability_engine.py`, `evidence_mapper.py`, and `agent_graph.py`
-- **Better models** — If you have more hardware, train with larger base models and open a PR with updated metrics
-- **Languages** — Extend beyond EN/DE to French, Italian, Spanish (EUR-Lex provides official translations)
-- **Frontend** — Improve the evidence citation view, add article-level evidence breakdown in PDF reports
+- **New regulatory coverage** - Add GDPR Article 2 territorial scope gate, GDPR actor normalisation (controller/processor → ActorType), or new EU AI Act articles
+- **Obligation schemas** - Expand `data/obligations/` JSONL files for Articles 9–15 and Article 5 (currently only `article_6_annex_iii.jsonl` is complete)
+- **Phase 3 tests** - Write tests for `actor_classifier.py`, `applicability_engine.py`, `evidence_mapper.py`, and `agent_graph.py`
+- **Better models** - If you have more hardware, train with larger base models and open a PR with updated metrics
+- **Languages** - Extend beyond EN/DE to French, Italian, Spanish (EUR-Lex provides official translations)
+- **Frontend** - Improve the evidence citation view, add article-level evidence breakdown in PDF reports
 
 ### Getting Started
 
@@ -832,14 +831,14 @@ Architecture, training pipeline, ML conventions, and service contracts are fully
 ### Reporting Issues
 
 - **Bugs / feature requests**: [Open a GitHub issue](https://github.com/s4nkar/KlarKI-EU-AI-Act-compliance-auditor/issues)
-- **Security vulnerabilities**: Do not open a public issue — email [s4nkar.sub.inr@gmail.com](mailto:s4nkar.sub.inr@gmail.com) directly
+- **Security vulnerabilities**: Do not open a public issue - email [s4nkar.sub.inr@gmail.com](mailto:s4nkar.sub.inr@gmail.com) directly
 
 ---
 
 ## Licence
 
-[MIT](LICENSE) — free to use, modify, and distribute. See `LICENSE` for details.
+[MIT](LICENSE) - free to use, modify, and distribute. See `LICENSE` for details.
 
 ---
 
-*Built for German SMEs navigating EU AI Act compliance. Tested on 4 GB VRAM — scales to any hardware.*
+*Built for German SMEs navigating EU AI Act compliance. Tested on 4 GB VRAM - scales to any hardware.*
