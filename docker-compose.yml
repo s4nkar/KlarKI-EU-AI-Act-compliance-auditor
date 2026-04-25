@@ -64,21 +64,14 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     environment:
-      # Limit GPU layers to stay within 4 GB VRAM on RTX 3050 Ti.
-      # phi3:mini has 32 layers — offloading 20 to GPU (~1.8 GB), rest on CPU.
-      # Increase to 32 if you close other GPU apps and have headroom.
+      # GPU layer count — used only when NVIDIA GPU is present (ignored otherwise).
+      # phi3:mini has 32 layers; offloading 20 stays within 4 GB VRAM on RTX 3050 Ti.
       - OLLAMA_GPU_LAYERS=20
-      # Keep only 1 model loaded at a time (memory pressure guard)
       - OLLAMA_MAX_LOADED_MODELS=1
-      # Reduce context window — 2048 is enough for compliance chunks
       - OLLAMA_NUM_CTX=2048
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    # GPU acceleration is opt-in via docker-compose.gpu.yml overlay:
+    #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+    # ./run.sh up and ./run.sh setup auto-apply the overlay when nvidia-smi is detected.
     networks:
       - klarki-net
     restart: unless-stopped
@@ -117,6 +110,29 @@ services:
     networks:
       - klarki-net
     restart: unless-stopped
+
+  klarki-training:
+    build:
+      context: .
+      dockerfile: training/Dockerfile
+    container_name: klarki-training
+    profiles:
+      - training
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    environment:
+      - OLLAMA_HOST=http://klarki-ollama:11434
+      - CHROMADB_HOST=http://klarki-chromadb:8000
+      - PYTHONUNBUFFERED=1
+      - PYTHONIOENCODING=utf-8
+    depends_on:
+      klarki-chromadb:
+        condition: service_healthy
+      klarki-ollama:
+        condition: service_started
+    networks:
+      - klarki-net
 
   klarki-triton:
     build:
