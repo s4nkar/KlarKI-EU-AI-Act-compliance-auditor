@@ -79,7 +79,7 @@ KlarKI is a **local-first EU AI Act + GDPR compliance auditor** for organisation
 | **Table Extraction** | pdfplumber extracts PDF tables as structured text |
 | **OCR Fallback** | pytesseract + Pillow for scanned/image-based PDFs (optional) |
 | **Bilingual** | EN + DE document detection and classification throughout |
-| **Legal-Unit Chunking** | Heading-aware splitter (512 chars, 50 overlap) with section metadata |
+| **Proposition Chunking** | Heading-aware splitter that splits colon-introduced obligation lists into individual propositions (512 chars max, section metadata stored per chunk) |
 
 ### Evidence & Scoring
 
@@ -341,7 +341,7 @@ The NER data pipeline requires **no LLM at all** - it uses deterministic templat
 | Dependency | Version | Notes |
 |---|---|---|
 | Docker Desktop | 4.x+ | With Docker Compose v2 |
-| Python | 3.10–3.12 | For setup scripts (not inside containers) |
+| Docker | 4.x+ with Compose v2 | All pipeline steps run inside containers — no host Python required |
 | Disk space | ~8–12 GB | ~2.3 GB Ollama model + images + training artefacts |
 | RAM | 8 GB minimum | 16 GB recommended for parallel training |
 | GPU (optional) | 4 GB VRAM+ | For BERT training and Triton inference; CPU fallback is automatic |
@@ -360,7 +360,9 @@ cp .env.example .env           # Configure environment (defaults work out of the
 ./run.sh setup                 # First-time init (safe to re-run; completed stages are skipped)
 ```
 
-Open **http://localhost:3000** - complete the **Risk Assessment** wizard, then **Upload Docs**.
+Open **http://localhost** (port 80, nginx). Complete the **Risk Assessment** wizard, then **Upload Docs**.
+
+For development with hot reload: `./run.sh dev` — frontend on **http://localhost:3000**.
 
 > **Windows users:** use `./run.sh` commands. **Linux/Mac:** `make` aliases are available — `make setup`, `make up`, `make test`, etc.
 
@@ -370,12 +372,12 @@ Open **http://localhost:3000** - complete the **Risk Assessment** wizard, then *
 
 | Command | What It Does |
 |---|---|
-| `./run.sh setup` | Full first-time setup (13 idempotent stages: Ollama, knowledge base, data gen, BERT, specialists, NER, ONNX export) |
-| `./run.sh up` | Start containers (Ollama/phi3:mini default mode) |
-| `./run.sh triton` | Start with Triton/gBERT GPU inference (`USE_TRITON=true` + NVIDIA GPU required) |
+| `./run.sh setup` | Full first-time init (Ollama, knowledge base, data gen, BERT/NER/specialist training). ONNX export and benchmark skipped by default — run `./run.sh triton` separately. |
+| `./run.sh up` | Production mode (nginx, compiled images, port 80). GPU auto-detected. |
+| `./run.sh dev` | Start containers in dev mode (hot reload, source volumes, frontend on port 3000) |
+| `./run.sh triton` | Export ONNX models (if needed) + start Triton GPU inference. Requires NVIDIA GPU + Container Toolkit. |
 | `./run.sh retrain` | Regenerate all training data and retrain all models |
 | `./run.sh test` | Run full test suite inside the API container |
-| `./run.sh bench` | Ollama vs Triton latency benchmark |
 | `./run.sh logs` | Tail API logs |
 | `./run.sh down` | Stop all containers |
 | `./run.sh clean` | Full wipe - containers, volumes, ChromaDB data |
@@ -407,9 +409,9 @@ python scripts/setup.py --skip-phase5    # Infrastructure-only mode (no ML)
 | `train-specialist` | Fine-tune 3 specialist gBERT classifiers | `--skip-train` |
 | `generate-ner-data` | Deterministic NER template expansion (no LLM) | `--skip-generate` |
 | `train-ner` | Train spaCy NER model (60 epochs) | `--skip-train` |
-| `export-bert` | BERT → ONNX for Triton | `--skip-export` |
-| `export-e5` | e5-small → ONNX for Triton | `--skip-export` |
-| `benchmark` | Ollama vs Triton latency comparison | `--skip-benchmark` |
+| `export-bert` | BERT → ONNX for Triton (run by `./run.sh triton`, not `./run.sh setup`) | `--skip-export` |
+| `export-e5` | e5-small → ONNX for Triton (run by `./run.sh triton`, not `./run.sh setup`) | `--skip-export` |
+| `benchmark` | Ollama vs Triton latency comparison (run by `./run.sh triton`, not `./run.sh setup`) | `--skip-benchmark` |
 
 ---
 
@@ -451,21 +453,24 @@ Every compliance report records the backend used in the `classifier_backend` fie
 | `klarki-api` | FastAPI backend (Uvicorn) | 8000 | default |
 | `klarki-chromadb` | Vector database (ChromaDB) | 8001 | default |
 | `klarki-ollama` | Local LLM inference server | 11434 | default |
+| `klarki-training` | Python 3.11 container for all training jobs | — | `--profile training` (ephemeral, used by `./run.sh setup/retrain`) |
 | `klarki-triton` | NVIDIA Triton ONNX inference | 8002 (HTTP) / 8003 (gRPC) | `--profile triton` |
 | `klarki-opensearch` | Server-side BM25 search | 9200 | `--profile opensearch` |
 
 ```bash
-# Default (Ollama + ChromaDB)
-docker compose up -d
+# Production mode (Ollama + ChromaDB, GPU auto-detected)
+./run.sh up
 
-# GPU inference
-docker compose --profile triton up -d
+# Dev mode (hot reload, source volumes, frontend on port 3000)
+./run.sh dev
 
-# With OpenSearch BM25
-docker compose --profile opensearch up -d
+# GPU inference (exports ONNX if needed, starts Triton)
+./run.sh triton
 
-# Both
-docker compose --profile triton --profile opensearch up -d
+# Manual docker compose examples (for reference)
+docker compose up -d                           # Ollama + ChromaDB default mode
+docker compose --profile triton up -d          # GPU inference
+docker compose --profile opensearch up -d      # With OpenSearch BM25
 ```
 
 ---
@@ -657,7 +662,9 @@ HTML reports are written to `tests/reports/` (gitignored):
 
 ### BERT Domain Classifier
 
-Fine-tuned `deepset/gbert-base` (110M params) - 8 classes mapping to EU AI Act articles:
+All training runs inside the `klarki-training` Docker container (Python 3.11). Use `./run.sh setup` or `./run.sh retrain` — do not invoke training scripts directly on the host.
+
+Fine-tuned `deepset/gbert-base` (110M params), 8 classes mapping to EU AI Act articles:
 
 | Label | Article |
 |---|---|
@@ -670,11 +677,16 @@ Fine-tuned `deepset/gbert-base` (110M params) - 8 classes mapping to EU AI Act a
 | `security` | Article 15 |
 | `unrelated` | - |
 
-Training data: ~6,400 bilingual examples (400 per class per language) generated via async Ollama with a semaphore of 6 concurrent requests.
+Training data: ~6,400 bilingual examples (400 per class per language, 85% train / 15% validation, stratified by class, seed=42) generated via async Ollama with a semaphore of 6 concurrent requests.
 
 ```bash
-python scripts/generate_bert_training_data.py --n-per-class 400 --languages en,de
-python training/train_classifier.py --epochs 5 --batch-size 16
+# Via run.sh (recommended)
+./run.sh setup                # Full pipeline with BERT/NER/specialist training
+./run.sh retrain              # Regenerate all training data and retrain models
+
+# Direct script invocation (inside training container)
+docker compose --profile training run --rm klarki-training python scripts/generate_bert_training_data.py --n-per-class 400 --languages en,de
+docker compose --profile training run --rm klarki-training python training/train_classifier.py --epochs 5 --batch-size 16
 ```
 
 ### 3 Specialist Classifiers
@@ -770,13 +782,13 @@ Stale network from a failed previous start:
 docker compose down --remove-orphans && docker network prune -f && docker compose up -d
 ```
 
-**`ModuleNotFoundError: torch` during setup (Windows)**
+**`./run.sh triton` says 'No NVIDIA GPU detected'**
 
-Multiple Python environments - ensure you use the right interpreter:
-```bash
-python -m pip install torch --index-url https://download.pytorch.org/whl/cu121
-python -m pip install -r training/requirements-training.txt
-```
+Triton requires a CUDA-capable GPU with NVIDIA Container Toolkit. Use `./run.sh up` for CPU/Ollama mode.
+
+**Ollama not using GPU after setup on a machine with GPU**
+
+GPU acceleration is auto-detected via `nvidia-smi`. If not working, check that NVIDIA Container Toolkit is installed.
 
 **GPU not detected by Ollama or Triton**
 
@@ -825,6 +837,8 @@ cd KlarKI-EU-AI-Act-compliance-auditor
 cp .env.example .env
 ./run.sh setup --skip-phase5    # Quick infra-only setup (skips ML training)
 ```
+
+Full technical documentation is in [`docs/`](docs/index.md) — architecture, training pipeline, inference pipeline, RAG system, model inventory, and configuration guide.
 
 Architecture, training pipeline, ML conventions, and service contracts are fully documented in [`CLAUDE.md`](CLAUDE.md).
 
