@@ -111,6 +111,29 @@ services:
       - klarki-net
     restart: unless-stopped
 
+  klarki-training:
+    build:
+      context: .
+      dockerfile: training/Dockerfile
+    container_name: klarki-training
+    profiles:
+      - training
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    environment:
+      - OLLAMA_HOST=http://klarki-ollama:11434
+      - CHROMADB_HOST=http://klarki-chromadb:8000
+      - PYTHONUNBUFFERED=1
+      - PYTHONIOENCODING=utf-8
+    depends_on:
+      klarki-chromadb:
+        condition: service_healthy
+      klarki-ollama:
+        condition: service_started
+    networks:
+      - klarki-net
+
   klarki-triton:
     build:
       context: .

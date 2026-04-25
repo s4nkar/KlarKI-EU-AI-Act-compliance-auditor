@@ -58,6 +58,13 @@ _has_nvidia_gpu() {
   command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1
 }
 
+# Run a command inside the training container (Python 3.11, isolated from host).
+# Builds the image on first run; subsequent runs use the layer cache.
+# Infrastructure (Ollama, ChromaDB) is started automatically via depends_on.
+_run_training() {
+  docker compose --profile training run --rm --build klarki-training "$@"
+}
+
 # Build the docker compose file list: base + GPU overlay when GPU is present.
 _compose_files() {
   if _has_nvidia_gpu && [ -f docker-compose.gpu.yml ]; then
@@ -77,20 +84,13 @@ cmd_setup() {
     info "No GPU detected — running in CPU-only mode (Ollama on CPU, slower but fully functional)."
   fi
 
-  info "Building and starting containers..."
+  info "Building and starting infrastructure containers..."
   # shellcheck disable=SC2086
   docker compose $COMPOSE up --build -d
 
-  info "Installing training dependencies..."
-  python -m pip install -r training/requirements-training.txt -q \
-    || abort "pip install failed. Check training/requirements-training.txt."
-
-  info "Downloading spaCy German model..."
-  python -m spacy download de_core_news_sm -q 2>/dev/null || true
-
-  info "Running setup pipeline (Ollama + ChromaDB + data gen + BERT/NER training)..."
+  info "Running setup pipeline inside training container (Python 3.11, isolated from host)..."
   info "ONNX export and Triton benchmark are skipped — run './run.sh triton' for GPU inference."
-  python scripts/setup.py --stop-on-error --skip-export --skip-benchmark
+  _run_training python scripts/setup.py --stop-on-error --skip-export --skip-benchmark
 
   success "Setup complete!"
   echo ""
@@ -115,14 +115,27 @@ cmd_up() {
   docker compose $COMPOSE up --build -d
 }
 
-cmd_retrain() {
-  info "Installing training dependencies..."
-  python -m pip install -r training/requirements-training.txt -q \
-    || abort "pip install failed."
+cmd_dev() {
+  # Development mode: hot reload, source volumes, Dockerfile.dev, port 3000 for frontend.
+  # Uses docker-compose.dev.yml overlay on top of the production compose file.
+  if [ ! -f docker-compose.dev.yml ]; then
+    abort "docker-compose.dev.yml not found."
+  fi
+  if grep -q "USE_TRITON=true" .env 2>/dev/null; then
+    _sed_inplace 's/USE_TRITON=true/USE_TRITON=false/' .env
+  fi
 
-  info "Retraining: force-regenerate data + retrain BERT + NER + re-export ONNX..."
+  COMPOSE=$(_compose_files)
+  # shellcheck disable=SC2086
+  docker compose $COMPOSE -f docker-compose.dev.yml up --build -d
+  echo ""
+  echo "Dev mode: API hot-reload on :8000, frontend on :3000"
+}
+
+cmd_retrain() {
+  info "Retraining inside training container (Python 3.11)..."
   info "(Skips: Ollama pull, ChromaDB rebuild — pass --only <stage> for finer control)"
-  python scripts/setup.py --retrain --stop-on-error
+  _run_training python scripts/setup.py --retrain --stop-on-error
 
   success "Retrain complete. Run './run.sh triton' to switch to the new model."
 }
@@ -136,8 +149,8 @@ cmd_triton() {
 
   # Export ONNX models if not already done (first-time Triton setup).
   if [ ! -f "model_repository/bert_clause_classifier/1/model.onnx" ]; then
-    info "BERT ONNX model not found — exporting now (requires trained BERT weights)..."
-    python scripts/setup.py --only export-bert --only export-e5 --stop-on-error \
+    info "BERT ONNX model not found — exporting inside training container..."
+    _run_training python scripts/setup.py --only export-bert --only export-e5 --stop-on-error \
       || abort "ONNX export failed. Run './run.sh setup' first to train the models."
   fi
 
@@ -146,7 +159,7 @@ cmd_triton() {
 
   info "Enabling Triton backend in API..."
   _sed_inplace 's/USE_TRITON=false/USE_TRITON=true/' .env
-  docker compose $(_compose_files) up -d klarki-api
+  docker compose $(_compose_files) up -d --build klarki-api
 
   success "Triton is live. Run './run.sh bench' to compare latency."
 }
@@ -167,7 +180,7 @@ cmd_test() {
 }
 
 cmd_bench() {
-  python scripts/benchmark_triton.py --n-samples 50
+  _run_training python scripts/benchmark_triton.py --n-samples 50
 }
 
 cmd_down() {
@@ -197,7 +210,8 @@ cmd_help() {
                       Works on all OS and hardware — GPU accelerates Ollama if detected.
                       Re-running is safe: long stages are skipped if outputs exist.
 
-    ./run.sh up       Start all containers in Ollama mode (day-to-day, no GPU needed)
+    ./run.sh up       Start containers in production mode (nginx, compiled images, no reload)
+    ./run.sh dev      Start containers in dev mode (hot reload, source volumes, port 3000)
     ./run.sh triton   Switch to Triton BERT mode (requires NVIDIA GPU + Container Toolkit)
     ./run.sh test     Run full test suite inside the API container
 
@@ -209,10 +223,11 @@ cmd_help() {
     ./run.sh clean    Full wipe (containers + volumes + ChromaDB data)
     ./run.sh help     Show this message
 
-  First time:   ./run.sh setup    (does everything; GPU auto-detected for Ollama)
-  Day-to-day:   ./run.sh up       (Ollama, CPU or GPU)
-  GPU inference: ./run.sh triton  (Triton BERT — NVIDIA GPU required)
-  Retrain only: ./run.sh retrain  (skips Ollama pull and ChromaDB rebuild)
+  First time:    ./run.sh setup    (does everything; GPU auto-detected for Ollama)
+  Day-to-day:    ./run.sh up       (production mode — nginx, compiled images)
+  Development:   ./run.sh dev      (hot reload, source volumes, frontend on :3000)
+  GPU inference: ./run.sh triton   (Triton BERT — NVIDIA GPU required)
+  Retrain only:  ./run.sh retrain  (skips Ollama pull and ChromaDB rebuild)
 
   Fine-grained control (see python scripts/setup.py --help):
     python scripts/setup.py --only train-bert          # retrain BERT only
@@ -227,6 +242,7 @@ EOF
 case "$CMD" in
   setup)   cmd_setup   ;;
   up)      cmd_up      ;;
+  dev)     cmd_dev     ;;
   triton)  cmd_triton  ;;
   retrain) cmd_retrain ;;
   test)    cmd_test    ;;
