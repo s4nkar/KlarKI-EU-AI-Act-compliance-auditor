@@ -1,0 +1,14 @@
+# GPU overlay — applied automatically by ./run.sh when nvidia-smi is detected.
+# Manual use: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+#
+# Adds NVIDIA GPU reservation to Ollama so Docker exposes the GPU to the container.
+# Without this overlay, Ollama runs in CPU-only mode (slower but fully functional).
+services:
+  klarki-ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

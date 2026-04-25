@@ -43,11 +43,43 @@ info()    { echo ""; echo "==> $*"; }
 success() { echo ""; echo "    OK: $*"; }
 abort()   { echo ""; echo "ERROR: $*" >&2; exit 1; }
 
+# Portable sed -i: macOS (BSD sed) requires an explicit backup extension with -i,
+# GNU sed and Git Bash on Windows do not.
+_sed_inplace() {
+  if sed --version 2>/dev/null | grep -q GNU; then
+    sed -i "$@"
+  else
+    sed -i '' "$@"
+  fi
+}
+
+# Returns 0 if an NVIDIA GPU is reachable via nvidia-smi, 1 otherwise.
+_has_nvidia_gpu() {
+  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1
+}
+
+# Build the docker compose file list: base + GPU overlay when GPU is present.
+_compose_files() {
+  if _has_nvidia_gpu && [ -f docker-compose.gpu.yml ]; then
+    echo "-f docker-compose.yml -f docker-compose.gpu.yml"
+  else
+    echo "-f docker-compose.yml"
+  fi
+}
+
 # ── Commands ──────────────────────────────────────────────────────────────────
 
 cmd_setup() {
+  COMPOSE=$(_compose_files)
+  if echo "$COMPOSE" | grep -q gpu; then
+    info "NVIDIA GPU detected — Ollama will use GPU acceleration."
+  else
+    info "No GPU detected — running in CPU-only mode (Ollama on CPU, slower but fully functional)."
+  fi
+
   info "Building and starting containers..."
-  docker compose up --build -d
+  # shellcheck disable=SC2086
+  docker compose $COMPOSE up --build -d
 
   info "Installing training dependencies..."
   python -m pip install -r training/requirements-training.txt -q \
@@ -56,22 +88,31 @@ cmd_setup() {
   info "Downloading spaCy German model..."
   python -m spacy download de_core_news_sm -q 2>/dev/null || true
 
-  info "Running full setup pipeline (Ollama + ChromaDB + data gen + BERT training)..."
-  python scripts/setup.py --stop-on-error
+  info "Running setup pipeline (Ollama + ChromaDB + data gen + BERT/NER training)..."
+  info "ONNX export and Triton benchmark are skipped — run './run.sh triton' for GPU inference."
+  python scripts/setup.py --stop-on-error --skip-export --skip-benchmark
 
   success "Setup complete!"
   echo ""
-  echo "    ./run.sh up      — start in Ollama mode (default)"
-  echo "    ./run.sh triton  — switch to Triton BERT mode"
+  echo "    ./run.sh up      — start in Ollama mode (default, works without GPU)"
+  echo "    ./run.sh triton  — switch to Triton BERT mode (NVIDIA GPU required)"
 }
 
 cmd_up() {
   # Ensure USE_TRITON is off for plain Ollama mode
   if grep -q "USE_TRITON=true" .env 2>/dev/null; then
-    sed -i 's/USE_TRITON=true/USE_TRITON=false/' .env
+    _sed_inplace 's/USE_TRITON=true/USE_TRITON=false/' .env
     echo "Switched to Ollama mode (USE_TRITON=false)"
   fi
-  docker compose up --build -d
+
+  COMPOSE=$(_compose_files)
+  if echo "$COMPOSE" | grep -q gpu; then
+    echo "NVIDIA GPU detected — Ollama will use GPU acceleration."
+  else
+    echo "No GPU detected — running in CPU-only mode."
+  fi
+  # shellcheck disable=SC2086
+  docker compose $COMPOSE up --build -d
 }
 
 cmd_retrain() {
@@ -87,17 +128,25 @@ cmd_retrain() {
 }
 
 cmd_triton() {
-  # Guard: ONNX model must exist (produced by setup)
+  # GPU is required for Triton — fail fast with a clear message.
+  if ! _has_nvidia_gpu; then
+    abort "No NVIDIA GPU detected. Triton requires a CUDA-capable GPU with the NVIDIA Container Toolkit installed.
+       Use './run.sh up' for CPU/Ollama mode — it works on all hardware."
+  fi
+
+  # Export ONNX models if not already done (first-time Triton setup).
   if [ ! -f "model_repository/bert_clause_classifier/1/model.onnx" ]; then
-    abort "BERT ONNX model not found. Run './run.sh setup' first to train and export."
+    info "BERT ONNX model not found — exporting now (requires trained BERT weights)..."
+    python scripts/setup.py --only export-bert --only export-e5 --stop-on-error \
+      || abort "ONNX export failed. Run './run.sh setup' first to train the models."
   fi
 
   info "Starting Triton inference server..."
-  docker compose --profile triton up -d --build klarki-triton
+  docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile triton up -d --build klarki-triton
 
   info "Enabling Triton backend in API..."
-  sed -i 's/USE_TRITON=false/USE_TRITON=true/' .env
-  docker compose up -d klarki-api
+  _sed_inplace 's/USE_TRITON=false/USE_TRITON=true/' .env
+  docker compose $(_compose_files) up -d klarki-api
 
   success "Triton is live. Run './run.sh bench' to compare latency."
 }
@@ -144,11 +193,12 @@ cmd_help() {
 
   KlarKI -- available commands
 
-    ./run.sh setup    Complete init: containers + models + knowledge graph + training + ONNX export.
+    ./run.sh setup    Complete init: containers + models + knowledge graph + training.
+                      Works on all OS and hardware — GPU accelerates Ollama if detected.
                       Re-running is safe: long stages are skipped if outputs exist.
 
-    ./run.sh up       Start all containers in Ollama mode (day-to-day)
-    ./run.sh triton   Switch to Triton BERT mode (requires prior setup + NVIDIA GPU)
+    ./run.sh up       Start all containers in Ollama mode (day-to-day, no GPU needed)
+    ./run.sh triton   Switch to Triton BERT mode (requires NVIDIA GPU + Container Toolkit)
     ./run.sh test     Run full test suite inside the API container
 
     ./run.sh retrain  Force-regenerate data + retrain BERT + NER + re-export ONNX.
@@ -159,8 +209,9 @@ cmd_help() {
     ./run.sh clean    Full wipe (containers + volumes + ChromaDB data)
     ./run.sh help     Show this message
 
-  First time:   ./run.sh setup    (does everything; GPU recommended for training)
-  Day-to-day:   ./run.sh up       (Ollama)  or  ./run.sh triton  (BERT/Triton)
+  First time:   ./run.sh setup    (does everything; GPU auto-detected for Ollama)
+  Day-to-day:   ./run.sh up       (Ollama, CPU or GPU)
+  GPU inference: ./run.sh triton  (Triton BERT — NVIDIA GPU required)
   Retrain only: ./run.sh retrain  (skips Ollama pull and ChromaDB rebuild)
 
   Fine-grained control (see python scripts/setup.py --help):

@@ -11,11 +11,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# CPU-only PyTorch first — prevents pip from pulling the 2.6 GB CUDA wheel.
-# Embedding model (e5-small) runs on CPU; GPU VRAM is reserved for Ollama.
-RUN pip install --no-cache-dir \
-    torch==2.3.1+cpu \
-    --index-url https://download.pytorch.org/whl/cpu
+# CPU-only PyTorch — avoids the 2.6 GB CUDA wheel on x86_64.
+# ARM64 (Apple Silicon / linux/aarch64) has no +cpu variant on the WHL index;
+# standard PyPI torch is already CPU-only on that platform.
+RUN arch=$(uname -m) && \
+    if [ "$arch" = "x86_64" ]; then \
+        pip install --no-cache-dir torch==2.3.1+cpu \
+            --index-url https://download.pytorch.org/whl/cpu; \
+    else \
+        pip install --no-cache-dir torch==2.3.1; \
+    fi
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
