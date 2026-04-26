@@ -25,6 +25,8 @@ services:
     volumes:
       - upload_data:/data/uploads
       - chroma_data:/data/chroma
+      - ./training/artifacts:/training/artifacts:ro
+      - ./training/data:/training/data:ro
     depends_on:
       klarki-chromadb:
         condition: service_healthy
