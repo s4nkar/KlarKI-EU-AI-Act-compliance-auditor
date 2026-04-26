@@ -29,6 +29,7 @@ Usage:
 import argparse
 import asyncio
 import json
+import random
 import re
 from pathlib import Path
 
@@ -242,7 +243,7 @@ async def _call_ollama(
         "stream": False,
         "options": {
             "temperature": 0.7,
-            "seed": 42,
+            "seed": random.randint(1, 100_000),
             "num_predict": num_predict,
         },
         "keep_alive": "-1m",
@@ -264,12 +265,16 @@ async def _generate_class(
     classifier_type: str,
     cls: dict,
     lang: str,
-    n_per_batch: int,
-    n_batches: int,
+    batch_size: int,
+    n_per_class: int,
     existing_texts: frozenset[str],
     semaphore: asyncio.Semaphore,
 ) -> list[dict]:
-    """Generate training examples for one class in one language."""
+    """Generate training examples for one class in one language.
+
+    Keeps calling Ollama until n_per_class unique new examples are collected
+    or the max-call ceiling is reached.
+    """
     config = CLASSIFIER_CONFIGS[classifier_type]
     lang_instruction = (
         "Write in ENGLISH only."
@@ -278,7 +283,7 @@ async def _generate_class(
     )
 
     prompt = config["prompt_template"].format(
-        n=n_per_batch,
+        n=batch_size,
         label=cls["label"],
         article=cls["article"],
         description=cls["description"],
@@ -286,15 +291,22 @@ async def _generate_class(
     )
 
     results: list[dict] = []
-    for batch in range(n_batches):
+    new_texts_seen: set[str] = set()  # intra-task dedup (post-gather dedup handles cross-task)
+    # Allow 4× budget for duplicates/empty responses before giving up
+    max_calls = max(10, (n_per_class * 4) // batch_size)
+    call_count = 0
+
+    while len(results) < n_per_class and call_count < max_calls:
         async with semaphore:
             texts = await _call_ollama(client, ollama_host, model, prompt, num_predict=2048)
+        call_count += 1
 
         new_count = 0
         for text in texts:
             text = text.strip()
-            if not text or text in existing_texts:
+            if not text or text in existing_texts or text in new_texts_seen:
                 continue
+            new_texts_seen.add(text)
             results.append({
                 "text": text,
                 "label": cls["label"],
@@ -303,7 +315,7 @@ async def _generate_class(
             })
             new_count += 1
 
-        print(f"      batch {batch + 1}/{n_batches}: +{new_count} new examples")
+        print(f"      call {call_count}/{max_calls}: +{new_count} → {len(results)}/{n_per_class}")
 
     return results
 
@@ -345,19 +357,18 @@ async def generate_classifier(
 
     existing_texts: frozenset[str] = frozenset(r["text"] for r in existing)
 
-    n_batches = max(1, n_per_class // batch_size)
     semaphore = asyncio.Semaphore(semaphore_limit)
 
     async with httpx.AsyncClient() as client:
         tasks = []
         for cls in config["classes"]:
             for lang in languages:
-                print(f"\n  Generating [{cls['label']}] [{lang}]:")
+                print(f"\n  Generating [{cls['label']}] [{lang}] (target: {n_per_class}):")
                 tasks.append(
                     _generate_class(
                         client, ollama_host, model,
                         classifier_type, cls, lang,
-                        batch_size, n_batches,
+                        batch_size, n_per_class,
                         existing_texts, semaphore,
                     )
                 )
@@ -393,16 +404,16 @@ async def main() -> None:
         "--type", choices=["actor", "risk", "prohibited", "all"], default="all",
         help="Which classifier to generate data for (default: all)",
     )
-    parser.add_argument("--n-per-class", type=int, default=500,
-                        help="Target examples per class per language (default: 500)")
-    parser.add_argument("--batch-size", type=int, default=5,
-                        help="Sentences per Ollama call (default: 5; phi3:mini reliable at ≤5)")
+    parser.add_argument("--n-per-class", type=int, default=200,
+                        help="Target new examples per class per language (default: 200)")
+    parser.add_argument("--batch-size", type=int, default=10,
+                        help="Sentences per Ollama call (default: 10)")
     parser.add_argument("--languages", default="en,de",
                         help="Comma-separated language codes (default: en,de)")
     parser.add_argument("--ollama-host", default="http://localhost:11434")
     parser.add_argument("--model", default="phi3:mini")
-    parser.add_argument("--semaphore", type=int, default=4,
-                        help="Max concurrent Ollama requests (default: 4)")
+    parser.add_argument("--semaphore", type=int, default=3,
+                        help="Max concurrent Ollama requests (default: 3)")
     parser.add_argument("--overwrite", action="store_true",
                         help="Clear output file before generating (default: append)")
     args = parser.parse_args()
