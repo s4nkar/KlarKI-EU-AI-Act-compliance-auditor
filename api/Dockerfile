@@ -14,12 +14,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # CPU-only PyTorch — avoids the 2.6 GB CUDA wheel on x86_64.
 # ARM64 (Apple Silicon / linux/aarch64) has no +cpu variant on the WHL index;
 # standard PyPI torch is already CPU-only on that platform.
+# Use --prefix=/install so torch and all its deps (typing_extensions, numpy…)
+# land in the prefix and get copied to Stage 2.
 RUN arch=$(uname -m) && \
     if [ "$arch" = "x86_64" ]; then \
-        pip install --no-cache-dir torch==2.3.1+cpu \
+        pip install --no-cache-dir --prefix=/install torch==2.3.1+cpu \
             --index-url https://download.pytorch.org/whl/cpu; \
     else \
-        pip install --no-cache-dir torch==2.3.1; \
+        pip install --no-cache-dir --prefix=/install torch==2.3.1; \
     fi
 
 COPY requirements.txt .
@@ -41,7 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy installed Python packages from builder
+# Copy all installed Python packages from builder (torch + deps + requirements)
 COPY --from=builder /install /usr/local
 
 # Copy application source

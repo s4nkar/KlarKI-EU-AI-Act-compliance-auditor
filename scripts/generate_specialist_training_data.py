@@ -393,8 +393,8 @@ async def main() -> None:
         "--type", choices=["actor", "risk", "prohibited", "all"], default="all",
         help="Which classifier to generate data for (default: all)",
     )
-    parser.add_argument("--n-per-class", type=int, default=200,
-                        help="Target examples per class per language (default: 200)")
+    parser.add_argument("--n-per-class", type=int, default=500,
+                        help="Target examples per class per language (default: 500)")
     parser.add_argument("--batch-size", type=int, default=5,
                         help="Sentences per Ollama call (default: 5; phi3:mini reliable at ≤5)")
     parser.add_argument("--languages", default="en,de",

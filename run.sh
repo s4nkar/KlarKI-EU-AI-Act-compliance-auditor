@@ -59,10 +59,17 @@ _has_nvidia_gpu() {
 }
 
 # Run a command inside the training container (Python 3.11, isolated from host).
-# Builds the image on first run; subsequent runs use the layer cache.
-# Infrastructure (Ollama, ChromaDB) is started automatically via depends_on.
+# Automatically uses the GPU overlay + CUDA torch when nvidia-smi is detected;
+# falls back to CPU-only torch on machines without an NVIDIA GPU.
+# Build args (USE_GPU) come from the compose file, not the run command, so we
+# build explicitly first and then run without --build.
 _run_training() {
-  docker compose --profile training run --rm --build klarki-training "$@"
+  local compose_files="-f docker-compose.yml"
+  if _has_nvidia_gpu && [ -f docker-compose.gpu.yml ]; then
+    compose_files="-f docker-compose.yml -f docker-compose.gpu.yml"
+  fi
+  docker compose $compose_files --profile training build klarki-training
+  docker compose $compose_files --profile training run --rm klarki-training "$@"
 }
 
 # Build the docker compose file list: base + GPU overlay when GPU is present.

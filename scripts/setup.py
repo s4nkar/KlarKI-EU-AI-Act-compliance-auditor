@@ -47,6 +47,7 @@ Environment (defaults match .env.example):
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -669,9 +670,9 @@ def parse_args() -> argparse.Namespace:
                    help="Abort entire pipeline on first stage failure (default: continue)")
 
     # Service addresses
-    p.add_argument("--ollama-host",  default="http://localhost:11434")
-    p.add_argument("--chroma-host",  default="http://localhost:8001")
-    p.add_argument("--triton-host",  default="localhost")
+    p.add_argument("--ollama-host",  default=os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
+    p.add_argument("--chroma-host",  default=os.environ.get("CHROMADB_HOST", "http://localhost:8001"))
+    p.add_argument("--triton-host",  default=os.environ.get("TRITON_HOST", "localhost"))
     p.add_argument("--triton-port",  type=int, default=8003)
     p.add_argument("--ollama-model", default="phi3:mini")
 

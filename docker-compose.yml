@@ -113,8 +113,8 @@ services:
 
   klarki-training:
     build:
-      context: .
-      dockerfile: training/Dockerfile
+      context: ./training
+      dockerfile: Dockerfile
     container_name: klarki-training
     profiles:
       - training
