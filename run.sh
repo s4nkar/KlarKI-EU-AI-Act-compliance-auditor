@@ -72,6 +72,17 @@ _run_training() {
   docker compose $compose_files --profile training run --rm klarki-training "$@"
 }
 
+# Run a command inside the dedicated test container (Python 3.11-slim + prod +
+# dev deps, same version as production).  Never runs on the host Python.
+_run_testing() {
+  local compose_files="-f docker-compose.yml"
+  if _has_nvidia_gpu && [ -f docker-compose.gpu.yml ]; then
+    compose_files="-f docker-compose.yml -f docker-compose.gpu.yml"
+  fi
+  docker compose $compose_files --profile testing build klarki-test
+  docker compose $compose_files --profile testing run --rm klarki-test "$@"
+}
+
 # Build the docker compose file list: base + GPU overlay when GPU is present.
 _compose_files() {
   if _has_nvidia_gpu && [ -f docker-compose.gpu.yml ]; then
@@ -172,14 +183,14 @@ cmd_triton() {
 }
 
 cmd_test() {
-  # Ensure report plugins are present (no-op if already installed)
-  MSYS_NO_PATHCONV=1 docker exec klarki-api pip install -q pytest-html==4.1.1 pytest-cov==5.0.0
+  mkdir -p tests/reports
 
-  MSYS_NO_PATHCONV=1 docker exec klarki-api mkdir -p /tests/reports
-
-  MSYS_NO_PATHCONV=1 docker exec klarki-api python -m pytest /tests/ -v --tb=short --asyncio-mode=auto \
-    --html=/tests/reports/report.html --self-contained-html \
-    --cov=. --cov-report=html:/tests/reports/coverage --cov-report=term-missing
+  # All tests run inside the dedicated klarki-test container (Python 3.11-slim,
+  # same version as production). The project root is bind-mounted at /workspace
+  # so conftest.py resolves api/ imports from /workspace/api exactly as in prod.
+  _run_testing python -m pytest tests/ -v --tb=short --asyncio-mode=auto \
+    --html=tests/reports/report.html --self-contained-html \
+    --cov=api --cov-report=html:tests/reports/coverage --cov-report=term-missing
 
   echo ""
   echo "Test report : tests/reports/report.html"

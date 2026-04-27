@@ -162,10 +162,12 @@ Output ONLY this JSON format:
         
     except Exception as e:
         logger.warning("synthesis_agent_error", error=str(e))
-        score = 50.0
-        reasoning = "Synthesis failed."
-        gaps = []
-        recs = []
+        score = 30.0
+        reasoning = "LangGraph analysis failed — manual review required."
+        gaps = [{"title": "Analysis failed — review manually",
+                 "description": f"Gap analysis could not be completed: {str(e)[:200]}",
+                 "severity": "major"}]
+        recs = ["Retry the audit or review documentation manually."]
         _error = True
 
     _monitor.record_graph_node("synthesis_agent", time.time() - _t0, error=_error)

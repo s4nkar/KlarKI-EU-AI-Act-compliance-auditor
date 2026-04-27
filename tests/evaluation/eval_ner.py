@@ -131,6 +131,159 @@ _RAW_GOLD: list[tuple[str, list[tuple[str, str]]]] = [
      [("Subliminal manipulation", "PROHIBITED_USE")]),
     ("Social Scoring durch Behörden ist nach Artikel 5 verboten.",
      [("Social Scoring", "PROHIBITED_USE"), ("Artikel 5", "ARTICLE")]),
+
+    # ── Abbreviated article references ────────────────────────────────────────
+    ("Art. 9 of the EU AI Act requires providers to establish a risk management system.",
+     [("Art. 9", "ARTICLE"), ("EU AI Act", "REGULATION"),
+      ("providers", "ACTOR"), ("establish", "OBLIGATION"), ("risk management system", "PROCEDURE")]),
+
+    ("Under Art. 13, deployers must give users clear information about the AI system capabilities.",
+     [("Art. 13", "ARTICLE"), ("deployers", "ACTOR"),
+      ("must give", "OBLIGATION"), ("AI system", "AI_SYSTEM")]),
+
+    ("§ 14 grants operators the right to override any automated output of the high-risk AI system.",
+     [("§ 14", "ARTICLE"), ("operators", "ACTOR"),
+      ("override", "OBLIGATION"), ("high-risk", "RISK_TIER"), ("AI system", "AI_SYSTEM")]),
+
+    ("Abs. 1 of Article 10 requires providers to ensure that training data shall be relevant and sufficiently representative.",
+     [("Article 10", "ARTICLE"), ("providers", "ACTOR"),
+      ("shall be", "OBLIGATION")]),
+
+    # ── Complex multi-entity sentences (3–5 entities) ─────────────────────────
+    ("Providers must complete a conformity assessment under Article 43 before placing the high-risk AI system on the market.",
+     [("Providers", "ACTOR"), ("must complete", "OBLIGATION"),
+      ("conformity assessment", "PROCEDURE"), ("Article 43", "ARTICLE"),
+      ("high-risk", "RISK_TIER"), ("AI system", "AI_SYSTEM")]),
+
+    ("Under the EU AI Act, notified bodies assess whether high-risk AI systems comply with Article 9 and Article 15 requirements.",
+     [("EU AI Act", "REGULATION"), ("notified bodies", "ACTOR"),
+      ("assess", "OBLIGATION"), ("high-risk AI systems", "AI_SYSTEM"),
+      ("Article 9", "ARTICLE"), ("Article 15", "ARTICLE")]),
+
+    ("Deployers of high-risk AI systems are required to implement human oversight measures as specified in Article 14.",
+     [("Deployers", "ACTOR"), ("high-risk AI systems", "AI_SYSTEM"),
+      ("are required to implement", "OBLIGATION"),
+      ("human oversight measures", "PROCEDURE"), ("Article 14", "ARTICLE")]),
+
+    ("The provider of the emotion recognition system must conduct a fundamental rights impact assessment under Article 9.",
+     [("provider", "ACTOR"), ("emotion recognition system", "AI_SYSTEM"),
+      ("must conduct", "OBLIGATION"),
+      ("fundamental rights impact assessment", "PROCEDURE"), ("Article 9", "ARTICLE")]),
+
+    ("Importers shall verify that the general-purpose AI model conforms to the EU AI Act before distribution.",
+     [("Importers", "ACTOR"), ("shall verify", "OBLIGATION"),
+      ("general-purpose AI model", "AI_SYSTEM"), ("EU AI Act", "REGULATION")]),
+
+    ("Distributors are required to check that Article 13 transparency obligations are met before making the prohibited AI system available.",
+     [("Distributors", "ACTOR"), ("are required to check", "OBLIGATION"),
+      ("Article 13", "ARTICLE"), ("transparency obligations", "PROCEDURE")]),
+
+    # ── Industry-specific entities ─────────────────────────────────────────────
+    ("The clinical decision support system deployed in ICUs must meet Article 15 accuracy requirements before patient use.",
+     [("clinical decision support system", "AI_SYSTEM"),
+      ("Article 15", "ARTICLE"), ("must meet", "OBLIGATION")]),
+
+    ("Our employment screening AI system applies automated ranking and must comply with Article 10 data governance rules.",
+     [("employment screening AI system", "AI_SYSTEM"),
+      ("must comply", "OBLIGATION"), ("Article 10", "ARTICLE")]),
+
+    ("The credit-scoring model is classified as high-risk under Annex III and requires a conformity assessment per Article 43.",
+     [("credit-scoring model", "AI_SYSTEM"), ("high-risk", "RISK_TIER"),
+      ("conformity assessment", "PROCEDURE"), ("Article 43", "ARTICLE")]),
+
+    ("Under GDPR Article 22 and the EU AI Act, automated decision-making systems in banking must offer human review.",
+     [("GDPR", "REGULATION"), ("Article 22", "ARTICLE"), ("EU AI Act", "REGULATION"),
+      ("automated decision-making systems", "AI_SYSTEM"),
+      ("must offer", "OBLIGATION"), ("human review", "PROCEDURE")]),
+
+    ("Biometric identification systems used in law enforcement are prohibited except under strict conditions listed in Article 5.",
+     [("Biometric identification systems", "AI_SYSTEM"), ("prohibited", "RISK_TIER"),
+      ("Article 5", "ARTICLE")]),
+
+    # ── German paragraph-length sentences ─────────────────────────────────────
+    ("Anbieter von Hochrisiko-KI-Systemen müssen gemäß Artikel 9 ein umfassendes Risikomanagementsystem einrichten und über den gesamten Lebenszyklus aufrechterhalten.",
+     [("Anbieter", "ACTOR"), ("Hochrisiko-KI-Systemen", "AI_SYSTEM"),
+      ("müssen", "OBLIGATION"), ("Artikel 9", "ARTICLE"),
+      ("Risikomanagementsystem", "PROCEDURE")]),
+
+    ("Der Betreiber ist verpflichtet, menschliche Aufsichtsmaßnahmen zu implementieren und sicherzustellen, dass qualifiziertes Personal die Ausgaben des KI-Systems überprüfen kann.",
+     [("Betreiber", "ACTOR"), ("ist verpflichtet", "OBLIGATION"),
+      ("menschliche Aufsichtsmaßnahmen", "PROCEDURE")]),
+
+    ("Einführer müssen sicherstellen, dass das Hochrisiko-KI-System der EU-KI-Verordnung entspricht, bevor es auf dem europäischen Markt bereitgestellt wird.",
+     [("Einführer", "ACTOR"), ("müssen sicherstellen", "OBLIGATION"),
+      ("Hochrisiko-KI-System", "AI_SYSTEM"), ("EU-KI-Verordnung", "REGULATION")]),
+
+    ("Das Echtzeit-Biometrie-Erkennungssystem in öffentlichen Räumen gilt nach Artikel 5 als verbotene KI-Praxis.",
+     [("Echtzeit-Biometrie-Erkennungssystem", "AI_SYSTEM"),
+      ("Artikel 5", "ARTICLE"), ("verbotene", "RISK_TIER")]),
+
+    ("Gemäß Artikel 13 der KI-Verordnung sind Betreiber verpflichtet, Nutzer darüber zu informieren, dass sie mit einem automatisierten System interagieren.",
+     [("Artikel 13", "ARTICLE"), ("KI-Verordnung", "REGULATION"),
+      ("Betreiber", "ACTOR"), ("verpflichtet", "OBLIGATION")]),
+
+    ("Das KI-System zur Kreditbewertung ist als hochriskant eingestuft und erfordert eine vollständige Konformitätsbewertung nach Artikel 43.",
+     [("KI-System zur Kreditbewertung", "AI_SYSTEM"),
+      ("hochriskant", "RISK_TIER"), ("Konformitätsbewertung", "PROCEDURE"),
+      ("Artikel 43", "ARTICLE")]),
+
+    # ── ACTOR: importer and distributor roles ─────────────────────────────────
+    ("Importers of high-risk AI systems established outside the EU must appoint an authorised representative under Article 25.",
+     [("Importers", "ACTOR"), ("high-risk AI systems", "AI_SYSTEM"),
+      ("must appoint", "OBLIGATION"), ("Article 25", "ARTICLE")]),
+
+    ("Distributors shall ensure that the AI system's instructions for use and CE marking are present before making it available.",
+     [("Distributors", "ACTOR"), ("shall ensure", "OBLIGATION"),
+      ("AI system", "AI_SYSTEM"), ("instructions for use", "PROCEDURE")]),
+
+    # ── Multiple ARTICLE references in one sentence ───────────────────────────
+    ("Article 9, Article 10, and Article 11 together form the technical compliance foundation for high-risk AI systems.",
+     [("Article 9", "ARTICLE"), ("Article 10", "ARTICLE"), ("Article 11", "ARTICLE"),
+      ("high-risk AI systems", "AI_SYSTEM")]),
+
+    ("The provider must satisfy obligations under Article 9 for risk management and Article 12 for record-keeping.",
+     [("provider", "ACTOR"), ("must satisfy", "OBLIGATION"),
+      ("Article 9", "ARTICLE"), ("Article 12", "ARTICLE"),
+      ("risk management", "PROCEDURE"), ("record-keeping", "PROCEDURE")]),
+
+    # ── PROCEDURE: complex and adjacent entities ───────────────────────────────
+    ("The post-market monitoring plan and the technical documentation must be updated whenever a substantial modification occurs.",
+     [("post-market monitoring plan", "PROCEDURE"),
+      ("technical documentation", "PROCEDURE"), ("must be updated", "OBLIGATION")]),
+
+    ("Before market placement, providers must complete a fundamental rights impact assessment, a conformity assessment, and register the AI system in the EU database.",
+     [("providers", "ACTOR"), ("must complete", "OBLIGATION"),
+      ("fundamental rights impact assessment", "PROCEDURE"),
+      ("conformity assessment", "PROCEDURE")]),
+
+    # ── PROHIBITED_USE: complex forms ─────────────────────────────────────────
+    ("Real-time remote biometric identification of individuals in publicly accessible spaces is a prohibited practice under the EU AI Act.",
+     [("Real-time remote biometric identification of individuals in publicly accessible spaces", "PROHIBITED_USE"),
+      ("EU AI Act", "REGULATION")]),
+
+    ("Using AI to infer emotions of workers on a factory floor for performance evaluation constitutes an emotion recognition in the workplace use case.",
+     [("emotion recognition in the workplace", "PROHIBITED_USE")]),
+
+    ("Predictive policing systems that rank individuals based on social behaviour data constitute social scoring and are banned under Article 5.",
+     [("social scoring", "PROHIBITED_USE"), ("Article 5", "ARTICLE")]),
+
+    # ── RISK_TIER: multiple forms ─────────────────────────────────────────────
+    ("The minimal-risk chatbot does not require a conformity assessment, unlike the high-risk recruitment AI that falls under Annex III.",
+     [("minimal-risk", "RISK_TIER"), ("high-risk", "RISK_TIER"),
+      ("conformity assessment", "PROCEDURE")]),
+
+    ("Limited-risk AI systems only need to satisfy the transparency obligations of Article 13, not the full Annex IV requirements.",
+     [("Limited-risk", "RISK_TIER"), ("Article 13", "ARTICLE"),
+      ("transparency obligations", "PROCEDURE")]),
+
+    # ── OBLIGATION: varied modal forms ────────────────────────────────────────
+    ("Manufacturers are obliged to draw up technical documentation before placing an AI system on the market.",
+     [("Manufacturers", "ACTOR"), ("are obliged to", "OBLIGATION"),
+      ("technical documentation", "PROCEDURE"), ("AI system", "AI_SYSTEM")]),
+
+    ("The deployer is under a duty to monitor the AI system's performance and report significant incidents to the provider.",
+     [("deployer", "ACTOR"), ("is under a duty to", "OBLIGATION"),
+      ("AI system", "AI_SYSTEM"), ("provider", "ACTOR")]),
 ]
 
 

@@ -33,7 +33,7 @@ _PROVIDER_PATTERNS: list[tuple[str, str]] = [
     (r"\bwe\s+(?:have\s+)?trained\b", "we (have) trained"),
     (r"\bour\s+(?:own\s+)?(?:AI\s+)?model\b", "our (own) (AI) model"),
     (r"\bour\s+(?:own\s+)?(?:AI\s+)?system\b", "our (own) (AI) system"),
-    (r"\bplaced?\s+on\s+the\s+market\b", "placed on the market"),
+    (r"\bplace[sd]?\b.{0,50}\bon\s+the\s+market\b", "placed on the market"),
     (r"\bin\s+Verkehr\s+gebracht\b", "in Verkehr gebracht"),  # DE: placed on market
     (r"\bwir\s+(?:haben\s+)?entwickelt\b", "wir (haben) entwickelt"),  # DE: we developed
     (r"\bproprietary\s+(?:AI|model|algorithm)\b", "proprietary AI/model/algorithm"),

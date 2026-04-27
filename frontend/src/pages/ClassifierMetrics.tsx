@@ -107,11 +107,36 @@ interface EvalResult {
   checks?: Record<string, boolean>
   checks_passed?: number
   checks_total?: number
+  article_scores?: Record<string, number>
   overall_f1?: number
   per_label?: Record<string, { precision: number; recall: number; f1: number; tp: number; fp: number; fn: number }>
   weak_labels?: Record<string, number>
   failing_labels?: Record<string, number>
   n_gold?: number
+  // Phase 3 eval fields
+  tpr?: number
+  tnr?: number
+  balanced_accuracy?: number
+  by_outcome?: {
+    prohibited?: { n_examples: number; n_correct: number; precision: number; recall: number; f1: number }
+    high_risk?:  { n_examples: number; n_correct: number; precision: number; recall: number; f1: number }
+    minimal?:    { n_examples: number; n_correct: number }
+  }
+  mode?: string
+  n_samples?: number
+  n_errors?: number
+  threshold_accuracy?: number
+  threshold_tpr?: number
+  // Specialist ML classifier eval fields (risk + prohibited)
+  recall?: number
+  precision?: number
+  f1?: number
+  avg_confidence?: number
+  n_high_risk?: number
+  n_not_high_risk?: number
+  n_prohibited?: number
+  n_not_prohibited?: number
+  by_type?: Record<string, { recall: number; tp: number; fp: number; tn: number; fn: number }>
 }
 
 type EvalResultsMap = Record<string, EvalResult>
@@ -409,6 +434,21 @@ function MetaCard({ label, value, sub, icon }: { label: string; value: string | 
 }
 
 function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+
+  function toggle(key: string) {
+    setExpanded(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  function hasDetails(r: EvalResult): boolean {
+    return !!(
+      (r.per_class && Object.keys(r.per_class).length > 0) ||
+      (r.per_label && Object.keys(r.per_label).length > 0) ||
+      r.by_outcome ||
+      (r.checks && Object.keys(r.checks).length > 0)
+    )
+  }
+
   if (!data) {
     return (
       <div className="border-t border-slate-200 pt-8 mb-10">
@@ -422,13 +462,18 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
   }
 
   const EVAL_META: Record<string, { label: string; desc: string }> = {
-    classifier:   { label: 'Gold Dataset',     desc: 'BERT on 80 hand-labeled examples' },
-    ner:          { label: 'NER Gold Eval',    desc: '8-label entity recognition — 31 gold sentences' },
-    rag:          { label: 'RAG Retrieval',     desc: 'Recall@K against ChromaDB' },
-    pipeline:     { label: 'End-to-End',        desc: 'Full pipeline on synthetic doc' },
-    hallucination:{ label: 'Hallucination',     desc: 'Citation & grounding checks' },
-    adversarial:  { label: 'Adversarial',       desc: '30 paraphrase robustness tests' },
-    consistency:  { label: 'Consistency',       desc: 'Determinism across repeated runs' },
+    classifier:      { label: 'Gold Dataset',        desc: 'BERT on 80 hand-labeled examples' },
+    ner:             { label: 'NER Gold Eval',        desc: '8-label entity recognition — 31 gold sentences' },
+    rag:             { label: 'RAG Retrieval',        desc: 'Recall@K against ChromaDB' },
+    pipeline:        { label: 'End-to-End',           desc: 'Full pipeline on synthetic doc' },
+    hallucination:   { label: 'Hallucination',        desc: 'Citation & grounding checks' },
+    adversarial:     { label: 'Adversarial',          desc: '30 paraphrase robustness tests' },
+    consistency:     { label: 'Consistency',          desc: 'Determinism across repeated runs' },
+    actor:           { label: 'Actor Classifier',     desc: 'Pattern accuracy on 31 gold documents' },
+    applicability:   { label: 'Applicability Gate',   desc: 'Art.5/6/Annex III decision accuracy on 28 examples' },
+    evidence_mapper: { label: 'Evidence Mapper',      desc: 'Synonym hit-rate on 24 gold evidence chunks' },
+    risk:            { label: 'Risk Classifier (ML)', desc: 'High-risk vs not-high-risk on 40 policy-doc examples' },
+    prohibited:      { label: 'Prohibited Classifier (ML)', desc: 'Art.5 prohibited vs lawful on 40 policy-doc examples' },
   }
 
   const statusStyle = (s: string) =>
@@ -441,13 +486,18 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
     s === 'pass' ? '#10b981' : s === 'warn' ? '#f59e0b' : s === 'skip' ? '#94a3b8' : '#ef4444'
 
   function keyMetric(key: string, r: EvalResult): string {
-    if (key === 'classifier') return r.macro_f1 != null ? `Macro F1 ${(r.macro_f1 * 100).toFixed(1)}%` : '—'
-    if (key === 'ner')        return r.overall_f1 != null ? `Overall F1 ${(r.overall_f1 * 100).toFixed(1)}%  ·  ${r.n_gold ?? '—'} gold samples` : '—'
-    if (key === 'rag')        return r['recall@3'] != null ? `Recall@3 ${(r['recall@3'] * 100).toFixed(1)}%  ·  MRR ${r.mrr?.toFixed(3) ?? '—'}` : '—'
-    if (key === 'adversarial')return r.adversarial_accuracy != null ? `Accuracy ${(r.adversarial_accuracy * 100).toFixed(1)}%` : '—'
-    if (key === 'consistency')return r.bert?.consistency_rate != null ? `BERT ${(r.bert.consistency_rate * 100).toFixed(0)}%  ·  LLM ${r.ollama?.consistency_rate != null ? (r.ollama.consistency_rate * 100).toFixed(0) + '%' : '—'}` : '—'
-    if (key === 'hallucination') return r.citation_rate != null ? `Citation rate ${(r.citation_rate * 100).toFixed(1)}%` : '—'
-    if (key === 'pipeline')   return r.checks_passed != null ? `${r.checks_passed}/${r.checks_total} checks passed` : '—'
+    if (key === 'classifier')      return r.macro_f1 != null ? `Macro F1 ${(r.macro_f1 * 100).toFixed(1)}%` : '—'
+    if (key === 'ner')             return r.overall_f1 != null ? `Overall F1 ${(r.overall_f1 * 100).toFixed(1)}%  ·  ${r.n_gold ?? '—'} gold samples` : '—'
+    if (key === 'rag')             return r['recall@3'] != null ? `Recall@3 ${(r['recall@3'] * 100).toFixed(1)}%  ·  MRR ${r.mrr?.toFixed(3) ?? '—'}` : '—'
+    if (key === 'adversarial')     return r.adversarial_accuracy != null ? `Accuracy ${(r.adversarial_accuracy * 100).toFixed(1)}%` : '—'
+    if (key === 'consistency')     return r.bert?.consistency_rate != null ? `BERT ${(r.bert.consistency_rate * 100).toFixed(0)}%  ·  LLM ${r.ollama?.consistency_rate != null ? (r.ollama.consistency_rate * 100).toFixed(0) + '%' : '—'}` : '—'
+    if (key === 'hallucination')   return r.citation_rate != null ? `Citation rate ${(r.citation_rate * 100).toFixed(1)}%` : '—'
+    if (key === 'pipeline')        return r.checks_passed != null ? `${r.checks_passed}/${r.checks_total} checks passed` : '—'
+    if (key === 'actor')           return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  F1 ${r.macro_f1 != null ? (r.macro_f1 * 100).toFixed(1) + '%' : '—'}` : '—'
+    if (key === 'applicability')   return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Prohibited recall ${r.by_outcome?.prohibited?.recall != null ? (r.by_outcome.prohibited.recall * 100).toFixed(0) + '%' : '—'}` : '—'
+    if (key === 'evidence_mapper') return r.tpr != null ? `TPR ${(r.tpr * 100).toFixed(1)}%  ·  TNR ${r.tnr != null ? (r.tnr * 100).toFixed(1) + '%' : '—'}` : '—'
+    if (key === 'risk')            return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Recall ${r.recall != null ? (r.recall * 100).toFixed(1) + '%' : '—'}` : '—'
+    if (key === 'prohibited')      return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Recall ${r.recall != null ? (r.recall * 100).toFixed(1) + '%' : '—'}` : '—'
     return '—'
   }
 
@@ -487,6 +537,67 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
                       <p className="text-xs text-amber-600 mt-1">
                         Weak: {Object.keys(r.weak_labels).join(', ')}
                       </p>
+                    )}
+                    {key === 'actor' && r.n_samples != null && (
+                      <p className="text-xs text-slate-400 mt-1">
+                        {r.n_samples} gold docs · {r.mode === 'with_ml' ? 'pattern + ML' : 'pattern only'}
+                      </p>
+                    )}
+                    {key === 'applicability' && r.by_outcome && (
+                      <p className="text-xs text-slate-400 mt-1">
+                        High-risk recall{' '}
+                        {r.by_outcome.high_risk?.recall != null
+                          ? `${(r.by_outcome.high_risk.recall * 100).toFixed(0)}%`
+                          : '—'}
+                        {' · '}
+                        {r.n_samples} examples
+                      </p>
+                    )}
+                    {key === 'evidence_mapper' && r.balanced_accuracy != null && (
+                      <p className="text-xs text-slate-400 mt-1">
+                        Balanced acc. {(r.balanced_accuracy * 100).toFixed(1)}%
+                        {r.n_errors != null && r.n_errors > 0 && (
+                          <span className="text-amber-600"> · {r.n_errors} misses</span>
+                        )}
+                      </p>
+                    )}
+                    {key === 'risk' && r.tnr != null && (
+                      <p className="text-xs text-slate-400 mt-1">
+                        Specificity {(r.tnr * 100).toFixed(1)}%
+                        {' · '}
+                        {r.n_samples ?? '—'} gold docs
+                        {r.f1 != null && <span> · F1 {(r.f1 * 100).toFixed(1)}%</span>}
+                      </p>
+                    )}
+                    {key === 'prohibited' && r.tnr != null && (
+                      <p className="text-xs text-slate-400 mt-1">
+                        Specificity {(r.tnr * 100).toFixed(1)}%
+                        {' · '}
+                        {r.n_samples ?? '—'} gold docs
+                        {r.f1 != null && <span> · F1 {(r.f1 * 100).toFixed(1)}%</span>}
+                      </p>
+                    )}
+                    {hasDetails(r) && (
+                      <button
+                        onClick={() => toggle(key)}
+                        className="mt-3 flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium"
+                      >
+                        <svg
+                          className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded[key] ? 'rotate-180' : ''}`}
+                          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                        {expanded[key] ? 'Hide' : 'Show'} breakdown
+                      </button>
+                    )}
+                    {expanded[key] && hasDetails(r) && (
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        {r.per_class && <EvalPerClassDetail data={r.per_class} />}
+                        {r.per_label && <EvalPerLabelDetail data={r.per_label} />}
+                        {r.by_outcome && <EvalByOutcomeDetail data={r.by_outcome} />}
+                        {r.checks && <EvalChecksDetail data={r.checks} articleScores={r.article_scores} />}
+                      </div>
                     )}
                   </div>
               }
@@ -754,6 +865,145 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
   )
 }
 
+
+function EvalPerClassDetail({ data }: {
+  data: Record<string, { precision: number; recall: number; f1: number; support?: number }>
+}) {
+  const entries = Object.entries(data)
+  const hasSupport = entries.some(([, m]) => m.support !== undefined)
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+          <th className="pb-1.5">Class</th>
+          <th className="pb-1.5 text-center">P</th>
+          <th className="pb-1.5 text-center">R</th>
+          <th className="pb-1.5 text-center">F1</th>
+          {hasSupport && <th className="pb-1.5 text-center">N</th>}
+        </tr>
+      </thead>
+      <tbody>
+        {entries.map(([cls, m]) => {
+          const color = m.f1 >= 0.85 ? 'text-emerald-600' : m.f1 >= 0.70 ? 'text-amber-600' : 'text-red-600'
+          return (
+            <tr key={cls} className="border-b border-slate-50 last:border-0">
+              <td className="py-1 text-slate-600 capitalize font-medium">{cls.replace(/_/g, ' ')}</td>
+              <td className="py-1 text-center text-slate-500 tabular-nums">{(m.precision * 100).toFixed(0)}%</td>
+              <td className="py-1 text-center text-slate-500 tabular-nums">{(m.recall * 100).toFixed(0)}%</td>
+              <td className={`py-1 text-center font-bold tabular-nums ${color}`}>{(m.f1 * 100).toFixed(1)}%</td>
+              {hasSupport && <td className="py-1 text-center text-slate-400 tabular-nums">{m.support}</td>}
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
+function EvalPerLabelDetail({ data }: {
+  data: Record<string, { precision: number; recall: number; f1: number; tp: number; fp: number; fn: number }>
+}) {
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+          <th className="pb-1.5">Label</th>
+          <th className="pb-1.5 text-center">F1</th>
+          <th className="pb-1.5 text-center">TP</th>
+          <th className="pb-1.5 text-center">FP</th>
+          <th className="pb-1.5 text-center">FN</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Object.entries(data).map(([lbl, m]) => {
+          const color = m.f1 >= 0.80 ? 'text-emerald-600' : m.f1 >= 0.60 ? 'text-amber-600' : 'text-red-600'
+          return (
+            <tr key={lbl} className="border-b border-slate-50 last:border-0">
+              <td className="py-1">
+                <code className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">{lbl}</code>
+              </td>
+              <td className={`py-1 text-center font-bold tabular-nums ${color}`}>{(m.f1 * 100).toFixed(1)}%</td>
+              <td className="py-1 text-center text-emerald-600 tabular-nums">{m.tp}</td>
+              <td className="py-1 text-center text-red-500 tabular-nums">{m.fp}</td>
+              <td className="py-1 text-center text-amber-600 tabular-nums">{m.fn}</td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
+function EvalByOutcomeDetail({ data }: { data: NonNullable<EvalResult['by_outcome']> }) {
+  return (
+    <div className="space-y-1.5">
+      {data.prohibited && (
+        <div className="flex justify-between items-baseline text-xs">
+          <span className="text-slate-600 font-medium">Prohibited</span>
+          <span className="text-slate-500 tabular-nums">
+            Recall {(data.prohibited.recall * 100).toFixed(0)}%
+            {' · '}F1 {(data.prohibited.f1 * 100).toFixed(0)}%
+            {' · '}{data.prohibited.n_examples} examples
+          </span>
+        </div>
+      )}
+      {data.high_risk && (
+        <div className="flex justify-between items-baseline text-xs">
+          <span className="text-slate-600 font-medium">High-risk</span>
+          <span className="text-slate-500 tabular-nums">
+            Recall {(data.high_risk.recall * 100).toFixed(0)}%
+            {' · '}F1 {(data.high_risk.f1 * 100).toFixed(0)}%
+            {' · '}{data.high_risk.n_examples} examples
+          </span>
+        </div>
+      )}
+      {data.minimal && (
+        <div className="flex justify-between items-baseline text-xs">
+          <span className="text-slate-600 font-medium">Minimal</span>
+          <span className="text-slate-500 tabular-nums">
+            {data.minimal.n_correct}/{data.minimal.n_examples} correct
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EvalChecksDetail({ data, articleScores }: {
+  data: Record<string, boolean>
+  articleScores?: Record<string, number>
+}) {
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+        {Object.entries(data).map(([check, passed]) => (
+          <div key={check} className="flex items-center gap-1 text-xs">
+            <span className={passed ? 'text-emerald-500' : 'text-red-500'}>{passed ? '✓' : '✗'}</span>
+            <span className={`${passed ? 'text-slate-600' : 'text-red-600'} truncate`}>
+              {check.replace(/_/g, ' ')}
+            </span>
+          </div>
+        ))}
+      </div>
+      {articleScores && Object.keys(articleScores).length > 0 && (
+        <div className="mt-2 pt-2 border-t border-slate-100">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Article Scores</p>
+          <div className="flex gap-3 flex-wrap">
+            {Object.entries(articleScores).map(([art, score]) => {
+              const color = score >= 75 ? 'text-emerald-600' : score >= 50 ? 'text-amber-600' : 'text-red-600'
+              return (
+                <div key={art} className="text-center">
+                  <div className={`text-sm font-bold tabular-nums ${color}`}>{score}%</div>
+                  <div className="text-[10px] text-slate-400">Art. {art}</div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function NerMetricsSection({ data }: { data: NerMetricsData }) {
   const theme = data.overall_f1 >= 0.80

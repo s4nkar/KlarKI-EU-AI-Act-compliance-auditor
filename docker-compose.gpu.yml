@@ -25,3 +25,15 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+
+  klarki-test:
+    build:
+      args:
+        USE_GPU: "1"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

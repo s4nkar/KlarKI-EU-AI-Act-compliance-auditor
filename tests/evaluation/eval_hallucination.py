@@ -17,8 +17,13 @@ regulatory text.  This eval enforces three rules:
       Recommendations must reference a regulatory concept
       (checked via keyword matching against a known vocabulary).
 
-The eval uses the same synthetic document as eval_pipeline.py so it can
-reuse cached results when available.
+Uses proposition_chunk_text (the production chunker) so the chunking
+strategy matches what the real pipeline produces.
+
+applicable_articles is intentionally passed as None to analyse_article
+so all 7 articles run through LangGraph — the goal here is to verify
+LLM output quality across every article, independent of whether a given
+document would trigger the applicability gate.
 
 Requires: Ollama + ChromaDB running.
 
@@ -32,7 +37,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -111,22 +115,22 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
     import os
 
     try:
-        from services.chunker           import chunk_text
+        from services.chunker           import proposition_chunk_text
         from services.language_detector import detect_language
         from services.classifier        import classify_chunks
         from services.embedding_service import EmbeddingService
         from services.chroma_client     import ChromaClient
-        from services.rag_engine        import retrieve_requirements
+        from services.rag_engine        import retrieve_requirements, build_bm25_index
         from services.gap_analyser      import analyse_article
         from services.ollama_client     import OllamaClient
         from models.schemas             import ArticleDomain
     except ImportError as e:
         return _skip(f"Cannot import API services: {e}")
 
-    ollama_host = os.getenv("OLLAMA_HOST", "localhost")
-    chroma_host = os.getenv("CHROMADB_HOST", "localhost")
+    ollama_host  = os.getenv("OLLAMA_HOST",  "localhost")
+    chroma_host  = os.getenv("CHROMADB_HOST", "localhost")
+    ollama_model = os.getenv("OLLAMA_MODEL",  "phi3:mini")
 
-    ollama_model = os.getenv("OLLAMA_MODEL", "phi3:mini")
     ollama = OllamaClient(host=ollama_host, model=ollama_model)
     chroma = ChromaClient(host=chroma_host)
     try:
@@ -138,9 +142,17 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
 
     emb = EmbeddingService()
 
-    # Run a minimal pipeline to get ArticleScores
-    chunks     = await chunk_text(SYNTHETIC_DOCUMENT, source_file="hallucination_test.txt")
+    # Use the production chunker so chunking matches what the real pipeline produces
+    chunks = await proposition_chunk_text(SYNTHETIC_DOCUMENT, source_file="hallucination_test.txt")
+
+    lang = await detect_language(SYNTHETIC_DOCUMENT)
+    for chunk in chunks:
+        chunk.language = lang
+
     classified = await classify_chunks(chunks, ollama)
+
+    # Build BM25 index so hybrid retrieval works (built at app startup in production)
+    await build_bm25_index(chroma)
 
     ARTICLE_DOMAINS = {
         9:  ArticleDomain.RISK_MANAGEMENT,
@@ -161,13 +173,31 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
         passages: list[dict] = []
         for chunk in art_chunks[:3]:
             try:
-                retrieved = await retrieve_requirements(chunk, emb, chroma, top_k=5)
+                # No applicable_articles filter — hallucination eval deliberately
+                # runs LangGraph on all 7 articles to test LLM output quality
+                # regardless of the applicability gate outcome.
+                retrieved = await retrieve_requirements(
+                    chunk=chunk,
+                    embedding_service=emb,
+                    chroma_client=chroma,
+                    top_k=5,
+                    regulation="eu_ai_act",
+                )
                 passages.extend(retrieved)
             except Exception:
                 pass
 
         try:
-            score = await analyse_article(art_num, domain, art_chunks, passages, ollama)
+            # applicable_articles=None so all articles enter LangGraph —
+            # this eval tests citation quality, not the applicability gate.
+            score = await analyse_article(
+                article_num=art_num,
+                domain=domain,
+                user_chunks=art_chunks,
+                regulatory_passages=passages,
+                ollama=ollama,
+                applicable_articles=None,
+            )
         except Exception as ex:
             if verbose:
                 print(f"  gap analysis failed for Article {art_num}: {ex}")
@@ -177,18 +207,20 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
         all_violations.extend(violations)
 
         article_results[art_num] = {
-            "gaps":             len(score.gaps),
-            "recommendations":  len(score.recommendations),
-            "passages":         len(score.regulatory_passages),
-            "chunk_count":      score.chunk_count,
-            "violations":       violations,
+            "gaps":            len(score.gaps),
+            "recommendations": len(score.recommendations),
+            "passages":        len(score.regulatory_passages),
+            "chunk_count":     score.chunk_count,
+            "violations":      violations,
         }
 
         if verbose:
             icon = "✓" if not violations else "✗"
-            print(f"  {icon} Article {art_num}: {len(score.gaps)} gaps, {len(score.regulatory_passages)} passages, {len(violations)} violations")
+            print(f"  {icon} Article {art_num}: {len(score.gaps)} gaps, "
+                  f"{len(score.regulatory_passages)} passages, "
+                  f"{len(violations)} violations")
 
-    # Citation rate: fraction of articles that *had user chunks* and retrieved passages.
+    # Citation rate: fraction of articles that had user chunks and retrieved passages.
     # Articles with no classified chunks are excluded — they never trigger RAG.
     articles_with_chunks = [v for v in article_results.values() if v["chunk_count"] > 0]
     citation_rate = (
@@ -196,7 +228,6 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
         / max(len(articles_with_chunks), 1)
     )
 
-    status: str
     if strict:
         status = "pass" if not all_violations else "fail"
     else:
@@ -205,13 +236,13 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
         )
 
     results = {
-        "eval":              "hallucination",
-        "status":            status,
-        "citation_rate":     round(citation_rate, 4),
-        "total_violations":  len(all_violations),
-        "violations":        all_violations,
-        "article_results":   article_results,
-        "strict_mode":       strict,
+        "eval":                    "hallucination",
+        "status":                  status,
+        "citation_rate":           round(citation_rate, 4),
+        "total_violations":        len(all_violations),
+        "violations":              all_violations,
+        "article_results":         article_results,
+        "strict_mode":             strict,
         "threshold_citation_rate": 0.90,
     }
 
@@ -255,7 +286,7 @@ def print_report(r: dict) -> None:
               f"violations={len(info['violations'])}")
 
 
-# ── pytest ─────────────────────────────────────────────────────────────────
+# ── pytest ──────────────────────────────────────────────────────────────────
 
 def test_no_ungrounded_gaps() -> None:
     """pytest: All articles must have ≥ 1 regulatory passage (no ungrounded gaps)."""
@@ -264,7 +295,7 @@ def test_no_ungrounded_gaps() -> None:
         import pytest
         pytest.skip(r.get("reason", ""))
     ungrounded = [v for v in r.get("violations", []) if "ungrounded" in v]
-    assert not ungrounded, f"Ungrounded gaps detected:\n" + "\n".join(ungrounded)
+    assert not ungrounded, "Ungrounded gaps detected:\n" + "\n".join(ungrounded)
 
 
 def test_gap_content_quality() -> None:
@@ -274,7 +305,7 @@ def test_gap_content_quality() -> None:
         import pytest
         pytest.skip(r.get("reason", ""))
     quality_failures = [v for v in r.get("violations", []) if "description" in v or "title" in v]
-    assert not quality_failures, f"Gap content quality failures:\n" + "\n".join(quality_failures)
+    assert not quality_failures, "Gap content quality failures:\n" + "\n".join(quality_failures)
 
 
 def test_citation_rate_above_90() -> None:
@@ -289,7 +320,7 @@ def test_citation_rate_above_90() -> None:
     )
 
 
-# ── CLI ────────────────────────────────────────────────────────────────────
+# ── CLI ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Hallucination and citation verification")
