@@ -220,6 +220,78 @@ _CATEGORY_NAMES: dict[AnnexIIICategory, str] = {
 
 _ARTICLES_9_TO_15 = [9, 10, 11, 12, 13, 14, 15]
 
+# ── GDPR applicability patterns ───────────────────────────────────────────────
+# Base trigger: any mention of personal data processing → Arts 5, 6, 24, 25, 30, 32
+_GDPR_BASE_PATTERNS: list[tuple[str, str]] = [
+    (r"\bpersonal\s+data\b", "personal data"),
+    (r"\bpersonal\s+information\b", "personal information"),
+    (r"\bpersonenbezogene\s+Daten\b", "personenbezogene Daten (DE)"),
+    (r"\bdata\s+subject[s]?\b", "data subjects"),
+    (r"\bbetroffene\s+Person(?:en)?\b", "betroffene Person (DE)"),
+    (r"\bGDPR\b|\bDSGVO\b", "GDPR/DSGVO reference"),
+    (r"\bdata\s+protection\b", "data protection"),
+    (r"\bDatenschutz\b", "Datenschutz (DE)"),
+    # Special-category data inherently involves personal data (GDPR Recital 51)
+    (r"\bhealth\s+data\b|\bGesundheitsdaten\b", "health data (special category)"),
+    (r"\bmedical\s+record[s]?\b|\bKrankenakte[n]?\b", "medical records (special category)"),
+    (r"\bbiometric\s+data\b|\bbiometrische\s+Daten\b", "biometric data (special category)"),
+    # Profiling is defined by GDPR Art. 4(4) as personal data processing
+    (r"\bprofiling\b|\bProfilbildung\b", "profiling (Art. 4(4))"),
+]
+
+# Special categories (Art 9) trigger
+_GDPR_SPECIAL_CATEGORY_PATTERNS: list[tuple[str, str]] = [
+    (r"\bhealth\s+data\b|\bGesundheitsdaten\b", "health data"),
+    (r"\bbiometric\s+data\b|\bbiometrische\s+Daten\b", "biometric data"),
+    (r"\bgenetic\s+data\b|\bgenetische\s+Daten\b", "genetic data"),
+    (r"\bracial\s+origin\b|\bethnische\s+Herkunft\b", "racial/ethnic origin"),
+    (r"\bpolitical\s+opinion[s]?\b|\bpolitische\s+Meinung\b", "political opinions"),
+]
+
+# Automated decision-making (Art 22) trigger
+_GDPR_AUTOMATED_DECISION_PATTERNS: list[tuple[str, str]] = [
+    (r"\bautomated\s+decision(?:[-\s]making)?\b", "automated decision-making"),
+    (r"\bautomatisierte\s+Entscheidung\b", "automatisierte Entscheidung (DE)"),
+    (r"\bprofiling\b", "profiling"),
+    (r"\balgorithmic\s+decision\b", "algorithmic decision"),
+    (r"\bautomated\s+processing.*\bsignificant\s+effect\b", "automated processing with significant effect"),
+]
+
+# DPIA (Art 35) trigger
+_GDPR_DPIA_PATTERNS: list[tuple[str, str]] = [
+    (r"\bdata\s+protection\s+impact\s+assessment\b|\bDPIA\b", "DPIA"),
+    (r"\bDatenschutz-Folgenabschätzung\b|\bDSFA\b", "DSFA (DE)"),
+    (r"\bhigh\s+risk.*\bprocessing\b", "high-risk processing"),
+    (r"\bsystematic.*\bmonitoring\b", "systematic monitoring"),
+]
+
+
+def _check_gdpr_applicability(full_text: str) -> list[int]:
+    """Return GDPR article numbers that apply based on personal data signals.
+
+    Base articles (5, 6, 13, 24, 25, 30, 32) apply whenever personal data
+    processing is detected. Additional articles are triggered by specific signals.
+    """
+    base_hit = any(
+        re.search(pattern, full_text, re.IGNORECASE)
+        for pattern, _ in _GDPR_BASE_PATTERNS
+    )
+    if not base_hit:
+        return []
+
+    articles = [5, 6, 13, 24, 25, 30, 32]
+
+    if any(re.search(p, full_text, re.IGNORECASE) for p, _ in _GDPR_SPECIAL_CATEGORY_PATTERNS):
+        articles.append(9)
+
+    if any(re.search(p, full_text, re.IGNORECASE) for p, _ in _GDPR_AUTOMATED_DECISION_PATTERNS):
+        articles.append(22)
+
+    if any(re.search(p, full_text, re.IGNORECASE) for p, _ in _GDPR_DPIA_PATTERNS):
+        articles.append(35)
+
+    return sorted(set(articles))
+
 
 def _load_obligations() -> dict[int, dict]:
     """Load Article 6 + Annex III obligation schemas keyed by annex_category."""
@@ -278,6 +350,7 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
             annex_iii_matches=[],
             annex_i_triggered=False,
             applicable_articles=[5],
+            gdpr_applicable_articles=_check_gdpr_applicability(full_text),
             reasoning=(
                 f"PROHIBITED PRACTICE DETECTED under Article 5. "
                 f"Signals found: {', '.join(prohibited_hits)}. "
@@ -352,6 +425,7 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
         )
 
     applicable_articles = _ARTICLES_9_TO_15 if is_high_risk else []
+    gdpr_applicable_articles = _check_gdpr_applicability(full_text)
 
     logger.info(
         "applicability_check_complete",
@@ -359,6 +433,7 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
         is_prohibited=False,
         annex_iii_categories=[m.category.value for m in annex_iii_matches],
         annex_i_triggered=annex_i_triggered,
+        gdpr_articles=gdpr_applicable_articles,
     )
 
     return ApplicabilityResult(
@@ -367,5 +442,6 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
         annex_iii_matches=annex_iii_matches,
         annex_i_triggered=annex_i_triggered,
         applicable_articles=applicable_articles,
+        gdpr_applicable_articles=gdpr_applicable_articles,
         reasoning=" ".join(reasoning_parts),
     )

@@ -219,3 +219,134 @@ def test_overall_coverage_bounded():
     chunks = [_chunk("General compliance framework text without specific evidence artefacts.")]
     result = map_evidence(chunks, ActorType.DEPLOYER, applicable_articles=[9])
     assert 0.0 <= result.overall_coverage <= 1.0
+
+
+# ── GDPR regulation-aware evidence mapping ────────────────────────────────────
+
+
+def test_gdpr_obligations_included_when_gdpr_articles_provided():
+    """map_evidence returns GDPR items when gdpr_applicable_articles is non-empty."""
+    from models.schemas import ActorType
+    from services.evidence_mapper import map_evidence, _load_all_obligations
+
+    if not _load_all_obligations():
+        pytest.skip("No obligation JSONL files found — run ./run.sh setup first.")
+
+    chunks = [_chunk("We collect personal data and process it lawfully. Data governance documentation is maintained.")]
+    result = map_evidence(
+        chunks,
+        ActorType.DEPLOYER,
+        applicable_articles=[],
+        gdpr_applicable_articles=[5, 6, 24, 25, 30],
+    )
+    gdpr_items = [i for i in result.items if i.regulation == "gdpr"]
+    assert len(gdpr_items) > 0
+
+
+def test_no_gdpr_items_when_gdpr_articles_empty():
+    """map_evidence returns no GDPR items when gdpr_applicable_articles is empty."""
+    from models.schemas import ActorType
+    from services.evidence_mapper import map_evidence, _load_all_obligations
+
+    if not _load_all_obligations():
+        pytest.skip("No obligation JSONL files found — run ./run.sh setup first.")
+
+    chunks = [_chunk("We have risk documentation and technical files.")]
+    result = map_evidence(
+        chunks,
+        ActorType.PROVIDER,
+        applicable_articles=[9, 10],
+        gdpr_applicable_articles=[],
+    )
+    gdpr_items = [i for i in result.items if i.regulation == "gdpr"]
+    assert gdpr_items == []
+
+
+def test_evidence_item_regulation_field_is_set():
+    """Every EvidenceItem has a non-empty regulation field."""
+    from models.schemas import ActorType
+    from services.evidence_mapper import map_evidence, _load_all_obligations
+
+    if not _load_all_obligations():
+        pytest.skip("No obligation JSONL files found — run ./run.sh setup first.")
+
+    chunks = [_chunk("Risk register and technical documentation are available.")]
+    result = map_evidence(
+        chunks,
+        ActorType.PROVIDER,
+        applicable_articles=[9, 11],
+        gdpr_applicable_articles=[5, 6],
+    )
+    for item in result.items:
+        assert item.regulation in ("eu_ai_act", "gdpr"), (
+            f"Unexpected regulation value '{item.regulation}' on {item.obligation_id}"
+        )
+
+
+def test_no_article_number_collision_gdpr_vs_aiact_article_5():
+    """GDPR Art. 5 obligations must not appear in EU AI Act applicable_articles context.
+
+    A document with only GDPR Art. 5 applicable (no EU AI Act Art. 5 / prohibited
+    practices) must return no EU AI Act obligation items for article 5.
+    """
+    from models.schemas import ActorType
+    from services.evidence_mapper import map_evidence, _load_all_obligations
+
+    if not _load_all_obligations():
+        pytest.skip("No obligation JSONL files found — run ./run.sh setup first.")
+
+    chunks = [_chunk("We process personal data in accordance with GDPR principles.")]
+    # Provide ONLY GDPR articles — no EU AI Act Art. 5 in applicable_articles
+    result = map_evidence(
+        chunks,
+        ActorType.DEPLOYER,
+        applicable_articles=[],          # EU AI Act: nothing
+        gdpr_applicable_articles=[5, 6], # GDPR: Arts 5 and 6
+    )
+    # All items should be gdpr, none should be eu_ai_act for article "Article 5"
+    eu_act_art5_items = [
+        i for i in result.items
+        if i.regulation == "eu_ai_act" and i.article == "Article 5"
+    ]
+    gdpr_art5_items = [
+        i for i in result.items
+        if i.regulation == "gdpr" and i.article == "Article 5"
+    ]
+    assert eu_act_art5_items == [], "EU AI Act Art. 5 obligations leaked into GDPR-only result"
+    assert len(gdpr_art5_items) > 0, "Expected GDPR Art. 5 items but found none"
+
+
+def test_both_regulations_appear_in_combined_map():
+    """When both EU AI Act and GDPR articles are provided, items from both appear."""
+    from models.schemas import ActorType
+    from services.evidence_mapper import map_evidence, _load_all_obligations
+
+    if not _load_all_obligations():
+        pytest.skip("No obligation JSONL files found — run ./run.sh setup first.")
+
+    chunks = [_chunk("Risk register, technical documentation, data governance documentation.")]
+    result = map_evidence(
+        chunks,
+        ActorType.DEPLOYER,
+        applicable_articles=[9, 12, 14],
+        gdpr_applicable_articles=[5, 6, 24, 30],
+    )
+    regulations = {i.regulation for i in result.items}
+    assert "eu_ai_act" in regulations
+    assert "gdpr" in regulations
+
+
+def test_empty_both_articles_returns_zero_map():
+    """Both applicable_articles=[] and gdpr_applicable_articles=[] → empty map."""
+    from models.schemas import ActorType
+    from services.evidence_mapper import map_evidence
+
+    chunks = [_chunk("We have all required documentation.")]
+    result = map_evidence(
+        chunks,
+        ActorType.PROVIDER,
+        applicable_articles=[],
+        gdpr_applicable_articles=[],
+    )
+    assert result.total_obligations == 0
+    assert result.items == []

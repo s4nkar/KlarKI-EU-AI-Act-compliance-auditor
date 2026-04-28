@@ -276,3 +276,83 @@ def test_result_always_has_reasoning():
     result = _run("Our AI assists with product recommendations on our e-commerce website.")
     assert isinstance(result.reasoning, str)
     assert len(result.reasoning) > 10
+
+
+# ── GDPR applicability gate ───────────────────────────────────────────────────
+
+
+def test_gdpr_gate_fires_on_personal_data():
+    """Document mentioning personal data processing → gdpr_applicable_articles non-empty."""
+    result = _run(
+        "We collect and process personal data from our users, including names, "
+        "email addresses and usage history. A data protection officer oversees "
+        "our data processing activities."
+    )
+    assert len(result.gdpr_applicable_articles) > 0
+    assert 5 in result.gdpr_applicable_articles
+    assert 6 in result.gdpr_applicable_articles
+
+
+def test_gdpr_gate_returns_empty_for_no_personal_data():
+    """Document with no personal-data signals → gdpr_applicable_articles empty."""
+    result = _run(
+        "This AI system analyses satellite imagery to predict crop yields. "
+        "It processes only anonymised field sensor readings and weather data."
+    )
+    assert result.gdpr_applicable_articles == []
+
+
+def test_gdpr_special_categories_trigger_article_9():
+    """Document mentioning health data or biometric data → GDPR Article 9 included."""
+    result = _run(
+        "Our system processes health data and medical records of patients "
+        "to predict disease risk. Biometric data is collected for authentication."
+    )
+    assert 9 in result.gdpr_applicable_articles
+
+
+def test_gdpr_automated_decision_triggers_article_22():
+    """Document mentioning automated decision-making → GDPR Article 22 included."""
+    result = _run(
+        "The platform makes automated decisions about loan approvals using AI profiling. "
+        "Decisions are made solely by the automated system without human review."
+    )
+    assert 22 in result.gdpr_applicable_articles
+
+
+def test_gdpr_dpia_signals_trigger_article_35():
+    """Document mentioning data protection impact assessment → GDPR Article 35 included."""
+    result = _run(
+        "We conducted a data protection impact assessment (DPIA) before deploying "
+        "the AI system due to the high-risk nature of the processing activities."
+    )
+    assert 35 in result.gdpr_applicable_articles
+
+
+def test_gdpr_no_article_number_collision_with_aiact_article_5():
+    """GDPR Art. 5 and EU AI Act Art. 5 must not cross-contaminate.
+
+    A document containing ONLY personal data signals (not prohibited AI practices)
+    should have GDPR Art. 5 in gdpr_applicable_articles but is_prohibited=False
+    and EU AI Act Art. 5 must NOT appear in applicable_articles.
+    """
+    result = _run(
+        "Our platform processes personal data including names and contact details. "
+        "All processing is lawful under GDPR Article 6(1)(b) — contractual necessity. "
+        "Data is not retained longer than necessary."
+    )
+    assert result.is_prohibited is False
+    # 5 should not appear in the EU AI Act applicable_articles
+    assert 5 not in result.applicable_articles
+    # GDPR Art. 5 (data principles) should be in the GDPR list
+    assert 5 in result.gdpr_applicable_articles
+
+
+def test_gdpr_base_articles_always_included_with_personal_data():
+    """Personal data signals always include the GDPR base set: 5, 6, 24, 25, 30."""
+    result = _run(
+        "The system collects personal information about end users including their "
+        "location history and device identifiers for personalisation purposes."
+    )
+    base = {5, 6, 24, 25, 30}
+    assert base.issubset(set(result.gdpr_applicable_articles))

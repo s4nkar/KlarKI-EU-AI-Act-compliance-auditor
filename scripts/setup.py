@@ -316,8 +316,8 @@ def stage_knowledge_base(args: argparse.Namespace) -> bool:
 
 
 def stage_build_graph(args: argparse.Namespace) -> bool:
-    """Stage 2.5 - Generate JSONL Knowledge Graph from raw text via Ollama."""
-    step("Building structured Knowledge Graph via Ollama")
+    """Stage 2.5 - Write deterministic obligation JSONL files from hardcoded legal text."""
+    step("Building structured obligation JSONL (deterministic, no Ollama)")
     graph_dir = ROOT / "data" / "obligations"
     
     if not args.gen_overwrite and not args.dry_run and graph_dir.exists() and any(graph_dir.glob("*/*.jsonl")):

@@ -5,9 +5,17 @@ sends to Ollama with the gap_analysis.txt prompt, parses the JSON response
 into an ArticleScore with GapItems and recommendations.
 """
 
+import asyncio
 from pathlib import Path
 
 import structlog
+
+# Ollama is single-threaded on CPU — running 7 concurrent LangGraph chains
+# (21 simultaneous LLM calls) causes later calls to timeout unpredictably,
+# producing non-deterministic scores across runs. Serialise all graph.ainvoke()
+# calls so they queue rather than race. A Semaphore > 1 can be used when a
+# GPU backend is available and concurrency is safe.
+_LLM_SEMAPHORE = asyncio.Semaphore(1)
 
 from models.schemas import (
     ArticleDomain,
@@ -142,7 +150,8 @@ async def analyse_article(
     }
 
     try:
-        final_state = await graph.ainvoke(initial_state)
+        async with _LLM_SEMAPHORE:
+            final_state = await graph.ainvoke(initial_state)
     except Exception as exc:
         logger.error("gap_langgraph_failed", article_num=article_num, error=str(exc))
         # Fallback: return partial score without LLM analysis
