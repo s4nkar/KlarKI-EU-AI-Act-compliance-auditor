@@ -49,6 +49,7 @@ export interface ApplicabilityResult {
   annex_iii_matches: AnnexIIIMatch[]
   annex_i_triggered: boolean
   applicable_articles: number[]
+  gdpr_applicable_articles: number[]
   reasoning: string
 }
 
@@ -56,6 +57,7 @@ export interface ApplicabilityResult {
 
 export interface EvidenceItem {
   obligation_id: string
+  regulation: string
   article: string
   requirement: string
   evidence_required: string[]
