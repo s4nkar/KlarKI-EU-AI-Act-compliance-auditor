@@ -46,12 +46,13 @@ async def legal_agent_node(state: AuditState) -> dict:
     _t0 = time.time()
     _error = False
 
-    reg_text = "\n\n".join(
-        f"[{p['metadata'].get('title', p['metadata'].get('requirement_id', ''))}]\n{p['text']}"
-        for p in state["regulatory_passages"][:8]
-    ) or "(no regulatory passages retrieved)"
-    
-    prompt = f"""You are a Legal Expert Agent analyzing the EU AI Act.
+    try:
+        reg_text = "\n\n".join(
+            f"[{p.get('metadata', {}).get('title', p.get('metadata', {}).get('requirement_id', ''))}]\n{p.get('text', '')}"
+            for p in state["regulatory_passages"][:8]
+        ) or "(no regulatory passages retrieved)"
+
+        prompt = f"""You are a Legal Expert Agent analyzing the EU AI Act.
 Extract a precise checklist of strict, actionable requirements from these regulatory passages for Article {state['article_num']}.
 Output a JSON array of strings, where each string is a single requirement.
 
@@ -61,7 +62,6 @@ Passages:
 Output ONLY this JSON format:
 {{"requirements": ["...", "..."]}}
 """
-    try:
         result = await state["ollama_client"].generate_json(prompt)
         reqs = result.get("requirements", [])
         if not isinstance(reqs, list):
@@ -130,8 +130,11 @@ async def synthesis_agent_node(state: AuditState) -> dict:
     if not findings:
         findings_str = "No findings could be extracted."
     else:
-        findings_str = "\n".join(f"[{req}]: {finding}" for req, finding in findings.items())
-    
+        # Truncate each finding to 300 chars to keep the prompt within the
+        # 2048-token Ollama context window (phi3:mini fails silently on overflow).
+        lines = [f"[{req[:80]}]: {str(finding)[:300]}" for req, finding in findings.items()]
+        findings_str = "\n".join(lines[:15])  # cap at 15 requirements
+
     prompt = f"""You are a Synthesis Agent compiling a compliance report for Article {state['article_num']}.
 Based on the Technical Agent's findings, generate a structured Gap Analysis JSON.
 Assign an overall score (0-100), identify gaps with severities (critical, major, minor), and provide actionable recommendations.
@@ -150,22 +153,26 @@ Output ONLY this JSON format:
 }}
 """
     try:
-        result = await state["ollama_client"].generate_json(prompt)
-        
+        # keep_alive="0" unloads the model immediately after this call so the
+        # NLI cross-encoder (loaded by evidence_mapper) has room in system RAM.
+        result = await state["ollama_client"].generate_json(prompt, keep_alive="0")
+
         score = float(result.get("score", 50.0))
         reasoning = str(result.get("reasoning", ""))
         gaps = result.get("gaps", [])
         recs = result.get("recommendations", [])
-        
+
         if not isinstance(gaps, list): gaps = []
         if not isinstance(recs, list): recs = []
-        
+
     except Exception as e:
         logger.warning("synthesis_agent_error", error=str(e))
-        score = 50.0
-        reasoning = "Synthesis failed."
-        gaps = []
-        recs = []
+        score = 30.0
+        reasoning = "LangGraph analysis failed — manual review required."
+        gaps = [{"title": "Analysis failed — review manually",
+                 "description": f"Gap analysis could not be completed: {str(e)[:200]}",
+                 "severity": "major"}]
+        recs = ["Retry the audit or review documentation manually."]
         _error = True
 
     _monitor.record_graph_node("synthesis_agent", time.time() - _t0, error=_error)

@@ -106,15 +106,22 @@ async def score_audit(
 
     # Phase 3: average only applicable articles so minimal-risk systems are not
     # penalised for Articles 9–15 they do not need to satisfy.
-    if applicability is not None and applicability.applicable_articles:
-        scored_applicable = [
-            s for s in final_scores
-            if s.article_num in applicability.applicable_articles
-        ]
-        overall = (
-            sum(s.score for s in scored_applicable) / len(scored_applicable)
-            if scored_applicable else 100.0
-        )
+    # Three cases:
+    #   applicability is None          → no Phase 3 info, fall back to 7-article average
+    #   applicable_articles is empty   → minimal risk, nothing applies → 100 %
+    #   applicable_articles non-empty  → average only those articles
+    if applicability is not None:
+        if not applicability.applicable_articles:
+            overall = 100.0
+        else:
+            scored_applicable = [
+                s for s in final_scores
+                if s.article_num in applicability.applicable_articles
+            ]
+            overall = (
+                sum(s.score for s in scored_applicable) / len(scored_applicable)
+                if scored_applicable else 100.0
+            )
     else:
         overall = sum(s.score for s in final_scores) * _ARTICLE_WEIGHT
 
@@ -139,10 +146,14 @@ async def score_audit(
         confidences.append(actor.confidence)
         
     # 2. Evidence map density
-    if evidence_map is not None and evidence_map.total_obligations > 0:
-        # A very sparse document might mean poor mapping or actual non-compliance
-        # We weigh it lightly
-        confidences.append(0.5 + (evidence_map.overall_coverage / 2))
+    if evidence_map is not None:
+        if evidence_map.total_obligations > 0:
+            confidences.append(0.5 + (evidence_map.overall_coverage / 2))
+        elif applicability is not None and applicability.is_high_risk:
+            # High-risk system but obligation files returned 0 matches —
+            # treat as neutral rather than dropping the component entirely,
+            # which would otherwise over-weight the actor confidence.
+            confidences.append(0.5)
         
     # 3. Chunk classification ratio
     if chunks:

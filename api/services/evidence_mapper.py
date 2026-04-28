@@ -94,6 +94,8 @@ _EVIDENCE_SYNONYMS: dict[str, list[str]] = {
         "fundamental rights impact", "FRIA", "rights impact assessment",
         "human rights assessment", "grundrechte-folgenabschätzung",
         "impact assessment fundamental rights",
+        "DPIA", "data protection impact assessment", "privacy impact assessment", "PIA",
+        "datenschutz-folgenabschätzung", "DSFA",
     ],
     "bias audit": [
         "bias audit", "bias testing", "fairness testing", "bias evaluation",
@@ -103,6 +105,8 @@ _EVIDENCE_SYNONYMS: dict[str, list[str]] = {
     "data governance documentation": [
         "data governance", "data management", "data quality", "datenverwaltung",
         "data policy", "data handling", "data documentation", "dataset documentation",
+        "records of processing", "processing activities", "data protection policy",
+        "privacy policy", "data protection framework", "datenschutzrichtlinie",
     ],
     "human oversight procedure": [
         "human oversight", "human review", "human-in-the-loop", "HITL",
@@ -113,6 +117,8 @@ _EVIDENCE_SYNONYMS: dict[str, list[str]] = {
         "transparency notice", "transparency information", "user notification",
         "disclosure notice", "AI disclosure", "transparency statement",
         "transparenzhinweis", "information notice", "system disclosure",
+        "privacy notice", "privacy policy", "data protection notice",
+        "data protection statement", "datenschutzhinweis", "datenschutzerklärung",
     ],
     "logging and audit trail": [
         "audit log", "audit trail", "logging", "event log", "system log",
@@ -246,6 +252,7 @@ def map_evidence(
     chunks: list[DocumentChunk],
     actor_type: ActorType,
     applicable_articles: list[int],
+    gdpr_applicable_articles: list[int] | None = None,
 ) -> EvidenceMap:
     """Map document chunks to legal obligation evidence requirements.
 
@@ -262,7 +269,8 @@ def map_evidence(
     Returns:
         EvidenceMap with per-obligation EvidenceItem coverage and aggregate stats.
     """
-    if not applicable_articles:
+    gdpr_articles = gdpr_applicable_articles or []
+    if not applicable_articles and not gdpr_articles:
         return EvidenceMap(
             total_obligations=0,
             fully_satisfied=0,
@@ -275,21 +283,22 @@ def map_evidence(
     all_obligations = _load_all_obligations()
     actor_str = actor_type.value
 
-    # Filter: actor must be in obligation's actor list AND article must be applicable
-    # Article number extraction: "Article 9" → 9, "Annex III" → skip article filter
     def _article_num(obligation: dict) -> int | None:
         article_str = obligation.get("article", "")
         m = re.search(r"\d+", article_str)
         return int(m.group()) if m else None
 
     def _is_applicable(ob: dict) -> bool:
-        # Actor filter
-        if actor_str not in ob.get("actor", []):
+        actor_list = ob.get("actor", [])
+        # Obligations with no actor field (e.g. Annex III category entries) apply to all actors.
+        if actor_list and actor_str not in actor_list:
             return False
-        # Article applicability filter
         art_num = _article_num(ob)
         if art_num is None:
             return True  # Annex-level obligations always apply if actor matches
+        # Route by regulation to avoid EU AI Act Art 5 / GDPR Art 5 collision
+        if ob.get("regulation") == "gdpr":
+            return art_num in gdpr_articles
         return art_num in applicable_articles
 
     applicable_obligations = [ob for ob in all_obligations if _is_applicable(ob)]
@@ -316,6 +325,7 @@ def map_evidence(
         items.append(
             EvidenceItem(
                 obligation_id=ob.get("id", ""),
+                regulation=ob.get("regulation", "eu_ai_act"),
                 article=ob.get("article", ""),
                 requirement=ob.get("requirement", ""),
                 evidence_required=evidence_required,

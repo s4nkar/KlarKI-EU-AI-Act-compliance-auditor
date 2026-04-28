@@ -47,6 +47,7 @@ Environment (defaults match .env.example):
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -65,6 +66,29 @@ except Exception:
 
 # Populated by generate stages; read by train stages to wire data_version into the model registry.
 _DATA_VERSIONS: dict[str, str] = {}
+
+
+def _min_per_class_lang(filepath: Path) -> int:
+    """Return the minimum record count for any (label, lang) pair in a JSONL file.
+
+    Used to decide whether specialist data files have enough records to skip
+    regeneration (file-existence alone is not sufficient).
+    """
+    if not filepath.exists():
+        return 0
+    counts: dict[tuple[str, str], int] = {}
+    with open(filepath, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+                key = (rec.get("label", "?"), rec.get("lang", "?"))
+                counts[key] = counts.get(key, 0) + 1
+            except json.JSONDecodeError:
+                pass
+    return min(counts.values(), default=0) if counts else 0
 
 
 def _vm_snapshot_data(data_type: str, path: Path) -> str | None:
@@ -292,8 +316,8 @@ def stage_knowledge_base(args: argparse.Namespace) -> bool:
 
 
 def stage_build_graph(args: argparse.Namespace) -> bool:
-    """Stage 2.5 - Generate JSONL Knowledge Graph from raw text via Ollama."""
-    step("Building structured Knowledge Graph via Ollama")
+    """Stage 2.5 - Write deterministic obligation JSONL files from hardcoded legal text."""
+    step("Building structured obligation JSONL (deterministic, no Ollama)")
     graph_dir = ROOT / "data" / "obligations"
     
     if not args.gen_overwrite and not args.dry_run and graph_dir.exists() and any(graph_dir.glob("*/*.jsonl")):
@@ -455,18 +479,46 @@ def stage_train_ner(args: argparse.Namespace) -> bool:
 def stage_generate_specialist_data(args: argparse.Namespace) -> bool:
     """Stage 3.5 - generate specialist classifier training data (actor / risk / prohibited).
 
-    Auto-skips if all three JSONL files already exist with sufficient records.
-    Pass --gen-overwrite to force regeneration.
+    Two-step pipeline:
+      1. Weak supervision (deterministic, no Ollama) — extracts labeled sentences
+         from data/regulatory/**/*.txt using regex pattern matching.
+      2. LLM augmentation (Ollama) — generates additional synthetic examples to
+         reach --gen-per-class target per class per language.
+
+    Auto-skips the LLM step if every (label, lang) combination already has at least
+    gen_per_class // 4 examples. Pass --gen-overwrite to force both steps.
     """
-    step("Generating specialist classifier training data via Ollama")
+    step("Generating specialist classifier training data")
     data_dir = ROOT / "training" / "data"
     needed_files = ["actor_labels.jsonl", "risk_labels.jsonl", "prohibited_labels.jsonl"]
 
+    # ── Step 1: weak supervision (always runs unless --gen-overwrite skips via its own logic) ──
+    ws_script = ROOT / "scripts" / "build_weak_supervision_labels.py"
+    if ws_script.exists():
+        print(_c(DIM, "  Pre-step: extracting labeled sentences from regulatory text (no Ollama)..."))
+        ws_cmd = [sys.executable, str(ws_script), "--type", "all"]
+        if args.gen_overwrite:
+            ws_cmd.append("--overwrite")
+        run(ws_cmd, args.dry_run)
+    else:
+        print(_c(YELLOW, f"  [warn] {ws_script} not found — skipping weak supervision pre-step"))
+
+    # ── Step 2: LLM augmentation — skip if already sufficient ────────────────────
+    min_threshold = max(30, args.gen_per_class // 4)
     if not args.gen_overwrite and not args.dry_run:
-        if all((data_dir / f).exists() for f in needed_files):
-            print(_c(YELLOW, "  --  actor/risk/prohibited label files already exist -- skipping."))
+        all_sufficient = all(
+            _min_per_class_lang(data_dir / f) >= min_threshold
+            for f in needed_files
+        )
+        if all_sufficient:
+            print(_c(YELLOW, f"  --  all specialist label files have ≥{min_threshold} records per "
+                              "class/lang -- skipping LLM augmentation."))
             print(_c(DIM, "      Pass --gen-overwrite to force regeneration."))
             return True
+        elif any((data_dir / f).exists() for f in needed_files):
+            mins = {f: _min_per_class_lang(data_dir / f) for f in needed_files}
+            print(_c(YELLOW, f"  --  insufficient records (min per class/lang: {mins}) — "
+                              f"threshold={min_threshold}, running LLM augmentation."))
 
     script = ROOT / "scripts" / "generate_specialist_training_data.py"
     if not args.dry_run and not script.exists():
@@ -476,10 +528,10 @@ def stage_generate_specialist_data(args: argparse.Namespace) -> bool:
     cmd = [
         sys.executable,
         str(script),
-        "--type",       "all",
+        "--type",        "all",
         "--ollama-host", args.ollama_host,
         "--model",       args.ollama_model,
-        "--batch-size",  "5",
+        "--batch-size",  "10",
         "--n-per-class", str(args.gen_per_class),
     ]
     if args.gen_overwrite:
@@ -669,9 +721,9 @@ def parse_args() -> argparse.Namespace:
                    help="Abort entire pipeline on first stage failure (default: continue)")
 
     # Service addresses
-    p.add_argument("--ollama-host",  default="http://localhost:11434")
-    p.add_argument("--chroma-host",  default="http://localhost:8001")
-    p.add_argument("--triton-host",  default="localhost")
+    p.add_argument("--ollama-host",  default=os.environ.get("OLLAMA_HOST", "http://localhost:11434"))
+    p.add_argument("--chroma-host",  default=os.environ.get("CHROMADB_HOST", "http://localhost:8001"))
+    p.add_argument("--triton-host",  default=os.environ.get("TRITON_HOST", "localhost"))
     p.add_argument("--triton-port",  type=int, default=8003)
     p.add_argument("--ollama-model", default="phi3:mini")
 

@@ -305,12 +305,13 @@ async def _run_pipeline(
         article_scores = await asyncio.gather(*tasks)
         _monitor.record_stage("analysing", _time.time() - _t0)
 
-        # Phase 3 — evidence mapping (deterministic, runs before LLM scoring)
+        # Phase 3 — evidence mapping (EU AI Act + GDPR, deterministic)
         evidence_map = await asyncio.to_thread(
             map_evidence,
             chunks,
             actor_result.actor_type,
             applicable_articles,
+            applicability_result.gdpr_applicable_articles,
         )
 
         # Aggregate article scores into a ComplianceReport

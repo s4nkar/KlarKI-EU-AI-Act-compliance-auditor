@@ -65,7 +65,7 @@ class OllamaClient:
             data = resp.json()
             return data.get("response", "").strip()
 
-    async def generate_json(self, prompt: str, system: str = "") -> dict:
+    async def generate_json(self, prompt: str, system: str = "", keep_alive: str = "5m") -> dict:
         """Send a prompt requesting JSON output, retry once on parse failure.
 
         Uses Ollama's format='json' mode to constrain output.
@@ -73,6 +73,9 @@ class OllamaClient:
         Args:
             prompt: User prompt text.
             system: Optional system message.
+            keep_alive: How long to keep model loaded after this call. Pass "0"
+                to unload immediately (useful before loading large CPU models
+                like the NLI cross-encoder).
 
         Returns:
             Parsed JSON dict from the model.
@@ -85,6 +88,7 @@ class OllamaClient:
             "prompt": prompt,
             "stream": False,
             "format": "json",
+            "keep_alive": keep_alive,
             "options": _DETERMINISTIC_OPTIONS,
         }
         if system:

@@ -1,42 +1,56 @@
-{"query": "risk management system requirements for high-risk AI", "expected_articles": [9], "description": "Core Article 9 obligation"}
-{"query": "hazard identification and mitigation procedures AI lifecycle", "expected_articles": [9], "description": "Risk identification requirement"}
-{"query": "residual risk evaluation before AI deployment", "expected_articles": [9], "description": "Residual risk assessment"}
-{"query": "continuous risk assessment during AI operation", "expected_articles": [9], "description": "Ongoing monitoring obligation"}
-{"query": "safety validation under foreseeable conditions of misuse", "expected_articles": [9], "description": "Misuse scenario testing"}
-{"query": "risk control measures AI system lifecycle", "expected_articles": [9], "description": "Risk control review"}
-{"query": "training data quality criteria statistical properties", "expected_articles": [10], "description": "Data quality Article 10"}
-{"query": "demographic bias examination training datasets", "expected_articles": [10], "description": "Bias detection requirement"}
-{"query": "data governance documentation AI training pipeline", "expected_articles": [10], "description": "Data governance documentation"}
-{"query": "validation and test dataset separation from training", "expected_articles": [10], "description": "Dataset split requirement"}
-{"query": "data lineage and provenance AI training", "expected_articles": [10], "description": "Data lineage tracking"}
-{"query": "representative sampling across demographic groups", "expected_articles": [10], "description": "Representativeness requirement"}
-{"query": "technical documentation requirements AI system architecture", "expected_articles": [11], "description": "Core Article 11 obligation"}
-{"query": "system design specifications intended purpose capabilities", "expected_articles": [11], "description": "Design specification docs"}
-{"query": "technical file content development lifecycle documentation", "expected_articles": [11], "description": "Technical file completeness"}
-{"query": "performance benchmarks and metrics documentation", "expected_articles": [11], "description": "Performance documentation"}
-{"query": "software component descriptions and architecture diagrams", "expected_articles": [11], "description": "Architecture documentation"}
-{"query": "updates modifications changes high-risk AI system technical documentation obligations", "expected_articles": [11], "description": "Documentation update obligations"}
-{"query": "automatic logging AI system operational events", "expected_articles": [12], "description": "Core Article 12 obligation"}
-{"query": "audit trail traceability AI decisions post deployment", "expected_articles": [12], "description": "Audit trail requirement"}
-{"query": "log retention period regulatory review compliance", "expected_articles": [12], "description": "Retention obligation"}
-{"query": "event logs timestamps inference records AI system", "expected_articles": [12], "description": "Log content requirement"}
-{"query": "audit log integrity protection unauthorized modification", "expected_articles": [12], "description": "Log integrity requirement"}
-{"query": "traceability log records access competent authority post deployment review", "expected_articles": [12], "description": "Log access for regulatory review"}
-{"query": "transparency information deployers instructions for use AI", "expected_articles": [13], "description": "Core Article 13 obligation"}
-{"query": "user notification disclosure interacting with AI system", "expected_articles": [13], "description": "AI disclosure requirement"}
-{"query": "explanation logic AI generated recommendations", "expected_articles": [13], "description": "Explainability obligation"}
-{"query": "capabilities limitations disclosure end users deployers", "expected_articles": [13], "description": "Capability disclosure"}
-{"query": "instructions for use deployment conditions AI system", "expected_articles": [13], "description": "Usage instructions"}
-{"query": "provider contact details identification name address transparency obligations", "expected_articles": [13], "description": "Provider identification in transparency obligations"}
-{"query": "human oversight measures monitoring AI real time operation", "expected_articles": [14], "description": "Core Article 14 obligation"}
-{"query": "override stop functionality human intervention AI", "expected_articles": [14], "description": "Override capability"}
-{"query": "human in the loop safety critical AI decisions", "expected_articles": [14], "description": "Human-in-the-loop"}
-{"query": "operator training understanding AI outputs anomaly detection", "expected_articles": [14], "description": "Operator competence"}
-{"query": "human supervision alert low confidence AI prediction", "expected_articles": [14], "description": "Confidence-based escalation"}
-{"query": "natural persons designated assigned human oversight responsibilities high-risk AI", "expected_articles": [14], "description": "Designated oversight persons requirement"}
-{"query": "AI system accuracy performance level intended purpose", "expected_articles": [15], "description": "Core Article 15 obligation"}
-{"query": "robustness testing adversarial inputs AI system", "expected_articles": [15], "description": "Adversarial robustness"}
-{"query": "cybersecurity measures protection AI model manipulation", "expected_articles": [15], "description": "Security measures"}
-{"query": "resilience failure modes degraded performance AI", "expected_articles": [15], "description": "Resilience requirement"}
-{"query": "security vulnerability assessment penetration testing AI", "expected_articles": [15], "description": "Security testing"}
-{"query": "accuracy metrics validated across demographic groups", "expected_articles": [15], "description": "Fairness in accuracy"}
+{"query": "what documentation proves our AI risks are being actively managed", "expected_articles": [9], "description": "Informal practitioner question — risk management evidence", "note": "real-world phrasing, not regulatory-style"}
+{"query": "how do we show a regulator our hazard controls are in place before go-live", "expected_articles": [9], "description": "Pre-deployment safety evidence", "note": "practical compliance question"}
+{"query": "clinical trial AI validation risk procedures required before medical device launch", "expected_articles": [9], "description": "Industry-specific — medical device risk management", "note": "IVD / MDR context"}
+{"query": "risk committee minutes and escalation process for credit scoring AI", "expected_articles": [9], "description": "Governance artefact — risk committee oversight", "note": "financial services format + governance term"}
+{"query": "Welche Anforderungen gelten für das Risikomanagementsystem eines Hochrisiko-KI-Systems?", "expected_articles": [9], "description": "German — core risk management obligation", "note": "German regulatory question"}
+{"query": "foreseeable misuse scenarios documentation obligation high-risk AI lifecycle", "expected_articles": [9], "description": "Misuse scenario cataloguing", "note": "paraphrase — not standard phrasing"}
+{"query": "post-deployment risk signal monitoring and escalation process obligation", "expected_articles": [9], "description": "Ongoing post-market risk monitoring", "note": "lifecycle phase specificity"}
+{"query": "FMEA failure mode analysis risk priority number requirements AI safety", "expected_articles": [9], "description": "FMEA methodology applied to AI risk", "note": "industry-standard method mapping to Art. 9"}
+{"query": "how do we prove our training data does not discriminate against protected groups", "expected_articles": [10], "description": "Informal bias and fairness evidence question", "note": "real-world compliance practitioner phrasing"}
+{"query": "what records does the labelling team need to keep for training data quality assurance", "expected_articles": [10], "description": "Annotation quality records", "note": "operational team perspective"}
+{"query": "protected attribute handling ground truth labelling policy for sensitive categories", "expected_articles": [10], "description": "Sensitive data in training governance", "note": "specific sub-obligation"}
+{"query": "Trainingsdaten Qualitätsnachweis und Repräsentativitätsanforderungen nach EU-KI-Verordnung", "expected_articles": [10], "description": "German — training data quality evidence requirement", "note": "German query, practitioner language"}
+{"query": "synthetic data supplementation differential privacy documentation requirement", "expected_articles": [10], "description": "Synthetic data governance", "note": "modern AI practice not in regulatory text verbatim"}
+{"query": "inter-annotator agreement dispute resolution documentation AI training data", "expected_articles": [10], "description": "Annotation workflow quality evidence", "note": "labelling process specificity"}
+{"query": "who is responsible for verifying training data integrity before each model run", "expected_articles": [10], "description": "Responsibility allocation for data quality", "note": "accountability framing"}
+{"query": "data lineage tracking from raw source through feature engineering to model input", "expected_articles": [10], "description": "End-to-end data provenance", "note": "data engineering perspective"}
+{"query": "what goes into the technical file for a CE marked high-risk AI system", "expected_articles": [11], "description": "CE marking technical file content — practitioner question", "note": "industry context: CE marking"}
+{"query": "model card content requirements for high-risk AI under EU AI Act", "expected_articles": [11], "description": "Model card as technical documentation", "note": "informal but specific"}
+{"query": "system architecture documentation requirements for notified body submission", "expected_articles": [11], "description": "Notified body dossier requirements", "note": "audience-specific: notified body review"}
+{"query": "Technische Dokumentation Inhalte und Mindestanforderungen für Hochrisiko-KI-Systeme", "expected_articles": [11], "description": "German — technical documentation minimum content", "note": "German query"}
+{"query": "intended purpose documentation for AI-based in vitro diagnostic medical device", "expected_articles": [11], "description": "Industry-specific — IVD intended purpose documentation", "note": "medical device sector specificity"}
+{"query": "when must technical documentation be updated after changes to the AI system", "expected_articles": [11], "description": "Documentation maintenance lifecycle obligation", "note": "lifecycle phase — post-approval changes"}
+{"query": "who holds the technical dossier the provider or the deployer and what must each keep", "expected_articles": [11], "description": "Responsibility allocation for technical file custody", "note": "accountability question"}
+{"query": "design rationale documentation requirements for architecture decisions in AI technical file", "expected_articles": [11], "description": "Design rationale as technical file element", "note": "specific sub-element of Annex IV"}
+{"query": "how long must we keep AI decision logs for employment screening use case", "expected_articles": [12], "description": "Retention period question — employment context", "note": "industry-specific log retention"}
+{"query": "what fields must the inference audit log contain for a high-risk AI system", "expected_articles": [12], "description": "Log schema / content requirements", "note": "operational implementation question"}
+{"query": "tamper-proof and tamper-evident logging requirements EU AI Act high-risk", "expected_articles": [12], "description": "Log integrity obligation", "note": "specific property — tamper evidence"}
+{"query": "Protokollierungspflichten für KI-Entscheidungen und Aufbewahrungsfristen nach Artikel 12", "expected_articles": [12], "description": "German — logging and retention obligations Art. 12", "note": "German query"}
+{"query": "audit log format and schema requirements for AI decisions in credit or insurance", "expected_articles": [12], "description": "Industry-specific log format — financial services", "note": "sector specificity"}
+{"query": "who can access AI decision audit logs and under what conditions do regulators have access", "expected_articles": [12], "description": "Log access rights — regulator vs internal", "note": "access control + regulatory inspection framing"}
+{"query": "post-incident forensic reconstruction of AI decision sequence from audit logs", "expected_articles": [12], "description": "Forensic log replay obligation / capability", "note": "post-incident use case"}
+{"query": "must automated logging capture input data or only the output and confidence score", "expected_articles": [12], "description": "Specific log content question — inputs vs outputs", "note": "granularity question"}
+{"query": "what information must we give someone whose loan application was rejected by our AI", "expected_articles": [13], "description": "Practical transparency to affected person — credit decline", "note": "real-world consumer protection framing"}
+{"query": "does our AI system need to tell users it is automated or can we keep that in the small print", "expected_articles": [13], "description": "AI disclosure obligation — form and prominence", "note": "practical compliance tension"}
+{"query": "instructions for use minimum content requirements for high-risk AI system deployers", "expected_articles": [13], "description": "IFU content obligation — deployer audience", "note": "specific document"}
+{"query": "Transparenzpflichten gegenüber Nutzern und betroffenen Personen für KI-Systeme", "expected_articles": [13], "description": "German — transparency obligations toward users and data subjects", "note": "German query"}
+{"query": "credit scoring AI decline explanation letter minimum requirements for consumers", "expected_articles": [13], "description": "Industry-specific — credit explanation letter obligations", "note": "financial services + consumer rights"}
+{"query": "which capabilities and limitations of the AI system must be disclosed in the instructions for use", "expected_articles": [13], "description": "Capability and limitation disclosure specifics", "note": "specific IFU element"}
+{"query": "can a generic chatbot notice satisfy the EU AI Act disclosure requirement for automated decision systems", "expected_articles": [13], "description": "Edge case — adequacy of notice format", "note": "compliance grey area"}
+{"query": "public register requirements for deployed high-risk AI systems transparency obligations", "expected_articles": [13], "description": "Public register as transparency mechanism", "note": "registration + transparency link"}
+{"query": "what controls prove that a human actually reviewed the AI recommendation before decision", "expected_articles": [14], "description": "Evidence of human review — practical audit question", "note": "real-world auditability question"}
+{"query": "at what confidence level must an AI system escalate a decision to a human reviewer", "expected_articles": [14], "description": "Confidence threshold for escalation", "note": "implementation-level question"}
+{"query": "how to document and log human override of an AI system output for audit purposes", "expected_articles": [14], "description": "Override logging as oversight evidence", "note": "near record_keeping but driven by Art. 14"}
+{"query": "Menschliche Aufsicht Anforderungen und Eingriffsmöglichkeiten für Hochrisiko-KI", "expected_articles": [14], "description": "German — human oversight requirements and intervention capabilities", "note": "German query"}
+{"query": "four-eyes principle implementation requirements for high-stakes AI-assisted decisions", "expected_articles": [14], "description": "Four-eyes principle as oversight measure", "note": "industry governance practice"}
+{"query": "what qualifications and training must operators of high-risk AI systems have", "expected_articles": [14], "description": "Operator competency requirements", "note": "human capability, not just system design"}
+{"query": "stop button or kill switch obligation for high-risk AI system under EU AI Act", "expected_articles": [14], "description": "Stop function / override capability obligation", "note": "specific technical measure"}
+{"query": "how do we demonstrate that human reviewers are not rubber-stamping AI recommendations", "expected_articles": [14], "description": "Quality of oversight — genuine vs nominal review", "note": "audit quality question"}
+{"query": "what accuracy level must our AI hiring screening tool maintain under the EU AI Act", "expected_articles": [15], "description": "Accuracy level obligation — employment context", "note": "industry-specific accuracy"}
+{"query": "how do we prove our AI model is robust against adversarial inputs and prompt injection", "expected_articles": [15], "description": "Adversarial robustness evidence", "note": "security testing framing"}
+{"query": "cybersecurity requirements to protect AI model integrity from poisoning and inversion attacks", "expected_articles": [15], "description": "ML-specific cybersecurity obligations", "note": "specific attack vectors"}
+{"query": "Sicherheitsanforderungen Genauigkeit und Robustheit für Hochrisiko-KI nach Artikel 15", "expected_articles": [15], "description": "German — accuracy, robustness, and security requirements Art. 15", "note": "German query"}
+{"query": "accuracy testing across demographic groups fairness requirements EU AI Act", "expected_articles": [15], "description": "Disaggregated accuracy and fairness obligation", "note": "near data_governance but driven by Art. 15 performance requirement"}
+{"query": "what resilience and failure-mode testing is required before deploying a high-risk AI system", "expected_articles": [15], "description": "Resilience testing before deployment", "note": "pre-deployment testing obligation"}
+{"query": "red teaming requirements scope and frequency for high-risk AI systems", "expected_articles": [15], "description": "Red team exercise as robustness evidence", "note": "emerging practice mapped to Art. 15"}
+{"query": "ongoing performance degradation monitoring obligation post-deployment high-risk AI", "expected_articles": [15], "description": "Continuous accuracy monitoring lifecycle obligation", "note": "post-deployment phase"}

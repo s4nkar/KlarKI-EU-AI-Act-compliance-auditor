@@ -80,3 +80,5 @@ model_repository/**/*.engine
 *BUILD_LOG.md
 .claude/settings.local.json
 .claude/memory/
+CLAUDE.md
+.claude/

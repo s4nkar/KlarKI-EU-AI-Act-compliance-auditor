@@ -116,6 +116,10 @@ class ApplicabilityResult(BaseModel):
         default_factory=list,
         description="EU AI Act articles that apply given the risk tier (e.g. [9,10,11,12,13,14,15])",
     )
+    gdpr_applicable_articles: list[int] = Field(
+        default_factory=list,
+        description="GDPR articles that apply based on personal data processing signals (e.g. [5,6,24,25,30])",
+    )
     reasoning: str = Field(
         default="",
         description="Plain-language explanation of why this applicability determination was reached",
@@ -142,6 +146,7 @@ class EvidenceItem(BaseModel):
     artefacts each obligation demands (e.g. 'risk register', 'CE marking').
     """
     obligation_id: str = Field(description="Obligation schema ID from JSONL, e.g. AIACT_ART9_PROVIDER_RISK_MGMT_001")
+    regulation: str = Field(default="eu_ai_act", description="Source regulation: 'eu_ai_act' or 'gdpr'")
     article: str = Field(description="Source article, e.g. 'Article 9'")
     requirement: str = Field(description="Plain-language obligation statement")
     evidence_required: list[str] = Field(description="All artefacts the obligation demands")

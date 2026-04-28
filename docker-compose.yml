@@ -25,6 +25,18 @@ services:
     volumes:
       - upload_data:/data/uploads
       - chroma_data:/data/chroma
+      - ./data/obligations:/data/obligations:ro
+      - ./training/artifacts:/training/artifacts:ro
+      - ./training/data:/training/data:ro
+      - ./tests/evaluation/results:/tests/evaluation/results:ro
+    healthcheck:
+      # Python is guaranteed present; curl is not in python:3.11-slim.
+      # start_period covers the ~20 s lifespan startup (embedding model + BM25 + cross-encoder).
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=5)"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 35s
     depends_on:
       klarki-chromadb:
         condition: service_healthy
@@ -68,7 +80,7 @@ services:
       # phi3:mini has 32 layers; offloading 20 stays within 4 GB VRAM on RTX 3050 Ti.
       - OLLAMA_GPU_LAYERS=20
       - OLLAMA_MAX_LOADED_MODELS=1
-      - OLLAMA_NUM_CTX=2048
+      - OLLAMA_NUM_CTX=1024
     # GPU acceleration is opt-in via docker-compose.gpu.yml overlay:
     #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
     # ./run.sh up and ./run.sh setup auto-apply the overlay when nvidia-smi is detected.
@@ -84,7 +96,8 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - klarki-api
+      klarki-api:
+        condition: service_healthy
     networks:
       - klarki-net
     restart: unless-stopped
@@ -113,8 +126,8 @@ services:
 
   klarki-training:
     build:
-      context: .
-      dockerfile: training/Dockerfile
+      context: ./training
+      dockerfile: Dockerfile
     container_name: klarki-training
     profiles:
       - training
@@ -124,6 +137,32 @@ services:
     environment:
       - OLLAMA_HOST=http://klarki-ollama:11434
       - CHROMADB_HOST=http://klarki-chromadb:8000
+      - PYTHONUNBUFFERED=1
+      - PYTHONIOENCODING=utf-8
+    depends_on:
+      klarki-chromadb:
+        condition: service_healthy
+      klarki-ollama:
+        condition: service_started
+    networks:
+      - klarki-net
+
+  klarki-test:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile
+    container_name: klarki-test
+    profiles:
+      - testing
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    environment:
+      - OLLAMA_HOST=http://klarki-ollama:11434
+      - CHROMADB_HOST=http://klarki-chromadb:8000
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-intfloat/multilingual-e5-small}
+      - USE_TRITON=false
+      - UPLOAD_DIR=/tmp/test-uploads
       - PYTHONUNBUFFERED=1
       - PYTHONIOENCODING=utf-8
     depends_on:

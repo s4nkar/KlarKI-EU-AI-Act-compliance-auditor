@@ -45,6 +45,21 @@ TRACKED_METRICS: dict[str, tuple[str, float]] = {
     "bert_consistency":             ("consistency.bert.consistency_rate", 0.0),
     "hallucination.citation_rate":  ("hallucination.citation_rate",   0.05),
     "pipeline.checks_passed_ratio": ("pipeline.checks_passed_ratio",  0.10),
+    # Phase 3 metrics
+    "actor.accuracy":               ("actor.accuracy",                0.05),
+    "actor.macro_f1":               ("actor.macro_f1",                0.05),
+    "applicability.accuracy":       ("applicability.accuracy",        0.05),
+    "applicability.prohibited_recall": ("applicability.by_outcome.prohibited.recall", 0.05),
+    "applicability.high_risk_recall":  ("applicability.by_outcome.high_risk.recall",  0.05),
+    "evidence_mapper.tpr":          ("evidence_mapper.tpr",           0.05),
+    "evidence_mapper.tnr":          ("evidence_mapper.tnr",           0.05),
+    # Specialist ML classifier evals (skip gracefully if models not trained)
+    "risk.accuracy":                ("risk.accuracy",                 0.05),
+    "risk.recall":                  ("risk.recall",                   0.05),
+    "risk.tnr":                     ("risk.tnr",                      0.05),
+    "prohibited.accuracy":          ("prohibited.accuracy",           0.05),
+    "prohibited.recall":            ("prohibited.recall",             0.05),
+    "prohibited.tnr":               ("prohibited.tnr",                0.05),
 }
 
 # ANSI colour helpers (gracefully degrade on Windows without ANSI support)
@@ -147,11 +162,16 @@ def _run_eval(name: str, fn, verbose: bool) -> dict:
 def _print_inline_summary(name: str, r: dict) -> None:
     """Print a one-line metric summary for a completed eval."""
     summaries = {
-        "classifier": lambda r: f"    macro_f1={r.get('macro_f1',0)*100:.1f}%  accuracy={r.get('accuracy',0)*100:.1f}%",
-        "rag":        lambda r: f"    recall@1={r.get('recall@1',0)*100:.1f}%  recall@3={r.get('recall@3',0)*100:.1f}%  MRR={r.get('mrr',0):.3f}",
-        "adversarial":lambda r: f"    adversarial_accuracy={r.get('adversarial_accuracy',0)*100:.1f}%",
-        "hallucination": lambda r: f"    citation_rate={r.get('citation_rate',0)*100:.1f}%  violations={r.get('total_violations',0)}",
-        "pipeline":   lambda r: f"    overall_score={r.get('overall_score',0):.0f}  checks={r.get('checks_passed',0)}/{r.get('checks_total',0)}",
+        "classifier":      lambda r: f"    macro_f1={r.get('macro_f1',0)*100:.1f}%  accuracy={r.get('accuracy',0)*100:.1f}%",
+        "rag":             lambda r: f"    recall@1={r.get('recall@1',0)*100:.1f}%  recall@3={r.get('recall@3',0)*100:.1f}%  MRR={r.get('mrr',0):.3f}",
+        "adversarial":     lambda r: f"    adversarial_accuracy={r.get('adversarial_accuracy',0)*100:.1f}%",
+        "hallucination":   lambda r: f"    citation_rate={r.get('citation_rate',0)*100:.1f}%  violations={r.get('total_violations',0)}",
+        "pipeline":        lambda r: f"    overall_score={r.get('overall_score',0):.0f}  checks={r.get('checks_passed',0)}/{r.get('checks_total',0)}",
+        "actor":           lambda r: f"    accuracy={r.get('accuracy',0)*100:.1f}%  macro_f1={r.get('macro_f1',0)*100:.1f}%",
+        "applicability":   lambda r: f"    accuracy={r.get('accuracy',0)*100:.1f}%  prohibited_recall={r.get('by_outcome',{}).get('prohibited',{}).get('recall',0)*100:.1f}%",
+        "evidence_mapper": lambda r: f"    tpr={r.get('tpr',0)*100:.1f}%  tnr={r.get('tnr',0)*100:.1f}%  balanced_acc={r.get('balanced_accuracy',0)*100:.1f}%",
+        "risk":            lambda r: f"    accuracy={r.get('accuracy',0)*100:.1f}%  recall={r.get('recall',0)*100:.1f}%  tnr={r.get('tnr',0)*100:.1f}%",
+        "prohibited":      lambda r: f"    accuracy={r.get('accuracy',0)*100:.1f}%  recall={r.get('recall',0)*100:.1f}%  tnr={r.get('tnr',0)*100:.1f}%",
     }
     fn = summaries.get(name)
     if fn:
@@ -171,12 +191,17 @@ def main() -> int:
     args = parser.parse_args()
 
     # Lazy imports so each module's own sys.path setup runs
-    from eval_classifier  import run as run_classifier
-    from eval_rag         import run as run_rag
-    from eval_pipeline    import run as run_pipeline
-    from eval_hallucination import run as run_hallucination
-    from eval_adversarial import run as run_adversarial
-    from eval_consistency  import run as run_consistency
+    from eval_classifier      import run as run_classifier
+    from eval_rag             import run as run_rag
+    from eval_pipeline        import run as run_pipeline
+    from eval_hallucination   import run as run_hallucination
+    from eval_adversarial     import run as run_adversarial
+    from eval_consistency     import run as run_consistency
+    from eval_actor           import run as run_actor
+    from eval_applicability   import run as run_applicability
+    from eval_evidence_mapper import run as run_evidence_mapper
+    from eval_risk            import run as run_risk
+    from eval_prohibited      import run as run_prohibited
 
     print(_bold("\n═══════════════════════════════════════════════════"))
     print(_bold("  KlarKI Evaluation & Regression Suite"))
@@ -192,6 +217,24 @@ def main() -> int:
     )
     all_results["adversarial"] = _run_eval(
         "adversarial", lambda: run_adversarial(verbose=args.verbose), args.verbose,
+    )
+
+    # Phase 3 evals — deterministic, no live services required
+    all_results["actor"] = _run_eval(
+        "actor", lambda: run_actor(verbose=args.verbose), args.verbose,
+    )
+    all_results["applicability"] = _run_eval(
+        "applicability", lambda: run_applicability(verbose=args.verbose), args.verbose,
+    )
+    all_results["evidence_mapper"] = _run_eval(
+        "evidence_mapper", lambda: run_evidence_mapper(verbose=args.verbose), args.verbose,
+    )
+    # Specialist ML classifiers — skip gracefully when models not yet trained
+    all_results["risk"] = _run_eval(
+        "risk", lambda: run_risk(verbose=args.verbose), args.verbose,
+    )
+    all_results["prohibited"] = _run_eval(
+        "prohibited", lambda: run_prohibited(verbose=args.verbose), args.verbose,
     )
 
     # Evals that need live services (skipped in --offline mode)

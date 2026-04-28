@@ -161,7 +161,7 @@ def _system_resources() -> dict:
         return {"available": False}
 
 
-@router.get("/", response_model=APIResponse)
+@router.get("", response_model=APIResponse)
 async def get_monitoring_snapshot(request: Request) -> APIResponse:
     """Return a full observability snapshot of the KlarKI application.
 
