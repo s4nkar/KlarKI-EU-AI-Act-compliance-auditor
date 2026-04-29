@@ -22,6 +22,9 @@ services:
       - USE_OPENSEARCH=${USE_OPENSEARCH:-false}
       - OPENSEARCH_HOST=klarki-opensearch
       - OPENSEARCH_PORT=${OPENSEARCH_PORT:-9200}
+      - HF_HOME=/app/.cache/huggingface
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
     volumes:
       - upload_data:/data/uploads
       - chroma_data:/data/chroma

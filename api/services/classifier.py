@@ -108,7 +108,16 @@ async def classify_chunks(
     """
     if settings.use_triton:
         logger.info("classify_backend", backend="triton", chunks=len(chunks))
-        chunks = await _classify_triton(chunks)
+        try:
+            chunks = await _classify_triton(chunks)
+        except Exception as exc:
+            logger.warning(
+                "triton_unavailable_fallback",
+                error=str(exc),
+                fallback="ollama",
+            )
+            logger.info("classify_backend", backend="ollama_fallback", chunks=len(chunks))
+            chunks = await _classify_ollama(chunks, ollama)
     else:
         logger.info("classify_backend", backend="ollama", chunks=len(chunks))
         chunks = await _classify_ollama(chunks, ollama)

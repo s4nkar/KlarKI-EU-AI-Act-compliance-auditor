@@ -51,6 +51,18 @@ COPY . .
 
 RUN mkdir -p /data/uploads
 
+# Pin HF cache to a fixed path so both the build-time download (root) and the
+# runtime user (appuser) resolve the same location.
+ENV HF_HOME=/app/.cache/huggingface
+
+# Pre-download models that are loaded at startup so HF_HUB_OFFLINE=1 works at runtime.
+# This bakes them into the image layer — no network access needed when the container runs.
+RUN python -c "\
+from sentence_transformers import CrossEncoder; \
+CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2'); \
+from sentence_transformers import SentenceTransformer; \
+SentenceTransformer('intfloat/multilingual-e5-small')"
+
 # Non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app /data
 USER appuser

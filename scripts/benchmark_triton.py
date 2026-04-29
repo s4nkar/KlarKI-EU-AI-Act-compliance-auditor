@@ -64,7 +64,10 @@ async def _benchmark_ollama(texts: list[str], host: str, model: str) -> dict:
                 latencies.append(time.perf_counter() - t0)
             except Exception:
                 errors += 1
-                latencies.append(time.perf_counter() - t0)
+
+    if not latencies:
+        return {"backend": "ollama", "model": model, "n_samples": len(texts),
+                "errors": errors, "error": f"all {errors} requests failed — is Ollama running at {host}?"}
 
     return {
         "backend":       "ollama",
@@ -161,8 +164,8 @@ def _print_table(results: list[dict]) -> None:
     print("  KlarKI Classifier Benchmark --Triton BERT vs Ollama phi3:mini")
     print("=" * 62)
 
-    headers = ["Backend", "N", "Mean (s)", "Median (s)", "P95 (s)", "Throughput/min"]
-    row_fmt = "{:<22} {:>6} {:>10} {:>12} {:>9} {:>16}"
+    headers = ["Backend", "N", "Errors", "Mean (s)", "Median (s)", "P95 (s)", "Throughput/min"]
+    row_fmt = "{:<22} {:>6} {:>8} {:>10} {:>12} {:>9} {:>16}"
     print(row_fmt.format(*headers))
     print("-" * 62)
 
@@ -170,14 +173,17 @@ def _print_table(results: list[dict]) -> None:
         if "error" in r:
             print(f"  {r['backend']}: {r['error']}")
             continue
+        errors = r.get("errors", 0)
+        error_suffix = f" (ALL FAILED — latencies are connection errors)" if errors == r["n_samples"] else ""
         print(row_fmt.format(
             r["backend"],
             r["n_samples"],
+            errors,
             r["mean_s"],
             r["median_s"],
             r["p95_s"],
             r["throughput_per_min"],
-        ))
+        ) + error_suffix)
 
     print("=" * 62)
 
@@ -196,7 +202,10 @@ async def _main(args: argparse.Namespace) -> None:
         print(f"Benchmarking Ollama ({args.n_samples} samples, sequential)...")
         r = await _benchmark_ollama(texts, args.ollama_host, args.model)
         results.append(r)
-        print(f"  Done --mean {r['mean_s']} s/chunk, total {r['total_s']} s")
+        if "mean_s" in r:
+            print(f"  Done --mean {r['mean_s']} s/chunk, total {r['total_s']} s")
+        else:
+            print(f"  Failed: {r['error']}")
 
     if not args.ollama_only:
         print(f"Benchmarking Triton ({args.n_samples} samples, batched)...")
@@ -204,6 +213,8 @@ async def _main(args: argparse.Namespace) -> None:
         results.append(r)
         if "mean_s" in r:
             print(f"  Done --mean {r['mean_s']} s/chunk, total {r['total_s']} s")
+        else:
+            print(f"  Failed: {r['error']}")
 
     _print_table(results)
 

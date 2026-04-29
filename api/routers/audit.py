@@ -276,6 +276,9 @@ async def _run_pipeline(
         # for UNRELATED chunks that contain explicit Article references (9–15).
         chunks = await asyncio.to_thread(enrich_chunks_with_ner, chunks)
 
+        # Ensure Ollama has the model loaded before firing 7 concurrent LangGraph calls
+        await ollama.warmup()
+
         # RAG retrieval + per-article gap analysis
         _set_status(AuditStatus.ANALYSING)
         _t0 = _time.time()

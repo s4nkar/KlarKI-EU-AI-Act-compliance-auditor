@@ -39,13 +39,26 @@ except ImportError:
 logger = structlog.get_logger()
 
 _NLI_MODEL = None
+_NLI_LOAD_FAILED = False  # prevents repeated download attempts after the first failure
+
 
 def _get_nli_model():
-    """Lazily load the NLI Cross-Encoder model to avoid overhead if unused."""
-    global _NLI_MODEL
-    if _NLI_MODEL is None and CrossEncoder is not None:
-        logger.info("loading_nli_model", model="cross-encoder/nli-deberta-v3-small")
-        _NLI_MODEL = CrossEncoder("cross-encoder/nli-deberta-v3-small")
+    """Lazily load the NLI Cross-Encoder model; returns None if unavailable."""
+    global _NLI_MODEL, _NLI_LOAD_FAILED
+    if _NLI_LOAD_FAILED or CrossEncoder is None:
+        return None
+    if _NLI_MODEL is None:
+        try:
+            logger.info("loading_nli_model", model="cross-encoder/nli-deberta-v3-small")
+            _NLI_MODEL = CrossEncoder("cross-encoder/nli-deberta-v3-small")
+        except Exception as exc:
+            _NLI_LOAD_FAILED = True
+            logger.warning(
+                "nli_model_unavailable",
+                error=str(exc),
+                fallback="regex-only evidence matching active",
+            )
+            return None
     return _NLI_MODEL
 
 _OBLIGATIONS_DIR = Path(__file__).parent.parent.parent / "data" / "obligations"
