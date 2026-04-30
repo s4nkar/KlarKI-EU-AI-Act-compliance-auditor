@@ -16,11 +16,13 @@ Model path: training/artifacts/spacy_ner_model/model-final  (relative to project
 
 from __future__ import annotations
 
+import asyncio
 import re
 from pathlib import Path
 
 import structlog
 
+from config import settings
 from models.schemas import ArticleDomain, DocumentChunk
 
 logger = structlog.get_logger()
@@ -127,4 +129,44 @@ def enrich_chunks_with_ner(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
     else:
         logger.info("ner_enrichment_done", total=len(chunks), domain_corrections=0)
 
+    return chunks
+
+
+async def enrich_chunks_with_ner_async(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
+    """Async wrapper — dispatches to Triton NER when USE_TRITON=true, local spaCy otherwise.
+
+    Triton Python backend runs spaCy on CPU inside the inference server.
+    Falls back to the local model if Triton is unreachable.
+    """
+    if settings.use_triton:
+        try:
+            return await _enrich_triton(chunks)
+        except Exception as exc:
+            logger.warning("triton_ner_fallback", error=str(exc), fallback="local")
+
+    return await asyncio.to_thread(enrich_chunks_with_ner, chunks)
+
+
+async def _enrich_triton(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
+    from services.triton_client import TritonClient
+
+    client = TritonClient(host=settings.triton_host, grpc_port=settings.triton_grpc_port)
+    texts = [c.text[:1000] for c in chunks]
+
+    batch_size = 16  # matches spacy_ner config.pbtxt max_batch_size
+    all_entities: list[dict[str, list[str]]] = []
+    for i in range(0, len(texts), batch_size):
+        batch_entities = await client.ner(texts[i : i + batch_size])
+        all_entities.extend(batch_entities)
+
+    corrected = 0
+    for chunk, entities in zip(chunks, all_entities):
+        chunk.metadata["ner_entities"] = entities
+        if chunk.domain == ArticleDomain.UNRELATED:
+            article_nums = _extract_article_nums(entities.get("ARTICLE", []))
+            if len(set(article_nums)) == 1:
+                chunk.domain = _ARTICLE_TO_DOMAIN[article_nums[0]]
+                corrected += 1
+
+    logger.info("ner_enrichment_done", total=len(chunks), domain_corrections=corrected, backend="triton")
     return chunks

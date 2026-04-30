@@ -34,7 +34,7 @@ from services.chunker import proposition_chunk_text
 from services.evidence_mapper import map_evidence
 from services.gap_analyser import analyse_article
 from services.language_detector import detect_language
-from services.ner_service import enrich_chunks_with_ner
+from services.ner_service import enrich_chunks_with_ner_async
 from services.ollama_client import OllamaClient
 from services.rag_engine import retrieve_requirements
 from services.monitoring_stats import stats as _monitor
@@ -274,7 +274,7 @@ async def _run_pipeline(
 
         # NER enrichment — adds entity metadata to each chunk and corrects domain
         # for UNRELATED chunks that contain explicit Article references (9–15).
-        chunks = await asyncio.to_thread(enrich_chunks_with_ner, chunks)
+        chunks = await enrich_chunks_with_ner_async(chunks)
 
         # Ensure Ollama has the model loaded before firing 7 concurrent LangGraph calls
         await ollama.warmup()

@@ -48,8 +48,8 @@ async def legal_agent_node(state: AuditState) -> dict:
 
     try:
         reg_text = "\n\n".join(
-            f"[{p.get('metadata', {}).get('title', p.get('metadata', {}).get('requirement_id', ''))}]\n{p.get('text', '')}"
-            for p in state["regulatory_passages"][:8]
+            f"[{p.get('metadata', {}).get('title', p.get('metadata', {}).get('requirement_id', ''))}]\n{p.get('text', '')[:400]}"
+            for p in state["regulatory_passages"][:5]
         ) or "(no regulatory passages retrieved)"
 
         prompt = f"""You are a Legal Expert Agent analyzing the EU AI Act.
@@ -132,24 +132,30 @@ async def synthesis_agent_node(state: AuditState) -> dict:
     else:
         # Truncate each finding to 300 chars to keep the prompt within the
         # 2048-token Ollama context window (phi3:mini fails silently on overflow).
-        lines = [f"[{req[:80]}]: {str(finding)[:300]}" for req, finding in findings.items()]
-        findings_str = "\n".join(lines[:15])  # cap at 15 requirements
+        lines = [f"[{req[:60]}]: {str(finding)[:200]}" for req, finding in findings.items()]
+        findings_str = "\n".join(lines[:10])  # cap at 10 requirements
 
     prompt = f"""You are a Synthesis Agent compiling a compliance report for Article {state['article_num']}.
-Based on the Technical Agent's findings, generate a structured Gap Analysis JSON.
-Assign an overall score (0-100), identify gaps with severities (critical, major, minor), and provide actionable recommendations.
+Based on the Technical Agent's findings below, generate a structured Gap Analysis JSON.
+
+Scoring guide:
+- 90-100: nearly all requirements met, no critical gaps
+- 70-89: most requirements met, some gaps
+- 50-69: partial compliance, significant gaps
+- 30-49: major gaps, limited evidence
+- 0-29: little to no compliance evidence
 
 Findings:
 {findings_str}
 
-Output ONLY this JSON format:
+Output ONLY valid JSON in exactly this format (replace placeholder comments with real values):
 {{
-  "score": 75,
-  "reasoning": "...",
+  "score": <integer 0-100 based on scoring guide above>,
+  "reasoning": "<2-3 sentences explaining the score>",
   "gaps": [
-    {{"title": "...", "description": "...", "severity": "major"}}
+    {{"title": "<short gap title>", "description": "<specific gap description>", "severity": "<critical|major|minor>"}}
   ],
-  "recommendations": ["...", "..."]
+  "recommendations": ["<specific action>"]
 }}
 """
     try:
