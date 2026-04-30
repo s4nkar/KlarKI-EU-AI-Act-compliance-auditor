@@ -23,6 +23,7 @@
 - [Hardware & Model Choices](#hardware--model-choices)
 - [Requirements](#requirements)
 - [Quick Start](#quick-start)
+- [Pretrained Models (Optional)](#pretrained-models-optional)
 - [Commands](#commands)
 - [Setup Stages](#setup-stages)
 - [Classifier Backends](#classifier-backends)
@@ -127,19 +128,22 @@ Upload a PDF, DOCX, TXT, or MD policy document (max 10 MB). The pipeline runs:
 - **PyMuPDF** prose extraction → **pdfplumber** table extraction (tab-separated rows appended) → **pytesseract** OCR for scanned PDFs (optional, guarded by `ImportError`)
 - **Legal-unit chunker** splits on headings first, then paragraphs, then sentences (512 chars, 50 overlap, UUID4 per chunk)
 - **Language detection** (EN/DE via langdetect; fallback to EN for < 100 chars)
-- **NER enrichment** - spaCy `de_core_news_lg` extracts 8 entity types; domain correction for UNRELATED chunks referencing explicit article numbers
+- **NER Phase 1 (entity extraction)** - spaCy `de_core_news_lg` extracts 8 entity types and writes them to `chunk.metadata["ner_entities"]`; runs **before** the legal gate so actor classification and applicability detection can read NER results
+- **NER Phase 2 (domain correction)** - after BERT/Triton chunk classification, already-extracted entities are used to correct UNRELATED chunks that contain exactly one explicit Article 9–15 reference
 
 ### Step 3 - Legal Decision Hierarchy (Deterministic, Runs in Parallel)
 
-No LLM is called in this stage. Two tasks run concurrently via `asyncio.to_thread`:
+No LLM is called in this stage. NER entities extracted in Step 2 are available to both tasks. Actor classification and applicability gate run concurrently via `asyncio.gather`:
 
 **A. Actor Classification (Article 3)**
 ```
-ML path  ──► predict_actor(text[:2000])  ──► confidence ≥ 0.80? ──► result
-                                                                  │
-                                               No ───────────────►│
-                                                                  ▼
+ML path  ──► predict_actor(text)  ──► confidence ≥ 0.80? ──► result
+                                                           │
+                                          No ─────────────►│
+                                                           ▼
 Pattern fallback ──► 39 EN+DE patterns (14 provider, 13 deployer, 6 importer, 6 distributor)
+                 ──► NER AI_SYSTEM entities with first-person ownership prefix
+                 │    ("our AI system", "unser KI-System") → additional PROVIDER signals
                  ──► confidence = matched_class / total_signals
                  ──► Default: DEPLOYER (most SMEs are deployers)
 
@@ -151,12 +155,14 @@ Output: ActorClassification(actor_type, confidence, matched_signals, reasoning)
 Step 1 (Article 5 Prohibited):
   9 regex patterns (subliminal techniques, social scoring, real-time biometric,
   emotion recognition in workplace/education)
+  + NER PROHIBITED_USE entities → fed directly into Article 5 detection
   + ML predict_prohibited() at confidence ≥ 0.85
   → is_prohibited=True → applicable_articles=[5] → STOP
 
 Step 2 (Annex III - 8 Categories, 60+ patterns):
   BIOMETRIC | CRITICAL_INFRASTRUCTURE | EDUCATION | EMPLOYMENT
   ESSENTIAL_SERVICES | LAW_ENFORCEMENT | MIGRATION | JUSTICE
+  + NER RISK_TIER entities ("high-risk", "hochriskant") → fed into Annex III detection
   → AnnexIIIMatch list with matched_keywords per category
 
 Step 3 (Article 6(1) Annex I - Safety Component Signals):
@@ -175,6 +181,10 @@ applicable_articles = [9,10,11,12,13,14,15] if high_risk, else []
 Each document chunk is classified to one of 7 `ArticleDomain` values (Articles 9–15) via:
 - **Default**: Ollama / phi3:mini (CPU-friendly, no GPU required)
 - **GPU fast-path**: NVIDIA Triton / fine-tuned gBERT ONNX (~50–100× faster)
+
+`classify_chunks` returns `(chunks, backend_str)` — the backend string records any Triton→Ollama fallback that occurred at runtime and is written to the report's `classifier_backend` field.
+
+Immediately after classification, **NER Phase 2 domain correction** runs: already-extracted NER entities are used to correct UNRELATED chunks that contain exactly one explicit Article 9–15 reference, recovering chunks the classifier missed.
 
 Domain assignments inform which chunks are sent to each article's gap analyser.
 
@@ -225,7 +235,7 @@ No-chunk articles: **score=0, critical gap, zero LLM calls.**
 After gap analysis, obligation schemas in `data/obligations/**/*.jsonl` are filtered by actor type and applicable articles. For each required evidence artefact:
 
 1. **Fast path**: pre-compiled regex synonym dictionary (22 canonical terms × synonym lists, e.g. "risk register" → 8 synonyms including "risikokatalog")
-2. **Slow path**: NLI Cross-Encoder (`cross-encoder/nli-deberta-v3-small`) — premise: chunk text, hypothesis: "This document contains a [term]." → ENTAILMENT = match
+2. **Slow path**: NLI Cross-Encoder (`cross-encoder/nli-deberta-v3-small`) — premise: chunk text, hypothesis: "This document contains a [term]." → ENTAILMENT class predicted with score ≥ 0.5 = match
 
 Output: `EvidenceMap` with per-obligation coverage (fully satisfied / partially satisfied / missing).
 
@@ -365,6 +375,48 @@ Open **http://localhost** (port 80, nginx). Complete the **Risk Assessment** wiz
 For development with hot reload: `./run.sh dev` — frontend on **http://localhost:3000**.
 
 > **Windows users:** use `./run.sh` commands. **Linux/Mac:** `make` aliases are available — `make setup`, `make up`, `make test`, etc.
+
+---
+
+## Pretrained Models (Optional)
+
+> **Skipping local training is completely optional.** If you have decent hardware and want full control over your models, ignore this section and let `./run.sh setup` train everything from scratch (~30–60 min).
+
+KlarKI ships 5 fine-tuned models on HuggingFace Hub. If you want to skip local training entirely, download them before running setup:
+
+```bash
+pip install huggingface-hub>=0.26.0
+python scripts/download_pretrained.py
+```
+
+That's it. The models are placed exactly where the pipeline expects them. Then start the stack as normal:
+
+```bash
+./run.sh up
+```
+
+### Which path is right for you?
+
+| Scenario | What to do |
+|---|---|
+| **You have a GPU / don't mind waiting 30–60 min** | Skip this section. Run `./run.sh setup` — trains on your own data, gives you full reproducibility and version history. |
+| **You want to get started immediately** | Run `python scripts/download_pretrained.py` first, then `./run.sh setup --skip-train`. Setup still runs the knowledge base, Ollama, and ChromaDB stages — just skips training. |
+| **You want a single model (e.g. only NER)** | `python scripts/download_pretrained.py --model ner` |
+| **You already downloaded but want the latest** | `python scripts/download_pretrained.py --force` |
+
+### What gets downloaded
+
+| Model | HuggingFace Repo | Task |
+|---|---|---|
+| `bert` | `s4nkar/klarki-bert-classifier` | 8-class article domain classifier (Articles 9–15 + unrelated) |
+| `actor` | `s4nkar/klarki-actor-classifier` | Article 3 actor role: provider / deployer / importer / distributor |
+| `risk` | `s4nkar/klarki-risk-classifier` | Article 6 + Annex III high-risk binary classifier |
+| `prohibited` | `s4nkar/klarki-prohibited-classifier` | Article 5 prohibited practice binary classifier |
+| `ner` | `s4nkar/klarki-ner-spacy` | spaCy NER — `de_core_news_lg` fine-tuned on KlarKI data, 8 EU AI Act entity types |
+
+All models are based on `deepset/gbert-base` (BERT classifiers) or `de_core_news_lg` (spaCy NER), fine-tuned on KlarKI's bilingual EN/DE regulatory training data.
+
+> **Note:** Downloaded models are treated as authoritative by the version manager — `./run.sh setup` will not overwrite them unless you explicitly pass `--retrain`.
 
 ---
 
@@ -532,7 +584,7 @@ All routes are prefixed `/api/v1`. Responses use the `APIResponse` envelope: `{"
   "overall_score": 58.0,               // Average across applicable articles only (0–100)
   "confidence_score": 0.82,            // 0–1; below 0.70 triggers human review
   "requires_human_review": false,
-  "classifier_backend": "ollama/phi3:mini",
+  "classifier_backend": "ollama/phi3:mini",    // Actual backend used at runtime; reflects any Triton→Ollama fallback
 
   // Phase 3 - Actor Classification (Article 3)
   "actor": {
