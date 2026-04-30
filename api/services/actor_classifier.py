@@ -88,7 +88,12 @@ _ALL_PATTERNS = {
 }
 
 
-def classify_actor(full_text: str) -> ActorClassification:
+# First-person ownership prefixes that make an AI_SYSTEM NER entity a provider signal.
+# "our AI system" / "unser KI-System" means the author owns/built the system.
+_OWNERSHIP_PREFIXES: tuple[str, ...] = ("our ", "unser ", "unsere ")
+
+
+def classify_actor(full_text: str, chunks: list | None = None) -> ActorClassification:
     """Detect the EU AI Act Article 3 actor role from document text.
 
     Phase 3 ensemble: tries ML model first. If the model is trained and
@@ -97,6 +102,9 @@ def classify_actor(full_text: str) -> ActorClassification:
 
     Args:
         full_text: Full raw text of the uploaded document.
+        chunks: Optional enriched chunks — NER AI_SYSTEM entities whose text
+                starts with a first-person ownership prefix ("our", "unser")
+                are added as PROVIDER signals in the pattern fallback path.
 
     Returns:
         ActorClassification with detected actor type and matched signals.
@@ -124,6 +132,18 @@ def classify_actor(full_text: str) -> ActorClassification:
         for pattern, label in patterns:
             if re.search(pattern, text_lower, re.IGNORECASE):
                 hits[actor_type].append(label)
+
+    # ── NER AI_SYSTEM ownership signals ──────────────────────────────────────
+    # AI_SYSTEM entities with a first-person prefix ("our AI system",
+    # "unser KI-System") unambiguously indicate the author owns the system —
+    # a provider signal the regex may have missed in unusual phrasing.
+    if chunks:
+        for chunk in chunks:
+            for ent_text in chunk.metadata.get("ner_entities", {}).get("AI_SYSTEM", []):
+                if ent_text.lower().startswith(_OWNERSHIP_PREFIXES):
+                    signal = f"NER AI_SYSTEM: {ent_text}"
+                    if signal not in hits[ActorType.PROVIDER]:
+                        hits[ActorType.PROVIDER].append(signal)
 
     scores = {actor: len(signals) for actor, signals in hits.items()}
     total_hits = sum(scores.values())

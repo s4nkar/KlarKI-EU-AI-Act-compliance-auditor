@@ -112,23 +112,6 @@ class VersionManager:
             return None
         return section.get("versions", {}).get(active_ver, {}).get("data_version")
 
-    def should_retrain(self, model_type: str, data_type: str) -> bool:
-        """True if the active data version differs from what the active model was trained on.
-
-        Returns True (must retrain) when:
-        - No model exists yet
-        - data_version on the model entry is null (legacy, pre-tracking)
-        - The data version that trained the model != the current active data version
-        """
-        if not self.model_exists(model_type):
-            return True
-        registry = self.load()
-        model_data_ver = self.get_model_data_version(model_type)
-        current_data_ver = registry.get(f"data_{data_type}", {}).get("active")
-        if model_data_ver is None or current_data_ver is None:
-            return True  # can't determine — safe default is retrain
-        return model_data_ver != current_data_ver
-
     # ── Existence checks (used by setup.py to decide skip) ───────────────────
 
     def data_exists(self, data_type: str) -> bool:
@@ -254,6 +237,99 @@ class VersionManager:
         self._save(registry)
         return version
 
+    # ── HuggingFace Hub tracking ──────────────────────────────────────────────
+
+    def record_hub_push(
+        self,
+        model_type: str,
+        version: str,
+        repo_id: str,
+        commit_hash: str,
+    ) -> None:
+        """Attach hub push metadata to an existing version entry."""
+        registry = self.load()
+        ver_entry = (
+            registry.setdefault(model_type, {"active": None, "versions": {}})
+            .setdefault("versions", {})
+            .setdefault(version, {})
+        )
+        ver_entry["hub"] = {
+            "repo_id": repo_id,
+            "commit": commit_hash,
+            "pushed_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        }
+        self._save(registry)
+        print(f"  [hub] {model_type}@{version} → {repo_id} ({commit_hash[:8]}…)")
+
+    def record_hub_download(
+        self,
+        model_type: str,
+        repo_id: str,
+        commit_hash: str,
+        metrics: dict | None = None,
+    ) -> str:
+        """Create a version entry for a hub-downloaded model and set it active.
+
+        The model files are assumed to already be in the active directory
+        (placed there by snapshot_download). Returns the new version string.
+        """
+        registry = self.load()
+        section = registry.setdefault(model_type, {"active": None, "versions": {}})
+        version = self._next_version(section)
+        active_dir = _ARTIFACTS_DIR / _ACTIVE_DIRS[model_type]
+
+        section["versions"][version] = {
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "versioned_dir": str(active_dir),
+            "metrics": metrics or {},
+            "data_version": None,
+            "hub": {
+                "repo_id": repo_id,
+                "commit": commit_hash,
+                "source": "downloaded",
+                "downloaded_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            },
+        }
+        section["active"] = version
+        self._save(registry)
+        print(
+            f"  [hub] {model_type}@{version} ← {repo_id} "
+            f"({commit_hash[:8]}…) → ACTIVE"
+        )
+        return version
+
+    def get_hub_info(self, model_type: str) -> dict | None:
+        """Return hub metadata for the active version, or None if not hub-sourced."""
+        registry = self.load()
+        section = registry.get(model_type, {})
+        active_ver = section.get("active")
+        if not active_ver:
+            return None
+        return section.get("versions", {}).get(active_ver, {}).get("hub")
+
+    def should_retrain(self, model_type: str, data_type: str) -> bool:
+        """True if the active data version differs from what the active model was trained on.
+
+        Returns True (must retrain) when:
+        - No model exists yet
+        - data_version on the model entry is null (legacy, pre-tracking)
+        - The data version that trained the model != the current active data version
+
+        Hub-downloaded models are treated as authoritative and never trigger retrain
+        unless the user explicitly passes --retrain.
+        """
+        if not self.model_exists(model_type):
+            return True
+        hub_info = self.get_hub_info(model_type)
+        if hub_info and hub_info.get("source") == "downloaded":
+            return False
+        registry = self.load()
+        model_data_ver = self.get_model_data_version(model_type)
+        current_data_ver = registry.get(f"data_{data_type}", {}).get("active")
+        if model_data_ver is None or current_data_ver is None:
+            return True
+        return model_data_ver != current_data_ver
+
     # ── Summary helpers (used by monitoring) ─────────────────────────────────
 
     def get_all_model_versions(self) -> dict:
@@ -275,6 +351,7 @@ class VersionManager:
                     "score": score,
                     "data_version": info.get("data_version"),
                     "is_active": ver == section.get("active"),
+                    "hub": info.get("hub"),
                 })
             versions.sort(key=lambda x: x["version"])
             result[model_type] = {

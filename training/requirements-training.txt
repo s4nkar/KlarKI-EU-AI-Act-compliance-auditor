@@ -30,3 +30,4 @@ httpx>=0.27.0
 # Required by scripts/benchmark_triton.py (Triton benchmark stage)
 tritonclient[grpc]>=2.40.0
 snorkel>=0.9.8
+huggingface-hub>=0.26.0  # required by scripts/push_models_to_hub.py and scripts/download_pretrained.py

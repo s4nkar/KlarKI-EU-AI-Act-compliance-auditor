@@ -339,7 +339,14 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
         if re.search(pattern, full_text, re.IGNORECASE):
             prohibited_hits.append(label)
 
-    ml_prohibited = _ml_prohibited(full_text[:2000])  # truncate for inference speed
+    # NER PROHIBITED_USE entities extracted before the gate supply a direct signal.
+    for chunk in chunks:
+        for ent_text in chunk.metadata.get("ner_entities", {}).get("PROHIBITED_USE", []):
+            signal = f"NER: {ent_text}"
+            if signal not in prohibited_hits:
+                prohibited_hits.append(signal)
+
+    ml_prohibited = _ml_prohibited(full_text)
     if ml_prohibited and ml_prohibited.label == "prohibited" and ml_prohibited.confidence >= _ML_CONFIDENCE_THRESHOLD:
         prohibited_hits.append(f"ML model ({ml_prohibited.confidence:.0%} confidence)")
 
@@ -386,16 +393,31 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
             annex_i_hits.append(label)
     annex_i_triggered = len(annex_i_hits) >= 2  # require at least 2 signals to avoid false positives
 
+    # NER RISK_TIER entities add a lightweight high-risk signal without regex.
+    ner_high_risk_signals: list[str] = []
+    _HIGH_RISK_TERMS = {"high-risk", "high risk", "hochriskant", "hohes risiko"}
+    for chunk in chunks:
+        for ent_text in chunk.metadata.get("ner_entities", {}).get("RISK_TIER", []):
+            if ent_text.lower() in _HIGH_RISK_TERMS:
+                signal = f"NER: {ent_text}"
+                if signal not in ner_high_risk_signals:
+                    ner_high_risk_signals.append(signal)
+
     # ── Step 4: ML high-risk augmentation ────────────────────────────────────
     # ML model can catch Annex III cases where keyword patterns missed.
-    ml_risk = _ml_high_risk(full_text[:2000])
+    ml_risk = _ml_high_risk(full_text)
     ml_high_risk_triggered = (
         ml_risk is not None
         and ml_risk.label == "high_risk"
         and ml_risk.confidence >= _ML_CONFIDENCE_THRESHOLD
     )
 
-    is_high_risk = bool(annex_iii_matches) or annex_i_triggered or ml_high_risk_triggered
+    is_high_risk = (
+        bool(annex_iii_matches)
+        or annex_i_triggered
+        or ml_high_risk_triggered
+        or bool(ner_high_risk_signals)
+    )
 
     # ── Build reasoning ───────────────────────────────────────────────────────
     reasoning_parts: list[str] = []
@@ -416,6 +438,11 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
             f"({ml_risk.confidence:.0%} confidence) — no keyword match found. "  # type: ignore[union-attr]
             "Manual review of Annex III category is recommended."
         )
+    if ner_high_risk_signals and not annex_iii_matches and not annex_i_triggered and not ml_high_risk_triggered:
+        reasoning_parts.append(
+            f"HIGH-RISK: NER detected risk tier signals: {', '.join(ner_high_risk_signals)}. "
+            "Manual review of Annex III category is recommended."
+        )
     if not is_high_risk:
         reasoning_parts.append(
             "No Annex III categories or Article 6(1) safety-component signals found. "
@@ -433,6 +460,7 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
         is_prohibited=False,
         annex_iii_categories=[m.category.value for m in annex_iii_matches],
         annex_i_triggered=annex_i_triggered,
+        ner_high_risk_signals=ner_high_risk_signals,
         gdpr_articles=gdpr_applicable_articles,
     )
 

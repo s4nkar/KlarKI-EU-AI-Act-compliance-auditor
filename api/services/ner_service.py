@@ -3,13 +3,16 @@
 Adds `ner_entities` to each chunk's metadata dict, grouped by label:
     {"ARTICLE": ["Article 9"], "OBLIGATION": ["shall maintain"], ...}
 
-Also applies a conservative domain correction for chunks classified as UNRELATED
-when NER finds an explicit Article reference pointing to a known domain. This
-recovers chunks the domain classifier missed (e.g. short procedural paragraphs
-that say "as required by Article 9" without any domain-specific vocabulary).
+Two-phase design so NER can run before the legal gate:
+  Phase 1 — extract_ner_entities_async   writes chunk.metadata["ner_entities"]
+                                         does NOT touch chunk.domain
+  Phase 2 — apply_ner_domain_correction  reads already-extracted entities and
+                                         corrects UNRELATED chunks that contain
+                                         an unambiguous Article 9–15 reference.
+                                         Must be called after classify_chunks.
 
-The spaCy model is lazy-loaded once and cached. If the model directory doesn't
-exist (not yet trained), all functions return the chunks unchanged.
+The legacy enrich_chunks_with_ner / enrich_chunks_with_ner_async wrappers
+remain for any callers that want both phases in one shot.
 
 Model path: training/artifacts/spacy_ner_model/model-final  (relative to project root)
 """
@@ -78,22 +81,21 @@ def _extract_article_nums(entity_texts: list[str]) -> list[int]:
     return nums
 
 
-def enrich_chunks_with_ner(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
-    """Run NER on every chunk and enrich chunk.metadata in-place.
+# ── Phase 1: entity extraction ────────────────────────────────────────────────
 
-    For each chunk:
-      - Adds metadata["ner_entities"] = {label: [text, ...], ...}
-      - If chunk.domain is UNRELATED and NER finds an unambiguous Article
-        reference (9–15), corrects domain to the matching ArticleDomain.
+def extract_ner_entities(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
+    """Run spaCy NER over every chunk and write entities to chunk.metadata.
 
-    Returns the same list (mutated in place) so callers can chain easily.
-    If the NER model is unavailable the chunks are returned unchanged.
+    Writes chunk.metadata["ner_entities"] = {label: [text, ...], ...}.
+    Does NOT touch chunk.domain — call apply_ner_domain_correction after
+    classify_chunks has set chunk.domain.
+
+    Returns the same list (mutated in place).
     """
     nlp = _get_nlp()
     if nlp is None:
         return chunks
 
-    corrected = 0
     for chunk in chunks:
         try:
             doc = nlp(chunk.text[:1000])  # cap at 1000 chars to limit latency
@@ -101,53 +103,28 @@ def enrich_chunks_with_ner(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
             logger.warning("ner_chunk_failed", chunk_id=chunk.chunk_id, error=str(exc))
             continue
 
-        # Group entities by label
         entities: dict[str, list[str]] = {}
         for ent in doc.ents:
             entities.setdefault(ent.label_, []).append(ent.text)
 
         chunk.metadata["ner_entities"] = entities
 
-        # Domain correction — only for UNRELATED chunks with a clear article signal
-        if chunk.domain == ArticleDomain.UNRELATED:
-            article_nums = _extract_article_nums(entities.get("ARTICLE", []))
-            # Only correct when there's exactly one article referenced — ambiguous
-            # chunks with multiple references stay UNRELATED for safety.
-            if len(set(article_nums)) == 1:
-                target_domain = _ARTICLE_TO_DOMAIN[article_nums[0]]
-                chunk.domain = target_domain
-                corrected += 1
-                logger.debug(
-                    "ner_domain_correction",
-                    chunk_id=chunk.chunk_id,
-                    article=article_nums[0],
-                    new_domain=target_domain.value,
-                )
-
-    if corrected:
-        logger.info("ner_enrichment_done", total=len(chunks), domain_corrections=corrected)
-    else:
-        logger.info("ner_enrichment_done", total=len(chunks), domain_corrections=0)
-
+    logger.info("ner_extraction_done", total=len(chunks))
     return chunks
 
 
-async def enrich_chunks_with_ner_async(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
-    """Async wrapper — dispatches to Triton NER when USE_TRITON=true, local spaCy otherwise.
-
-    Triton Python backend runs spaCy on CPU inside the inference server.
-    Falls back to the local model if Triton is unreachable.
-    """
+async def extract_ner_entities_async(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
+    """Async Phase-1 wrapper — Triton NER backend when USE_TRITON=true."""
     if settings.use_triton:
         try:
-            return await _enrich_triton(chunks)
+            return await _extract_triton(chunks)
         except Exception as exc:
             logger.warning("triton_ner_fallback", error=str(exc), fallback="local")
 
-    return await asyncio.to_thread(enrich_chunks_with_ner, chunks)
+    return await asyncio.to_thread(extract_ner_entities, chunks)
 
 
-async def _enrich_triton(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
+async def _extract_triton(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
     from services.triton_client import TritonClient
 
     client = TritonClient(host=settings.triton_host, grpc_port=settings.triton_grpc_port)
@@ -159,14 +136,60 @@ async def _enrich_triton(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
         batch_entities = await client.ner(texts[i : i + batch_size])
         all_entities.extend(batch_entities)
 
-    corrected = 0
     for chunk, entities in zip(chunks, all_entities):
         chunk.metadata["ner_entities"] = entities
-        if chunk.domain == ArticleDomain.UNRELATED:
-            article_nums = _extract_article_nums(entities.get("ARTICLE", []))
-            if len(set(article_nums)) == 1:
-                chunk.domain = _ARTICLE_TO_DOMAIN[article_nums[0]]
-                corrected += 1
 
-    logger.info("ner_enrichment_done", total=len(chunks), domain_corrections=corrected, backend="triton")
+    logger.info("ner_extraction_done", total=len(chunks), backend="triton")
     return chunks
+
+
+# ── Phase 2: domain correction ────────────────────────────────────────────────
+
+def apply_ner_domain_correction(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
+    """Correct UNRELATED chunks using already-extracted NER entities.
+
+    Reads chunk.metadata["ner_entities"] — does NOT re-run spaCy.
+    Must be called after classify_chunks has set chunk.domain.
+
+    Only corrects chunks where NER found exactly one unambiguous Article 9–15
+    reference. Multi-article chunks stay UNRELATED to avoid wrong assignment.
+    """
+    corrected = 0
+    for chunk in chunks:
+        if chunk.domain != ArticleDomain.UNRELATED:
+            continue
+        entities = chunk.metadata.get("ner_entities", {})
+        article_nums = _extract_article_nums(entities.get("ARTICLE", []))
+        if len(set(article_nums)) == 1:
+            target_domain = _ARTICLE_TO_DOMAIN[article_nums[0]]
+            chunk.domain = target_domain
+            corrected += 1
+            logger.debug(
+                "ner_domain_correction",
+                chunk_id=chunk.chunk_id,
+                article=article_nums[0],
+                new_domain=target_domain.value,
+            )
+
+    if corrected:
+        logger.info("ner_domain_correction_done", corrected=corrected)
+    return chunks
+
+
+# ── Legacy combined wrappers ──────────────────────────────────────────────────
+
+def enrich_chunks_with_ner(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
+    """Run both NER phases in sequence (entity extraction + domain correction).
+
+    Requires chunk.domain to be already set by classify_chunks.
+    Use extract_ner_entities + apply_ner_domain_correction separately when
+    NER needs to run before the legal gate.
+    """
+    chunks = extract_ner_entities(chunks)
+    return apply_ner_domain_correction(chunks)
+
+
+async def enrich_chunks_with_ner_async(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
+    """Async combined wrapper — both phases via Triton or local spaCy."""
+    chunks = await extract_ner_entities_async(chunks)
+    return apply_ner_domain_correction(chunks)

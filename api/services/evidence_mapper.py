@@ -250,11 +250,22 @@ def _evidence_present(evidence_term: str, chunks: list[DocumentChunk]) -> list[s
             "id2label",
             {0: "CONTRADICTION", 1: "ENTAILMENT", 2: "NEUTRAL"},
         )
+        # Find entailment class index once for the whole batch.
+        entailment_idx = next(
+            (idx for idx, lbl in labels.items() if "ENTAILMENT" in lbl.upper()),
+            None,
+        )
         for chunk, scores in zip(nli_candidates, batch_scores):
             predicted_label = labels.get(int(scores.argmax()), "").upper()
-            if "ENTAILMENT" in predicted_label:
-                logger.debug("nli_entailment_match", term=evidence_term, chunk_id=chunk.chunk_id)
-                matched_ids.append(chunk.chunk_id)
+            if "ENTAILMENT" not in predicted_label:
+                continue
+            # Require a minimum entailment score to suppress marginal matches
+            # where all three classes are near 0.33.
+            if entailment_idx is not None and float(scores[entailment_idx]) < 0.5:
+                continue
+            logger.debug("nli_entailment_match", term=evidence_term, chunk_id=chunk.chunk_id,
+                         score=round(float(scores[entailment_idx]), 3))
+            matched_ids.append(chunk.chunk_id)
     except Exception as exc:
         logger.warning("nli_batch_failed", term=evidence_term, error=str(exc))
 
