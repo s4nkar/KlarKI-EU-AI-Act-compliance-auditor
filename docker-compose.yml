@@ -31,6 +31,7 @@ services:
       - ./data/obligations:/data/obligations:ro
       - ./training/artifacts:/training/artifacts:ro
       - ./training/data:/training/data:ro
+      - ./training/version_manager.py:/training/version_manager.py:ro
       - ./tests/evaluation/results:/tests/evaluation/results:ro
     healthcheck:
       # Python is guaranteed present; curl is not in python:3.11-slim.
@@ -83,7 +84,7 @@ services:
       # phi3:mini has 32 layers; offloading 20 stays within 4 GB VRAM on RTX 3050 Ti.
       - OLLAMA_GPU_LAYERS=20
       - OLLAMA_MAX_LOADED_MODELS=1
-      - OLLAMA_NUM_CTX=1024
+      - OLLAMA_NUM_CTX=2048
     # GPU acceleration is opt-in via docker-compose.gpu.yml overlay:
     #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
     # ./run.sh up and ./run.sh setup auto-apply the overlay when nvidia-smi is detected.
