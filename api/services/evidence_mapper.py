@@ -39,13 +39,26 @@ except ImportError:
 logger = structlog.get_logger()
 
 _NLI_MODEL = None
+_NLI_LOAD_FAILED = False  # prevents repeated download attempts after the first failure
+
 
 def _get_nli_model():
-    """Lazily load the NLI Cross-Encoder model to avoid overhead if unused."""
-    global _NLI_MODEL
-    if _NLI_MODEL is None and CrossEncoder is not None:
-        logger.info("loading_nli_model", model="cross-encoder/nli-deberta-v3-small")
-        _NLI_MODEL = CrossEncoder("cross-encoder/nli-deberta-v3-small")
+    """Lazily load the NLI Cross-Encoder model; returns None if unavailable."""
+    global _NLI_MODEL, _NLI_LOAD_FAILED
+    if _NLI_LOAD_FAILED or CrossEncoder is None:
+        return None
+    if _NLI_MODEL is None:
+        try:
+            logger.info("loading_nli_model", model="cross-encoder/nli-deberta-v3-small")
+            _NLI_MODEL = CrossEncoder("cross-encoder/nli-deberta-v3-small")
+        except Exception as exc:
+            _NLI_LOAD_FAILED = True
+            logger.warning(
+                "nli_model_unavailable",
+                error=str(exc),
+                fallback="regex-only evidence matching active",
+            )
+            return None
     return _NLI_MODEL
 
 _OBLIGATIONS_DIR = Path(__file__).parent.parent.parent / "data" / "obligations"
@@ -237,11 +250,22 @@ def _evidence_present(evidence_term: str, chunks: list[DocumentChunk]) -> list[s
             "id2label",
             {0: "CONTRADICTION", 1: "ENTAILMENT", 2: "NEUTRAL"},
         )
+        # Find entailment class index once for the whole batch.
+        entailment_idx = next(
+            (idx for idx, lbl in labels.items() if "ENTAILMENT" in lbl.upper()),
+            None,
+        )
         for chunk, scores in zip(nli_candidates, batch_scores):
             predicted_label = labels.get(int(scores.argmax()), "").upper()
-            if "ENTAILMENT" in predicted_label:
-                logger.debug("nli_entailment_match", term=evidence_term, chunk_id=chunk.chunk_id)
-                matched_ids.append(chunk.chunk_id)
+            if "ENTAILMENT" not in predicted_label:
+                continue
+            # Require a minimum entailment score to suppress marginal matches
+            # where all three classes are near 0.33.
+            if entailment_idx is not None and float(scores[entailment_idx]) < 0.5:
+                continue
+            logger.debug("nli_entailment_match", term=evidence_term, chunk_id=chunk.chunk_id,
+                         score=round(float(scores[entailment_idx]), 3))
+            matched_ids.append(chunk.chunk_id)
     except Exception as exc:
         logger.warning("nli_batch_failed", term=evidence_term, error=str(exc))
 

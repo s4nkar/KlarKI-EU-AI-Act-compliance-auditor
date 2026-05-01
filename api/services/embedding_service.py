@@ -16,6 +16,8 @@ import hashlib
 import structlog
 from sentence_transformers import SentenceTransformer
 
+from config import settings
+
 logger = structlog.get_logger()
 
 
@@ -70,11 +72,7 @@ class EmbeddingService:
 
         # Encode only the uncached texts
         if uncached_texts:
-            def _encode() -> list[list[float]]:
-                vectors = self.model.encode(uncached_texts, normalize_embeddings=True)
-                return vectors.tolist()
-
-            new_vectors: list[list[float]] = await asyncio.to_thread(_encode)
+            new_vectors: list[list[float]] = await self._encode_batch(uncached_texts)
 
             for i, vec in zip(uncached_indices, new_vectors, strict=True):
                 self._cache[keys[i]] = vec
@@ -83,6 +81,23 @@ class EmbeddingService:
 
         # Reconstruct result in original order (all from cache now)
         return [self._cache[k] for k in keys]
+
+    async def _encode_batch(self, texts: list[str]) -> list[list[float]]:
+        """Encode a batch of texts — Triton GPU path when enabled, local CPU otherwise."""
+        if settings.use_triton:
+            try:
+                from services.triton_client import TritonClient
+                client = TritonClient(host=settings.triton_host, grpc_port=settings.triton_grpc_port)
+                vecs = await client.embed(texts)
+                logger.debug("embedding_via_triton", count=len(texts))
+                return vecs
+            except Exception as exc:
+                logger.warning("triton_embed_fallback", error=str(exc), fallback="local")
+
+        def _local() -> list[list[float]]:
+            return self.model.encode(texts, normalize_embeddings=True).tolist()
+
+        return await asyncio.to_thread(_local)
 
     @property
     def cache_size(self) -> int:

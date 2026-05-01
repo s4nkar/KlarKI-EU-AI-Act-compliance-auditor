@@ -160,6 +160,45 @@ class TritonClient:
         logger.debug("triton_embed_done", batch_size=len(texts))
         return pooled.tolist()
 
+    async def ner(self, texts: list[str]) -> list[dict[str, list[str]]]:
+        """Run spaCy NER via Triton Python backend.
+
+        Args:
+            texts: List of text strings (pre-truncated to model's preferred length).
+
+        Returns:
+            One dict per text: {label: [entity_text, ...]}
+        """
+        import json
+        import tritonclient.grpc.aio as grpcclient
+
+        np_texts = np.array([[t.encode("utf-8")] for t in texts], dtype=object)
+
+        inputs = [grpcclient.InferInput("text", np_texts.shape, "BYTES")]
+        inputs[0].set_data_from_numpy(np_texts)
+
+        outputs = [grpcclient.InferRequestedOutput("entities")]
+
+        client = await self._get_client()
+        response = await client.infer(
+            model_name="spacy_ner",
+            inputs=inputs,
+            outputs=outputs,
+        )
+
+        raw = response.as_numpy("entities").flatten()
+        results: list[dict[str, list[str]]] = []
+        for item in raw:
+            decoded = item.decode("utf-8") if isinstance(item, bytes) else item
+            entities_list = json.loads(decoded)
+            grouped: dict[str, list[str]] = {}
+            for ent in entities_list:
+                grouped.setdefault(ent["label"], []).append(ent["text"])
+            results.append(grouped)
+
+        logger.debug("triton_ner_done", batch_size=len(texts))
+        return results
+
     async def health_check(self) -> bool:
         """Check Triton server readiness via gRPC.
 

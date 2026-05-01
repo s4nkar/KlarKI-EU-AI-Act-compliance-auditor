@@ -34,13 +34,68 @@ from services.chunker import proposition_chunk_text
 from services.evidence_mapper import map_evidence
 from services.gap_analyser import analyse_article
 from services.language_detector import detect_language
-from services.ner_service import enrich_chunks_with_ner
+from services.ner_service import apply_ner_domain_correction, extract_ner_entities_async
 from services.ollama_client import OllamaClient
 from services.rag_engine import retrieve_requirements
 from services.monitoring_stats import stats as _monitor
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/audit", tags=["audit"])
+
+# Fixed article-topic queries used to rank domain chunks before RAG retrieval.
+# Bilingual so they work with multilingual-e5-small on both EN and DE documents.
+# Embeddings are cached by EmbeddingService — cost is paid once per server lifetime.
+_ARTICLE_RAG_QUERIES: dict[int, str] = {
+    9:  "risk management system requirements high-risk AI Risikomanagementsystem Anforderungen",
+    10: "training data governance quality management AI dataset Datenverwaltung Qualität",
+    11: "technical documentation AI system design architecture Technische Dokumentation",
+    12: "record keeping logging automated decisions audit trail Aufzeichnungspflichten",
+    13: "transparency information disclosure AI system users Transparenzpflicht Nutzer",
+    14: "human oversight monitoring control intervention Menschliche Aufsicht Kontrolle",
+    15: "accuracy robustness cybersecurity resilience AI Cybersicherheit Genauigkeit",
+}
+
+
+async def _select_query_chunks(
+    domain_chunks: list,
+    article_num: int,
+    embeddings,
+    n: int = 3,
+) -> list:
+    """Return the top-n most relevant chunks for a given article using semantic similarity.
+
+    Embeds a fixed article-topic query and scores each domain chunk by cosine
+    similarity (dot product of already-normalised e5-small vectors).
+    Falls back to document order if embedding fails.
+    """
+    if len(domain_chunks) <= n:
+        return domain_chunks
+
+    query = _ARTICLE_RAG_QUERIES.get(article_num)
+    if query is None:
+        return domain_chunks[:n]
+
+    try:
+        import numpy as np
+
+        texts = [query] + [c.text for c in domain_chunks]
+        vectors = await embeddings.embed(texts)
+        q_vec = np.array(vectors[0])
+        scores = [float(np.dot(q_vec, np.array(v))) for v in vectors[1:]]
+        ranked = sorted(zip(scores, domain_chunks), key=lambda x: x[0], reverse=True)
+        selected = [c for _, c in ranked[:n]]
+        logger.debug(
+            "chunk_relevance_ranked",
+            article=article_num,
+            total=len(domain_chunks),
+            selected=n,
+            top_score=round(scores[0], 3) if scores else 0,
+        )
+        return selected
+    except Exception as exc:
+        logger.warning("chunk_relevance_ranking_failed", article=article_num, error=str(exc))
+        return domain_chunks[:n]
+
 
 # In-memory audit store — replace with Redis or a DB for multi-worker deployments.
 _audits: dict[str, AuditResponse] = {}
@@ -193,7 +248,7 @@ async def _run_pipeline(
         applicable_articles,
     ):
         art_chunks = domain_chunks.get(domain, [])
-        query_chunks = art_chunks[:3]
+        query_chunks = await _select_query_chunks(art_chunks, article_num, embeddings)
 
         reg_passages = []
 
@@ -236,24 +291,30 @@ async def _run_pipeline(
         chroma = request.app.state.chroma
         embeddings = request.app.state.embeddings
 
-        # Parse → chunk (legal-unit) → detect language
+        # ── Stage 1: parse → chunk → language ────────────────────────────────
         _set_status(AuditStatus.PARSING)
         _t0 = _time.time()
         raw_text = await parse_document(file_path, filename)
         chunks = await proposition_chunk_text(raw_text, source_file=filename)
         language = await detect_language(raw_text)
-        _monitor.record_stage("parsing", _time.time() - _t0)
         for chunk in chunks:
             chunk.language = language
+        _monitor.record_stage("parsing", _time.time() - _t0)
 
-        # Phase 3 — legal decision hierarchy (must run before gap analysis)
-        # Step 1: detect actor role (Article 3)
-        # Step 2: applicability gate (Article 6 + Annex III) — determines if 9–15 apply
+        # ── Stage 2: NER entity extraction ───────────────────────────────────
+        # Runs before the legal gate so PROHIBITED_USE / RISK_TIER entities
+        # are available to applicability_engine. Domain correction happens
+        # after classify_chunks (Phase 2 below).
         _set_status(AuditStatus.CLASSIFYING)
         _t0 = _time.time()
-        actor_result = await asyncio.to_thread(classify_actor, raw_text)
-        applicability_result = await asyncio.to_thread(check_applicability, chunks)
-        _monitor.record_stage("classifying", _time.time() - _t0)
+        chunks = await extract_ner_entities_async(chunks)
+
+        # ── Stage 3: actor + applicability gate ──────────────────────────────
+        # Both are deterministic and use NER entity metadata written above.
+        actor_result, applicability_result = await asyncio.gather(
+            asyncio.to_thread(classify_actor, raw_text, chunks),
+            asyncio.to_thread(check_applicability, chunks),
+        )
 
         logger.info(
             "applicability_determined",
@@ -264,17 +325,17 @@ async def _run_pipeline(
             annex_iii_categories=[m.category.value for m in applicability_result.annex_iii_matches],
         )
 
-        # Classify each chunk into an ArticleDomain
-        chunks = await classify_chunks(chunks, ollama)
-        classifier_backend = (
-            "triton/gbert-base"
-            if settings.use_triton
-            else f"ollama/{settings.ollama_model}"
-        )
+        # ── Stage 4: chunk classification (BERT/Ollama) ───────────────────────
+        chunks, classifier_backend = await classify_chunks(chunks, ollama)
 
-        # NER enrichment — adds entity metadata to each chunk and corrects domain
-        # for UNRELATED chunks that contain explicit Article references (9–15).
-        chunks = await asyncio.to_thread(enrich_chunks_with_ner, chunks)
+        # ── Stage 5: NER domain correction ───────────────────────────────────
+        # Now that chunk.domain is set, correct UNRELATED chunks that NER
+        # flagged as containing an unambiguous Article 9–15 reference.
+        chunks = await asyncio.to_thread(apply_ner_domain_correction, chunks)
+        _monitor.record_stage("classifying", _time.time() - _t0)
+
+        # Ensure Ollama has the model loaded before firing 7 concurrent LangGraph calls
+        await ollama.warmup()
 
         # RAG retrieval + per-article gap analysis
         _set_status(AuditStatus.ANALYSING)

@@ -44,7 +44,7 @@ def _parse_label(raw: str) -> ArticleDomain:
     return _LABEL_MAP.get(cleaned, ArticleDomain.UNRELATED)
 
 
-async def _classify_ollama(chunks: list[DocumentChunk], ollama: OllamaClient) -> list[DocumentChunk]:
+async def _classify_ollama(chunks: list[DocumentChunk], ollama: OllamaClient) -> tuple[list[DocumentChunk], str]:
     """Sequential few-shot classification via Ollama."""
     prompt_template = _load_prompt()
     total = len(chunks)
@@ -61,10 +61,10 @@ async def _classify_ollama(chunks: list[DocumentChunk], ollama: OllamaClient) ->
         if (i + 1) % 10 == 0 or (i + 1) == total:
             logger.info("classify_progress", done=i + 1, total=total)
 
-    return chunks
+    return chunks, "ollama"
 
 
-async def _classify_triton(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
+async def _classify_triton(chunks: list[DocumentChunk]) -> tuple[list[DocumentChunk], str]:
     """Batched BERT classification via Triton gRPC."""
     from services.triton_client import TritonClient
 
@@ -87,13 +87,13 @@ async def _classify_triton(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
     for chunk, label in zip(chunks, all_labels):
         chunk.domain = _LABEL_MAP.get(label, ArticleDomain.UNRELATED)
 
-    return chunks
+    return chunks, "triton"
 
 
 async def classify_chunks(
     chunks: list[DocumentChunk],
     ollama: OllamaClient,
-) -> list[DocumentChunk]:
+) -> tuple[list[DocumentChunk], str]:
     """Classify each chunk into an ArticleDomain.
 
     Delegates to Triton (batched BERT) when USE_TRITON=true,
@@ -104,15 +104,26 @@ async def classify_chunks(
         ollama: OllamaClient — used only when USE_TRITON=false.
 
     Returns:
-        Same list with .domain set on every chunk.
+        Tuple of (chunks with .domain set, actual backend name used).
+        Backend name reflects any fallback that occurred at runtime.
     """
     if settings.use_triton:
         logger.info("classify_backend", backend="triton", chunks=len(chunks))
-        chunks = await _classify_triton(chunks)
+        try:
+            chunks, backend = await _classify_triton(chunks)
+        except Exception as exc:
+            logger.warning(
+                "triton_unavailable_fallback",
+                error=str(exc),
+                fallback="ollama",
+            )
+            logger.info("classify_backend", backend="ollama_fallback", chunks=len(chunks))
+            chunks, backend = await _classify_ollama(chunks, ollama)
+            backend = f"ollama_fallback/{settings.ollama_model}"
     else:
         logger.info("classify_backend", backend="ollama", chunks=len(chunks))
-        chunks = await _classify_ollama(chunks, ollama)
+        chunks, backend = await _classify_ollama(chunks, ollama)
 
     classified = sum(1 for c in chunks if c.domain != ArticleDomain.UNRELATED)
-    logger.info("classify_done", total=len(chunks), classified=classified)
-    return chunks
+    logger.info("classify_done", total=len(chunks), classified=classified, backend=backend)
+    return chunks, backend

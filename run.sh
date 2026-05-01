@@ -198,7 +198,9 @@ cmd_test() {
 }
 
 cmd_bench() {
-  _run_training python scripts/benchmark_triton.py --n-samples 50
+  _run_training python scripts/benchmark_triton.py --n-samples 50 \
+    --ollama-host http://klarki-ollama:11434 \
+    --triton-host klarki-triton --triton-port 8001
 }
 
 cmd_down() {

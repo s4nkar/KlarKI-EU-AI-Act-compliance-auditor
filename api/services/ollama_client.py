@@ -118,6 +118,32 @@ class OllamaClient:
 
         raise ValueError("ollama_generate_json: unreachable")
 
+    async def warmup(self, retries: int = 5, delay: float = 3.0) -> bool:
+        """Ensure the model is loaded before sending real requests.
+
+        Sends a minimal generate request. Retries on 500 (model still loading).
+        Returns True once warm, False if all retries exhausted.
+        """
+        import asyncio
+        for attempt in range(1, retries + 1):
+            try:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(30.0)) as client:
+                    resp = await client.post(
+                        f"{self._host}/api/generate",
+                        json={"model": self._model, "prompt": "hi", "stream": False,
+                              "options": {"num_predict": 1, **_DETERMINISTIC_OPTIONS}},
+                    )
+                    if resp.status_code == 200:
+                        logger.info("ollama_warmup_ready", model=self._model, attempt=attempt)
+                        return True
+                    logger.warning("ollama_warmup_retry", status=resp.status_code, attempt=attempt)
+            except Exception as exc:
+                logger.warning("ollama_warmup_error", error=str(exc), attempt=attempt)
+            if attempt < retries:
+                await asyncio.sleep(delay)
+        logger.warning("ollama_warmup_failed", model=self._model, retries=retries)
+        return False
+
     async def health_check(self) -> bool:
         """Check if Ollama is reachable and the model is available.
 
