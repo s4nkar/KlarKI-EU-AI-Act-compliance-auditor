@@ -157,16 +157,28 @@ def load_jsonl(path: str) -> list[dict]:
 
 
 def split_dataset(records: list[dict], val_ratio: float = 0.15, seed: int = 42) -> tuple[list, list]:
-    """Stratified train/val split — reproducible with seed."""
+    """Stratified train/val split by (label, source) — reproducible with seed.
+
+    Records are grouped by (label, source) before splitting so val gets a
+    proportional mix of regulatory and synthetic examples. With label-only
+    stratification, regulatory records would scatter randomly into train and
+    val, letting the model memorise synthetic-distribution phrasing while
+    val numbers stay artificially high. Pairing on source forces every
+    (label, source) bucket to contribute to val in the same ratio, which
+    means regulatory examples reliably appear on the val side and the
+    `macro_f1_regulatory_only` number computed at training-end actually
+    reflects out-of-distribution performance on real text.
+    """
     from collections import defaultdict
     rng = random.Random(seed)
 
-    by_label: dict[str, list] = defaultdict(list)
+    by_label_source: dict[tuple[str, str], list] = defaultdict(list)
     for r in records:
-        by_label[r["label"]].append(r)
+        key = (r["label"], r.get("source", "generated"))
+        by_label_source[key].append(r)
 
     train, val = [], []
-    for items in by_label.values():
+    for items in by_label_source.values():
         rng.shuffle(items)
         cut = max(1, int(len(items) * (1 - val_ratio)))
         train.extend(items[:cut])
@@ -364,8 +376,23 @@ def main() -> None:
     ]
     macro_f1 = round(float(results["eval_macro_f1"]), 4)
 
+    # Regulatory-only macro F1 — honest signal on real (non-synthetic) text.
+    # A wide gap to the mixed-set macro_f1 means the model is overfitting to
+    # generator-specific phrasing rather than learning the legal distinctions.
+    reg_mask = [i for i, r in enumerate(val_data) if r.get("source") == "regulatory"]
+    if reg_mask:
+        reg_labels = labels[reg_mask]
+        reg_preds = preds[reg_mask]
+        reg_macro_f1 = round(float(f1_score(reg_labels, reg_preds, average="macro", zero_division=0)), 4)
+        reg_n = len(reg_mask)
+    else:
+        reg_macro_f1 = None
+        reg_n = 0
+
     metrics_payload = {
         "macro_f1": macro_f1,
+        "macro_f1_regulatory_only": reg_macro_f1,
+        "regulatory_val_size": reg_n,
         "per_class": per_class,
         "confusion_matrix": cm,
         "labels": LABELS,
@@ -373,6 +400,17 @@ def main() -> None:
         "train_size": len(train_data),
         "base_model": args.base_model,
     }
+
+    if reg_macro_f1 is not None:
+        gap = macro_f1 - reg_macro_f1
+        gap_colour = _RED if gap > 0.15 else _AMBER if gap > 0.08 else _GREEN
+        print(f"\nMixed val macro F1   : {macro_f1:.4f}")
+        print(f"Regulatory-only F1   : {_c(gap_colour, f'{reg_macro_f1:.4f}')}  "
+              f"(gap={_c(gap_colour, f'{gap:+.4f}')}, n={reg_n})")
+        if gap > 0.15:
+            print(_c(_RED, "  [!!] Large gap — model is overfitting to synthetic distribution"))
+    else:
+        print("\nNo regulatory examples in val set — cannot compute honest F1")
     metrics_path = output_path / "metrics.json"
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics_payload, f, indent=2)

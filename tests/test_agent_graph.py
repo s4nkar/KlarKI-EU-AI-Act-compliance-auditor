@@ -328,7 +328,13 @@ async def test_synthesis_agent_node_no_findings():
 
 @pytest.mark.asyncio
 async def test_synthesis_agent_node_llm_exception_returns_defaults():
-    """Synthesis node exception → score=50, empty gaps, 'Synthesis failed.' reasoning."""
+    """Synthesis node exception → low score, visible failure gap, retry recommendation.
+
+    The synthesis node intentionally surfaces a critical-severity gap on failure
+    rather than returning empty gaps — empty gaps would silently hide a failed
+    audit from the user. The score is set to 30 so the article visibly fails
+    review. See agent_graph.synthesis_agent_node.
+    """
     from services.agent_graph import synthesis_agent_node
     from models.schemas import ArticleDomain
 
@@ -344,10 +350,11 @@ async def test_synthesis_agent_node_llm_exception_returns_defaults():
     }
     result = await synthesis_agent_node(state)
 
-    assert result["final_score"] == 50.0
-    assert result["reasoning"] == "Synthesis failed."
-    assert result["gaps"] == []
-    assert result["recommendations"] == []
+    assert result["final_score"] == 30.0
+    assert "manual review" in result["reasoning"].lower()
+    assert len(result["gaps"]) == 1
+    assert result["gaps"][0]["severity"] == "major"
+    assert len(result["recommendations"]) == 1
 
 
 @pytest.mark.asyncio
@@ -413,7 +420,8 @@ async def test_full_graph_state_flows_legal_to_technical():
 
     captured_prompts: list[str] = []
 
-    async def _capturing_generate_json(prompt: str) -> dict:
+    # Synthesis node passes keep_alive="0" — accept arbitrary kwargs.
+    async def _capturing_generate_json(prompt: str, **_kwargs) -> dict:
         captured_prompts.append(prompt)
         idx = len(captured_prompts)
         if idx == 1:
@@ -447,7 +455,7 @@ async def test_full_graph_state_flows_technical_to_synthesis():
 
     captured_prompts: list[str] = []
 
-    async def _capturing_generate_json(prompt: str) -> dict:
+    async def _capturing_generate_json(prompt: str, **_kwargs) -> dict:
         captured_prompts.append(prompt)
         idx = len(captured_prompts)
         if idx == 1:
