@@ -77,8 +77,11 @@ model_repository/**/*.onnx
 model_repository/**/*.plan
 model_repository/**/*.engine
 
-# HuggingFace Hub push script — contains tokens, never commit
+# HuggingFace Hub push script
 scripts/push_models_to_hub.py
+
+# API-driven data generators
+local-datagen/
 
 *BUILD_LOG.md
 .claude/settings.local.json
