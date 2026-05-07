@@ -162,7 +162,7 @@ async def _run_async(verbose: bool) -> dict:
     # ── stage 4: chunk classification ──────────────────────────────────────
     if verbose:
         print("  Stage 4: Classifying chunks …")
-    chunks = await classify_chunks(chunks, ollama)
+    chunks, _backend = await classify_chunks(chunks, ollama)
     unlabeled        = [c for c in chunks if c.domain is None]
     classified_count = len(chunks) - len(unlabeled)
     if verbose:

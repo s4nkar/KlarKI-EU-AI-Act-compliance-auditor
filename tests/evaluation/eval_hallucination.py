@@ -149,7 +149,7 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
     for chunk in chunks:
         chunk.language = lang
 
-    classified = await classify_chunks(chunks, ollama)
+    classified, _backend = await classify_chunks(chunks, ollama)
 
     # Build BM25 index so hybrid retrieval works (built at app startup in production)
     await build_bm25_index(chroma)

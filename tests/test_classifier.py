@@ -72,10 +72,11 @@ async def test_classify_chunks_ollama_sets_domain():
 
     with patch("services.classifier.settings") as mock_settings:
         mock_settings.use_triton = False
-        result = await classify_chunks(chunks, mock_ollama)
+        result, backend = await classify_chunks(chunks, mock_ollama)
 
     assert result[0].domain == ArticleDomain.RISK_MANAGEMENT
     assert result[1].domain == ArticleDomain.DATA_GOVERNANCE
+    assert backend == "ollama"
 
 
 @pytest.mark.asyncio
@@ -91,7 +92,7 @@ async def test_classify_chunks_ollama_unknown_label_maps_to_unrelated():
 
     with patch("services.classifier.settings") as mock_settings:
         mock_settings.use_triton = False
-        result = await classify_chunks([chunk], mock_ollama)
+        result, _ = await classify_chunks([chunk], mock_ollama)
 
     assert result[0].domain == ArticleDomain.UNRELATED
 
@@ -109,7 +110,7 @@ async def test_classify_chunks_ollama_error_falls_back_to_unrelated():
 
     with patch("services.classifier.settings") as mock_settings:
         mock_settings.use_triton = False
-        result = await classify_chunks([chunk], mock_ollama)
+        result, _ = await classify_chunks([chunk], mock_ollama)
 
     assert result[0].domain == ArticleDomain.UNRELATED
 
@@ -123,7 +124,7 @@ async def test_classify_chunks_empty_list_returns_empty():
 
     with patch("services.classifier.settings") as mock_settings:
         mock_settings.use_triton = False
-        result = await classify_chunks([], mock_ollama)
+        result, _ = await classify_chunks([], mock_ollama)
 
     assert result == []
     mock_ollama.generate.assert_not_called()
@@ -148,11 +149,12 @@ async def test_classify_chunks_triton_backend_used_when_flag_set():
 
         async def fake_triton(chunks):
             chunks[0].domain = ArticleDomain.SECURITY
-            return chunks
+            return chunks, "triton"
 
         mock_triton.side_effect = fake_triton
-        result = await classify_chunks(chunks, mock_ollama)
+        result, backend = await classify_chunks(chunks, mock_ollama)
 
     mock_triton.assert_called_once()
     mock_ollama.generate.assert_not_called()
     assert result[0].domain == ArticleDomain.SECURITY
+    assert backend == "triton"

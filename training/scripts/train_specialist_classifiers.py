@@ -159,12 +159,14 @@ def load_jsonl(path: str) -> list[dict]:
 
 
 def split_dataset(records: list[dict], val_ratio: float = 0.15, seed: int = 42) -> tuple[list, list]:
+    """Stratified train/val split by (label, source) — see train_classifier.py for rationale."""
     rng = random.Random(seed)
-    by_label: dict[str, list] = defaultdict(list)
+    by_label_source: dict[tuple[str, str], list] = defaultdict(list)
     for r in records:
-        by_label[r["label"]].append(r)
+        key = (r["label"], r.get("source", "generated"))
+        by_label_source[key].append(r)
     train, val = [], []
-    for items in by_label.values():
+    for items in by_label_source.values():
         rng.shuffle(items)
         cut = max(1, int(len(items) * (1 - val_ratio)))
         train.extend(items[:cut])
@@ -348,9 +350,32 @@ def train(
         }
         for i in range(len(labels))
     ]
+
+    # Regulatory-only val macro F1 — honest signal on real text. See
+    # train_classifier.py for rationale.
+    reg_mask = [i for i, r in enumerate(val_data) if r.get("source") == "regulatory"]
+    if reg_mask:
+        reg_y = y_true[reg_mask]
+        reg_p = preds[reg_mask]
+        reg_macro_f1 = round(float(f1_score(reg_y, reg_p, average="macro", zero_division=0)), 4)
+        reg_n = len(reg_mask)
+        gap = round(float(final_f1) - reg_macro_f1, 4)
+        gap_colour = _RED if gap > 0.15 else _AMBER if gap > 0.08 else _GREEN
+        print(f"\nMixed val macro F1   : {final_f1:.4f}")
+        print(f"Regulatory-only F1   : {_c(gap_colour, f'{reg_macro_f1:.4f}')}  "
+              f"(gap={_c(gap_colour, f'{gap:+.4f}')}, n={reg_n})")
+        if gap > 0.15:
+            print(_c(_RED, "  [!!] Large gap — overfitting to synthetic distribution"))
+    else:
+        reg_macro_f1 = None
+        reg_n = 0
+        print("\nNo regulatory examples in val set — cannot compute honest F1")
+
     metrics_payload = {
         "classifier_type": classifier_type,
         "macro_f1": round(float(final_f1), 4),
+        "macro_f1_regulatory_only": reg_macro_f1,
+        "regulatory_val_size": reg_n,
         "per_class": per_class,
         "confusion_matrix": cm,
         "labels": labels,

@@ -150,7 +150,7 @@ async def _ollama_consistency_async(n_runs: int, verbose: bool) -> dict:
                 source_file="probe.txt",
                 chunk_index=0,
             )
-            result = await classify_chunks([chunk], ollama)
+            result, _ = await classify_chunks([chunk], ollama)
             labels_across_runs.append(result[0].domain.value if result[0].domain else "unrelated")
 
         majority, count = Counter(labels_across_runs).most_common(1)[0]
