@@ -1,44 +1,46 @@
-# KlarKI | EU AI Act + GDPR Compliance Auditor
+# KlarKI
+**KlarKI is a local-first, privacy-preserving EU AI Act and GDPR compliance auditor built for organisations 
+primarily German SMEs assessing whether their AI systems meet European regulatory requirements. 
+The entire audit pipeline runs on-device across six Docker services, no data leaves the machine, uploaded documents are deleted 
+immediately after processing, and all inference runs locally.**
 
-> **Local-first. Privacy-preserving. Fully open-source.**
-> Upload a policy document and receive a scored gap analysis against EU AI Act Articles 3–15 and GDPR entirely on your own hardware. No data ever leaves your machine.
+<div align="left">
+ <h2>Local-first. Privacy-preserving. Fully open-source.</h2>
 
----
+
 
 [![Python 3.11](https://img.shields.io/badge/Python-3.11-blue)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green)](https://fastapi.tiangolo.com/)
 [![React 18](https://img.shields.io/badge/React-18.3-61dafb)](https://react.dev/)
-[![LangGraph](https://img.shields.io/badge/LangGraph-multi--agent-purple)](https://github.com/langchain-ai/langgraph)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![Open Source](https://img.shields.io/badge/Open%20Source-Collaborate-brightgreen)](https://github.com/s4nkar/KlarKI-EU-AI-Act-compliance-auditor)
 
----
 
-## Contents
+</div>
 
-- [What KlarKI Does](#what-klarki-does)
-- [Key Features](#key-features)
-- [How It Works](#how-it-works)
-- [Tech Stack](#tech-stack)
-- [Hardware & Model Choices](#hardware--model-choices)
-- [Requirements](#requirements)
-- [Quick Start](#quick-start)
-- [Pretrained Models (Optional)](#pretrained-models-optional)
-- [Commands](#commands)
-- [Setup Stages](#setup-stages)
-- [Classifier Backends](#classifier-backends)
-- [Containers & Profiles](#containers--profiles)
-- [API Reference](#api-reference)
-- [Report Schema](#report-schema)
-- [Environment Variables](#environment-variables)
-- [Testing](#testing)
-- [Training Pipeline](#training-pipeline)
-- [Privacy](#privacy)
-- [Troubleshooting](#troubleshooting)
-- [Contributing & Collaboration](#contributing--collaboration)
-- [Licence](#licence)
+<details>
+<summary><strong>Expand to see the complete table of contents</strong></summary>
 
----
+<br>
+
+**Overview**  
+[What KlarKI Does](#what-klarki-does) · [Key Features](#key-features) · [How It Works](#how-it-works)
+
+**Architecture**  
+[Tech Stack](#tech-stack) · [Hardware & Model Choices](#hardware--model-choices) · [Classifier Backends](#classifier-backends) · [Containers & Profiles](#containers--profiles)
+
+**Setup**  
+[Requirements](#requirements) · [Quick Start](#quick-start) · [Pretrained Models (Optional)](#pretrained-models-optional) · [Setup Stages](#setup-stages)
+
+**Usage**  
+[Commands](#commands) · [API Reference](#api-reference) · [Report Schema](#report-schema) · [Environment Variables](#environment-variables)
+
+**Development**  
+[Testing](#testing) · [Training Pipeline](#training-pipeline) · [Troubleshooting](#troubleshooting) · [Contributing & Collaboration](#contributing--collaboration)
+
+**Project**  
+[Privacy](#privacy) · [Licence](#licence)
+
+</details>
 
 ## What KlarKI Does
 
