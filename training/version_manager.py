@@ -195,7 +195,12 @@ class VersionManager:
             shutil.rmtree(versioned_dir)
         shutil.copytree(source_dir, versioned_dir)
 
-        metric_key = _METRIC_KEYS.get(model_type, "macro_f1")
+        primary_key = _METRIC_KEYS.get(model_type, "macro_f1")
+        # Prefer the honest gold-set score when the new model reports it: gold is
+        # measured on real out-of-distribution text, while the primary key
+        # (macro_f1 / overall_f1) is computed on the same synthetic distribution
+        # the model trained on and routinely reads ~99% even when gold fails.
+        metric_key = "gold_macro_f1" if "gold_macro_f1" in metrics else primary_key
         new_score = float(metrics.get(metric_key, 0.0))
 
         section["versions"][version] = {
@@ -208,11 +213,13 @@ class VersionManager:
         # Compare with currently active version — promote only if better
         active_ver = section.get("active")
         if active_ver and active_ver in section["versions"] and active_ver != version:
-            prev_score = float(
-                section["versions"][active_ver]
-                .get("metrics", {})
-                .get(metric_key, 0.0)
-            )
+            prev_metrics = section["versions"][active_ver].get("metrics", {})
+            # If the previous version predates gold gating, fall back to the
+            # primary key for a fair like-for-like comparison.
+            if metric_key == "gold_macro_f1" and "gold_macro_f1" not in prev_metrics:
+                metric_key = primary_key
+                new_score = float(metrics.get(metric_key, 0.0))
+            prev_score = float(prev_metrics.get(metric_key, 0.0))
             if new_score > prev_score:
                 print(
                     f"  [version] {model_type}@{version} {metric_key}={new_score:.4f} "

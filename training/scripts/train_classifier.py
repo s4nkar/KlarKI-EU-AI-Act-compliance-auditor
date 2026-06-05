@@ -411,6 +411,34 @@ def main() -> None:
             print(_c(_RED, "  [!!] Large gap — model is overfitting to synthetic distribution"))
     else:
         print("\nNo regulatory examples in val set — cannot compute honest F1")
+    # ── Gold-set evaluation — honest OOD signal that gates promotion ─────────
+    # The mixed-val macro_f1 above is measured on the same synthetic distribution
+    # the model trained on. The hand-curated gold set is the real test; recording
+    # gold_macro_f1 lets version_manager promote on it instead of the inflated val.
+    try:
+        import sys as _sys
+        if str(Path(__file__).parent) not in _sys.path:
+            _sys.path.insert(0, str(Path(__file__).parent))
+        from gold_eval import evaluate_on_gold
+        gold = evaluate_on_gold("bert", model, tokenizer, LABELS, device=device,
+                                max_length=args.max_length)
+    except Exception as _gold_exc:
+        gold = None
+        print(f"  [gold] skipped: {_gold_exc!r}")
+    if gold:
+        metrics_payload["gold_macro_f1"] = gold["macro_f1"]
+        metrics_payload["gold_accuracy"] = gold["accuracy"]
+        metrics_payload["gold_n"] = gold["n"]
+        colour = _GREEN if gold["passed"] else _RED
+        verdict = "PASS" if gold["passed"] else "FAIL"
+        gold_f1_str = _c(colour, f"{gold['macro_f1']:.4f}")
+        verdict_str = _c(colour, verdict)
+        print(f"\nGold-set macro F1    : {gold_f1_str}  "
+              f"(threshold {gold['threshold']:.2f}, n={gold['n']})  [{verdict_str}]")
+        if not gold["passed"]:
+            print(_c(_RED, "  [!!] Below gold threshold — model will NOT be promoted "
+                           "(synthetic val is misleadingly high; fix training data)."))
+
     metrics_path = output_path / "metrics.json"
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics_payload, f, indent=2)
