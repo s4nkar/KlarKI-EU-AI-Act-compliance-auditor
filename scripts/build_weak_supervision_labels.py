@@ -36,10 +36,14 @@ OUTPUT_DIR = ROOT / "training" / "data"
 # ── Sentence splitter ─────────────────────────────────────────────────────────
 
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-ZÜÄÖ\(\"\'])")
+# EU legislative text uses semicolons to terminate sub-clauses and colons to
+# introduce lists; normalise both to periods so the splitter sees them.
+_LEGISLATIVE_NORM = re.compile(r"[;:]\s*\n\s*\n")
 
 
 def _sentences(text: str, min_len: int, max_len: int) -> Iterator[str]:
     """Split text into sentences; filter by character length."""
+    text = _LEGISLATIVE_NORM.sub(".\n\n", text)
     for sent in _SENT_SPLIT.split(text):
         sent = sent.strip()
         if min_len <= len(sent) <= max_len:

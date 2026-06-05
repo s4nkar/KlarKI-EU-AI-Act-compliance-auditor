@@ -30,7 +30,14 @@ def spacy_ner_nlp():
         return None
     try:
         import spacy
-        return spacy.load(str(model_path))
+        # Keep only the NER head + its tok2vec. The de_core_news_lg backbone's
+        # tagger/parser/attribute_ruler overwrite doc.ents at inference, silently
+        # dropping ARTICLE/OBLIGATION/PROHIBITED_USE entities. See ner_service.
+        nlp = spacy.load(str(model_path))
+        disable = [p for p in nlp.pipe_names if p not in ("ner", "tok2vec")]
+        if disable:
+            nlp.select_pipes(disable=disable)
+        return nlp
     except Exception:
         return None
 

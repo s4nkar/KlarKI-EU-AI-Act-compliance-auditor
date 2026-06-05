@@ -67,7 +67,14 @@ def _resolve_spans(record: dict, nlp) -> list[tuple[int, int, str]]:
     doc = nlp.make_doc(record["text"])
     candidates = []
     for ent in record.get("entities", []):
-        span = doc.char_span(ent["start"], ent["end"], label=ent["label"])
+        # alignment_mode="expand": when an offset lands mid-token (e.g. the
+        # German tokenizer fuses a sentence-final "43." into one token, so the
+        # exact span "Article 43" can't align), expand to the enclosing token
+        # boundary instead of silently dropping the span. Strict mode was
+        # discarding ~25% of ARTICLE spans (all sentence-final), so the model
+        # never learned end-of-sentence article references.
+        span = doc.char_span(ent["start"], ent["end"], label=ent["label"],
+                             alignment_mode="expand")
         if span is not None:
             candidates.append(span)
     candidates.sort(key=lambda s: s.end - s.start, reverse=True)
@@ -83,6 +90,44 @@ def _resolve_spans(record: dict, nlp) -> list[tuple[int, int, str]]:
 def _make_example(record: dict, nlp) -> Example:
     spans = _resolve_spans(record, nlp)
     return Example.from_dict(nlp.make_doc(record["text"]), {"entities": spans})
+
+
+def _audit_span_alignment(records: list[dict], nlp) -> dict:
+    """Count annotated spans that spaCy cannot align to token boundaries.
+
+    `doc.char_span(start, end)` returns None when an offset falls mid-token
+    (e.g. a tagger truncated 'Hochrisiko-KI-System' inside the inflected
+    'Hochrisiko-KI-Systeme'). Those spans are silently dropped from training
+    AND from the dev score, so dev F1 can look perfect while real coverage
+    quietly shrinks. We surface the drop counts so the failure is visible.
+    """
+    from collections import Counter
+    requested: Counter = Counter()
+    dropped: Counter = Counter()
+    for rec in records:
+        doc = nlp.make_doc(rec["text"])
+        for ent in rec.get("entities", []):
+            label = ent["label"]
+            requested[label] += 1
+            # Mirror training's alignment_mode so the audit reports spans that
+            # are *actually* dropped (those that can't align even when expanded).
+            if doc.char_span(ent["start"], ent["end"], label=label,
+                             alignment_mode="expand") is None:
+                dropped[label] += 1
+    total_req = sum(requested.values())
+    total_drop = sum(dropped.values())
+    rate = (total_drop / total_req) if total_req else 0.0
+    colour = RED if rate > 0.05 else AMBER if rate > 0.01 else GREEN
+    print(_c(colour, f"  Span alignment: {total_drop}/{total_req} dropped "
+                     f"({rate*100:.1f}%) — misaligned offsets are NOT trained"))
+    if dropped:
+        worst = ", ".join(f"{lbl}={dropped[lbl]}/{requested[lbl]}"
+                          for lbl, _ in dropped.most_common(8))
+        print(_c(colour, f"    by label: {worst}"))
+    if rate > 0.05:
+        print(_c(RED, "  [!!] >5% of spans are misaligned — check the data "
+                      "generator's entity offsets (word-boundary truncation?)."))
+    return {"requested": total_req, "dropped": total_drop, "rate": round(rate, 4)}
 
 
 def _eval_f1(nlp, records: list[dict]) -> tuple[float, dict]:
@@ -175,6 +220,10 @@ def main() -> None:
     if not records:
         print(_c(RED, "  ERROR: No annotations found. Check your JSONL file."))
         return
+
+    # Pre-flight: surface any annotated spans spaCy can't align to tokens.
+    # These are silently dropped from training otherwise.
+    _audit_span_alignment(records, nlp)
 
     # 80/20 train/dev split
     random.shuffle(records)
@@ -277,10 +326,17 @@ def main() -> None:
         print(_c(DIM, f"  Loading best model from epoch {best_epoch}..."))
         nlp.from_disk(model_best_path)
 
-    # Save as model-final (the best checkpoint, not the last epoch)
+    # Save as model-final (the best checkpoint, not the last epoch).
+    # Disable the non-NER backbone pipes before saving so they persist as
+    # disabled in config.cfg. If they run at inference they overwrite doc.ents
+    # and ARTICLE/OBLIGATION/PROHIBITED_USE entities silently vanish — the same
+    # interference this script already works around during its own eval.
+    save_disable = [p for p in nlp.pipe_names if p not in {"ner", "tok2vec"}]
+    if save_disable:
+        nlp.select_pipes(disable=save_disable)
     model_path = output_path / "model-final"
     nlp.to_disk(model_path)
-    print(_c(GREEN, f"  Model saved to {model_path}"))
+    print(_c(GREEN, f"  Model saved to {model_path} (active pipes: {nlp.pipe_names})"))
     print(_c(DIM,   "  Copy to model_repository/spacy_ner/1/ for Triton deployment."))
 
     # -- Evaluation on dev set -------------------------------------------------

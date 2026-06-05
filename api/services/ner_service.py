@@ -36,6 +36,23 @@ _NER_MODEL_PATH = _ROOT / "training" / "artifacts" / "spacy_ner_model" / "model-
 # Loaded once on first call; False = unavailable
 _nlp = None
 
+# Only the NER head and the tok2vec it listens to may run at inference. The
+# de_core_news_lg backbone also ships tagger/morphologizer/parser/attribute_ruler
+# components; when those run they overwrite doc.ents and ARTICLE, OBLIGATION and
+# PROHIBITED_USE entities silently vanish. The training script already disables
+# them for its own eval — we must do the same wherever the model is invoked.
+_NER_KEEP_PIPES = ("ner", "tok2vec")
+
+
+def load_ner_model(model_path):
+    """Load the spaCy NER model with only the NER-relevant pipes enabled."""
+    import spacy
+    nlp = spacy.load(str(model_path))
+    disable = [p for p in nlp.pipe_names if p not in _NER_KEEP_PIPES]
+    if disable:
+        nlp.select_pipes(disable=disable)
+    return nlp
+
 
 def _get_nlp():
     global _nlp
@@ -46,9 +63,8 @@ def _get_nlp():
         _nlp = False
         return None
     try:
-        import spacy
-        _nlp = spacy.load(str(_NER_MODEL_PATH))
-        logger.info("ner_model_loaded", path=str(_NER_MODEL_PATH))
+        _nlp = load_ner_model(_NER_MODEL_PATH)
+        logger.info("ner_model_loaded", path=str(_NER_MODEL_PATH), active_pipes=_nlp.pipe_names)
         return _nlp
     except Exception as exc:
         logger.warning("ner_model_load_failed", error=str(exc))

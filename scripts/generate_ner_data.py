@@ -61,13 +61,19 @@ _VOCABS_EN: dict[str, list[str]] = {
         "shall be conducted", "must be retained", "are required to",
         "are obliged to", "have to register",
     ],
+    # SPLIT convention: a leading risk tier ("high-risk", "prohibited") is a
+    # separate RISK_TIER entity, NOT part of the AI_SYSTEM span. This keeps
+    # "high-risk" available as a standalone RISK_TIER entity, which
+    # applicability_engine matches verbatim to fire its high-risk signal.
+    # So AI_SYSTEM phrases here never carry a risk-tier prefix.
     "AI_SYSTEM": [
-        "high-risk AI system", "general-purpose AI model",
+        "general-purpose AI model",
         "remote biometric identification system", "emotion recognition system",
-        "prohibited AI system", "biometric categorisation system",
+        "biometric categorisation system",
         "AI system used in critical infrastructure", "AI system for credit scoring",
         "AI system for recruitment", "AI system used in education",
         "AI system used in employment", "real-time biometric surveillance system",
+        "AI system", "AI model",
     ],
     "RISK_TIER": [
         "high-risk", "prohibited", "limited risk", "minimal risk",
@@ -397,7 +403,12 @@ _COMPLIANCE_VERBS_EN = (
 
 _OBLIGATION_RE_EN = re.compile(
     r'\b(?:'
-    r'(?:shall|must)(?:\s+not)?\s+(?:be\s+)?(?:' + _COMPLIANCE_VERBS_EN + r')'
+    # Allow up to 4 intervening words between the modal and the (whitelisted,
+    # infinitive) compliance verb so discontiguous obligations are caught
+    # ("providers must, before deployment, establish ..."). Passive hard
+    # negatives ("must be tested/restarted") stay unmatched because their
+    # participle forms aren't in the infinitive whitelist (trailing \b).
+    r'(?:shall|must)(?:\s+not)?\s+(?:\w+\s+){0,4}(?:be\s+)?(?:' + _COMPLIANCE_VERBS_EN + r')'
     r'|are\s+required\s+to'
     r'|is\s+required\s+to'
     r'|are\s+obliged\s+to'
@@ -420,7 +431,11 @@ _COMPLIANCE_VERBS_DE = (
 
 _OBLIGATION_RE_DE = re.compile(
     r'\b(?:'
-    r'(?:müssen?|sollen?)\s+(?:nicht\s+)?(?:' + _COMPLIANCE_VERBS_DE + r')'
+    # Bounded gap (≤4 words) for German verb-final obligations
+    # ("Anbieter müssen alle Trainingsdaten vollständig dokumentieren").
+    # Passive hard negatives ("müssen ... informiert werden") stay unmatched:
+    # their participles (informiert/getestet) aren't the infinitives whitelisted.
+    r'(?:müssen?|sollen?)\s+(?:nicht\s+)?(?:\w+\s+){0,4}(?:' + _COMPLIANCE_VERBS_DE + r')'
     r'|ist\s+verpflichtet'
     r'|sind\s+verpflichtet'
     r'|ist\s+zu\s+\w+'
@@ -463,8 +478,8 @@ _AI_SYSTEM_PHRASES_EN: list[str] = [
     "AI system for recruitment",
     "AI system used in education",
     "AI system used in employment",
-    "high-risk AI system",
-    "prohibited AI system",
+    "AI system",
+    "AI model",
 ]
 _AI_SYSTEM_PHRASES_DE: list[str] = [
     "KI-System mit allgemeinem Verwendungszweck",
@@ -649,6 +664,31 @@ def generate_hard_negatives() -> list[dict]:
     return records
 
 
+def _iter_phrase_matches(text: str, phrase: str, *, case_sensitive: bool = False):
+    """Yield (start, end) for each whole-word occurrence of `phrase` in `text`.
+
+    Matches whose boundary falls inside a word are skipped. This matters when
+    the tagger is applied to free-form (e.g. LLM-generated, inflected) text:
+    a naive substring search tags "Hochrisiko-KI-System" inside
+    "Hochrisiko-KI-Systeme", producing a mid-token span that spaCy's strict
+    char_span() silently drops at train time. Boundary-checking keeps offsets
+    aligned. On template-inserted exact forms this is a no-op (no matches lost).
+    """
+    hay = text if case_sensitive else text.lower()
+    needle = phrase if case_sensitive else phrase.lower()
+    start = 0
+    while True:
+        idx = hay.find(needle, start)
+        if idx == -1:
+            return
+        end = idx + len(phrase)
+        before_ok = idx == 0 or not text[idx - 1].isalnum()
+        after_ok = end >= len(text) or not text[end].isalnum()
+        if before_ok and after_ok:
+            yield idx, end
+        start = idx + 1
+
+
 def _find_entities(text: str, lang: str) -> list[dict]:
     """Find all 8 NER entity labels in a sentence.
 
@@ -656,7 +696,6 @@ def _find_entities(text: str, lang: str) -> list[dict]:
     Overlapping spans are dropped (longest match wins).
     """
     candidates: list[tuple[int, int, str]] = []
-    text_lower = text.lower()
 
     # ARTICLE
     for m in _ARTICLE_RE.finditer(text):
@@ -675,41 +714,31 @@ def _find_entities(text: str, lang: str) -> list[dict]:
     # AI_SYSTEM — phrase matching, longest first
     ai_phrases = _AI_SYSTEM_PHRASES_DE if lang == "de" else _AI_SYSTEM_PHRASES_EN
     for phrase in sorted(ai_phrases, key=len, reverse=True):
-        idx = text_lower.find(phrase.lower())
-        while idx != -1:
-            candidates.append((idx, idx + len(phrase), "AI_SYSTEM"))
-            idx = text_lower.find(phrase.lower(), idx + 1)
+        for s, e in _iter_phrase_matches(text, phrase):
+            candidates.append((s, e, "AI_SYSTEM"))
 
     # RISK_TIER — phrase matching, longest first
     risk_phrases = _RISK_TIER_PHRASES_DE if lang == "de" else _RISK_TIER_PHRASES_EN
     for phrase in sorted(risk_phrases, key=len, reverse=True):
-        idx = text_lower.find(phrase.lower())
-        while idx != -1:
-            candidates.append((idx, idx + len(phrase), "RISK_TIER"))
-            idx = text_lower.find(phrase.lower(), idx + 1)
+        for s, e in _iter_phrase_matches(text, phrase):
+            candidates.append((s, e, "RISK_TIER"))
 
     # PROCEDURE — phrase matching, longest first
     proc_phrases = _PROCEDURE_PHRASES_DE if lang == "de" else _PROCEDURE_PHRASES_EN
     for phrase in sorted(proc_phrases, key=len, reverse=True):
-        idx = text_lower.find(phrase.lower())
-        while idx != -1:
-            candidates.append((idx, idx + len(phrase), "PROCEDURE"))
-            idx = text_lower.find(phrase.lower(), idx + 1)
+        for s, e in _iter_phrase_matches(text, phrase):
+            candidates.append((s, e, "PROCEDURE"))
 
     # PROHIBITED_USE — Article 5 banned practices, longest-first
     prohibited_phrases = _PROHIBITED_USE_PHRASES_DE if lang == "de" else _PROHIBITED_USE_PHRASES_EN
     for phrase in sorted(prohibited_phrases, key=len, reverse=True):
-        idx = text_lower.find(phrase.lower())
-        while idx != -1:
-            candidates.append((idx, idx + len(phrase), "PROHIBITED_USE"))
-            idx = text_lower.find(phrase.lower(), idx + 1)
+        for s, e in _iter_phrase_matches(text, phrase):
+            candidates.append((s, e, "PROHIBITED_USE"))
 
     # REGULATION — case-sensitive (EU AI Act vs ai act are distinct)
     for phrase in sorted(_REGULATION_PHRASES, key=len, reverse=True):
-        idx = text.find(phrase)
-        while idx != -1:
-            candidates.append((idx, idx + len(phrase), "REGULATION"))
-            idx = text.find(phrase, idx + 1)
+        for s, e in _iter_phrase_matches(text, phrase, case_sensitive=True):
+            candidates.append((s, e, "REGULATION"))
 
     if not candidates:
         return []

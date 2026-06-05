@@ -200,6 +200,28 @@ def test_no_actor_class_below_60_f1() -> None:
     )
 
 
+def test_actor_accuracy_with_ml() -> None:
+    """pytest: The pattern+ML ensemble (what production actually runs) must reach
+    ≥ 80% gold accuracy. Pattern-only tests above isolate the regex layer; this
+    gates the trained ML model too — otherwise it's promoted but never measured.
+    Skips when the actor ML model is not trained."""
+    import pytest
+    try:
+        from services.actor_classifier import _ml_predict_actor
+    except ImportError as exc:
+        pytest.skip(f"Cannot import actor_classifier: {exc}")
+    if _ml_predict_actor("probe text for trained-model detection") is None:
+        pytest.skip("Actor ML model not trained — ensemble == pattern mode.")
+    r = run(with_ml=True)
+    if r["status"] == "skip":
+        pytest.skip(r["reason"])
+    assert r["accuracy"] >= 0.80, (
+        f"Actor ensemble (pattern+ML) accuracy {r['accuracy']:.4f} is below 0.80. "
+        f"The trained ML model may be dragging the ensemble below pattern-only "
+        f"performance. Errors: {r.get('n_errors', '?')}/{r.get('n_samples', '?')}"
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Actor classifier gold dataset evaluation")
     parser.add_argument("--verbose", "-v", action="store_true")
