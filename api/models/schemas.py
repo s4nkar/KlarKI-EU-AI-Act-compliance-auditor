@@ -104,6 +104,11 @@ class ApplicabilityResult(BaseModel):
     """
     is_high_risk: bool = Field(description="True if Article 6 applies (Annex I safety component or Annex III match)")
     is_prohibited: bool = Field(description="True if Article 5 prohibited practice detected")
+    prohibited_signals: list[str] = Field(
+        default_factory=list,
+        description="Labels of the specific Article 5 signals that triggered is_prohibited "
+                     "(pattern, NER, or ML); empty when is_prohibited is False",
+    )
     annex_iii_matches: list[AnnexIIIMatch] = Field(
         default_factory=list,
         description="All Annex III categories matched; empty means not high-risk via Annex III",

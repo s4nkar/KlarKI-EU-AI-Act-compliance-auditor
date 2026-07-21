@@ -235,7 +235,6 @@ flowchart TD
                 direction LR
                 BM9["BM25
                 rank-bm25
-                (or OpenSearch)
                 top 10
                 keyword hits
                 filtered:

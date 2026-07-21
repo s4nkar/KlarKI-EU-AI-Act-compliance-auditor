@@ -8,40 +8,15 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "api"))
 
 
-def test_classify_risk_tier_prohibited():
-    """Biometric real-time keyword yields PROHIBITED tier."""
-    from services.compliance_scorer import classify_risk_tier
-    from models.schemas import DocumentChunk, RiskTier
+@pytest.mark.asyncio
+async def test_score_audit_risk_tier_defaults_minimal_without_applicability():
+    """No applicability supplied → risk_tier defaults to MINIMAL, not a second keyword guess."""
+    from services.compliance_scorer import score_audit
+    from models.schemas import ArticleDomain, ArticleScore, RiskTier
 
-    chunks = [DocumentChunk(
-        chunk_id="1", text="The system performs real-time biometric identification of employees.",
-        source_file="test.txt", chunk_index=0,
-    )]
-    assert classify_risk_tier(chunks) == RiskTier.PROHIBITED
-
-
-def test_classify_risk_tier_high():
-    """Recruitment keyword yields HIGH tier."""
-    from services.compliance_scorer import classify_risk_tier
-    from models.schemas import DocumentChunk, RiskTier
-
-    chunks = [DocumentChunk(
-        chunk_id="1", text="This AI system is used for recruitment and candidate screening.",
-        source_file="test.txt", chunk_index=0,
-    )]
-    assert classify_risk_tier(chunks) == RiskTier.HIGH
-
-
-def test_classify_risk_tier_minimal():
-    """No sensitive keywords yields MINIMAL tier."""
-    from services.compliance_scorer import classify_risk_tier
-    from models.schemas import DocumentChunk, RiskTier
-
-    chunks = [DocumentChunk(
-        chunk_id="1", text="The chatbot assists customers with product recommendations.",
-        source_file="test.txt", chunk_index=0,
-    )]
-    assert classify_risk_tier(chunks) == RiskTier.MINIMAL
+    scores = [ArticleScore(article_num=9, domain=ArticleDomain.RISK_MANAGEMENT, score=50.0)]
+    report = await score_audit(scores, chunks=[])
+    assert report.risk_tier == RiskTier.MINIMAL
 
 
 @pytest.mark.asyncio

@@ -45,9 +45,6 @@ klarki-training  [ephemeral — --profile training]
    All training jobs: data generation, BERT fine-tuning, NER training
    Mounts project root as /workspace
    Talks to klarki-ollama and klarki-chromadb
-
-klarki-opensearch  :9200  [optional — --profile opensearch]
-   Drop-in BM25 replacement for large document corpora
 ```
 
 All inter-service communication runs on the `klarki-net` bridge network using Docker internal DNS. The base `docker-compose.yml` handles production. A GPU overlay (`docker-compose.gpu.yml`) adds NVIDIA reservations to Ollama automatically when `nvidia-smi` is detected at startup.
@@ -217,10 +214,6 @@ An optional regulation filter (e.g. `"eu_ai_act"`) prevents GDPR passages appear
 
 `eu_ai_act` and `compliance_checklist` are queried on every RAG request. `gdpr` is populated but not yet wired into the live retrieval path (planned for GDPR gate in Phase D).
 
-### OpenSearch (optional BM25 backend)
-
-For large document corpora in production, BM25 can be swapped to OpenSearch by starting the `opensearch` profile and setting `USE_OPENSEARCH=true`. OpenSearch provides persistent indexing, server-side metadata filtering, and BM25+ with field boosting. Vector search remains in ChromaDB — OpenSearch does not replace it. For public demo use, `rank_bm25` in-memory is adequate.
-
 ---
 
 ## ML models
@@ -327,7 +320,6 @@ Key settings:
 |---|---|---|
 | `OLLAMA_MODEL` | `phi3:mini` | Any Ollama-compatible model; pull before switching |
 | `USE_TRITON` | `false` | Set automatically by `./run.sh triton` |
-| `USE_OPENSEARCH` | `false` | Set manually; requires opensearch profile |
 | `UPLOAD_MAX_SIZE_MB` | `10` | Enforced in FastAPI route |
 | `DEBUG` | `false` | Enables verbose structlog output |
 
@@ -336,8 +328,6 @@ All LLM calls hardcode `temperature=0, seed=42` for deterministic output. Changi
 ### Inference backends
 
 **Triton** (GPU): `./run.sh triton` checks for `nvidia-smi`, exports BERT + e5 to ONNX if needed, starts the Triton container, sets `USE_TRITON=true`, and restarts the API. Chunk classification goes from ~5–10s/chunk (Ollama) to ~50ms/batch-32 (Triton ONNX). LangGraph gap analysis still uses Ollama. Switch back with `./run.sh up`.
-
-**OpenSearch**: start the `opensearch` profile, index regulatory text with `python scripts/build_knowledge_base.py --opensearch`, set `USE_OPENSEARCH=true`, restart the API. BM25 queries go to OpenSearch; vector search stays in ChromaDB; RRF and cross-encoder are unchanged.
 
 ### Confidence thresholds (hardcoded)
 

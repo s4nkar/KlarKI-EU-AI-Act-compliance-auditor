@@ -33,11 +33,6 @@ USE_TRITON=false              # Set to true by ./run.sh triton automatically
 TRITON_HOST=klarki-triton
 TRITON_GRPC_PORT=8001
 
-# ── OpenSearch BM25 (optional) ───────────────────────────────────
-USE_OPENSEARCH=false
-OPENSEARCH_HOST=klarki-opensearch
-OPENSEARCH_PORT=9200
-
 # ── Frontend ─────────────────────────────────────────────────────
 VITE_API_URL=http://localhost:8000
 ```
@@ -68,30 +63,6 @@ What changes when Triton is enabled:
 - Chunk classification: goes from Ollama few-shot (~5–10s/chunk) to Triton ONNX batch (~50ms/batch-32)
 - LangGraph gap analysis: still uses Ollama (LLM-based, Triton doesn't replace this)
 - Embedding: e5-small ONNX served by Triton instead of CPU inference
-
-### Enable OpenSearch (alternative BM25 backend)
-
-Requirements: Docker running (no GPU needed).
-
-```bash
-# Start OpenSearch container
-docker compose --profile opensearch up -d
-
-# Index regulatory text into OpenSearch (keep ChromaDB for vector search)
-python scripts/build_knowledge_base.py --opensearch
-
-# Enable in .env
-USE_OPENSEARCH=true
-
-# Restart API to pick up the new setting
-docker compose up -d klarki-api
-```
-
-What changes when OpenSearch is enabled:
-- BM25 keyword search: goes from rank_bm25 in-memory to OpenSearch HTTP queries
-- Vector search: stays in ChromaDB (unchanged)
-- RRF merge, cross-encoder re-ranking: unchanged
-- Metadata filtering: now server-side in OpenSearch (article_num + regulation + lang filters)
 
 ### Change the Ollama LLM model
 

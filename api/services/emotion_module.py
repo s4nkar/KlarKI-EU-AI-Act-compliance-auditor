@@ -5,7 +5,7 @@ workplace/education/commercial context to determine Art. 5 prohibition.
 """
 
 import structlog
-from models.schemas import DocumentChunk, EmotionFlag
+from models.schemas import ApplicabilityResult, DocumentChunk, EmotionFlag
 
 logger = structlog.get_logger()
 
@@ -19,16 +19,31 @@ EDUCATION_KEYWORDS = ["school", "student", "education", "classroom", "schule", "
 COMMERCIAL_KEYWORDS = ["customer", "consumer", "retail", "marketing", "kunde", "verbraucher"]
 
 
-async def check_emotion_recognition(chunks: list[DocumentChunk]) -> EmotionFlag:
+async def check_emotion_recognition(
+    chunks: list[DocumentChunk],
+    applicability: ApplicabilityResult | None = None,
+) -> EmotionFlag:
     """Scan document chunks for Art. 5 emotion recognition prohibition triggers.
 
-    Keyword scan logic:
-    - EMOTION + WORKPLACE/EDUCATION → is_prohibited = True (Art. 5(1)(f))
-    - EMOTION + COMMERCIAL           → detected = True, is_prohibited = False (high-risk)
-    - EMOTION only                   → detected = True, context unknown
+    Keyword scan logic (detected/context/explanation, always computed here):
+    - EMOTION + WORKPLACE/EDUCATION → workplace/education context
+    - EMOTION + COMMERCIAL           → commercial context (high-risk, not prohibited)
+    - EMOTION only                   → context unknown
+
+    is_prohibited is anchored to the applicability engine's result when
+    provided, so this flag can never disagree with report.risk_tier: it is
+    only True if applicability_engine independently confirmed prohibition
+    AND attributed it to an emotion-recognition signal (not e.g. social
+    scoring). When applicability is not supplied (isolated/unit-test use),
+    falls back to the workplace/education keyword match — which draws on the
+    same EMOTION_KEYWORDS/WORKPLACE_KEYWORDS/EDUCATION_KEYWORDS that
+    applicability_engine.py imports from this module, so the two stay
+    consistent either way.
 
     Args:
         chunks: All document chunks from the uploaded documents.
+        applicability: Result of applicability_engine.check_applicability,
+            if already computed (it is, at this point, in the live pipeline).
 
     Returns:
         EmotionFlag with detected, is_prohibited, context, and explanation.
@@ -44,7 +59,15 @@ async def check_emotion_recognition(chunks: list[DocumentChunk]) -> EmotionFlag:
     is_education  = any(kw in full_text for kw in EDUCATION_KEYWORDS)
     is_commercial = any(kw in full_text for kw in COMMERCIAL_KEYWORDS)
 
-    if is_workplace or is_education:
+    if applicability is not None:
+        is_prohibited_context = applicability.is_prohibited and any(
+            "emotion recognition" in signal.lower()
+            for signal in applicability.prohibited_signals
+        )
+    else:
+        is_prohibited_context = is_workplace or is_education
+
+    if is_prohibited_context:
         context = "workplace" if is_workplace else "education"
         logger.warning("emotion_prohibited_context", context=context, keyword=emotion_match)
         return EmotionFlag(

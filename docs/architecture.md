@@ -38,11 +38,6 @@ klarki-training  [ephemeral — profile: training]
    Mounts project root as /workspace
    Talks to klarki-ollama (data generation) and klarki-chromadb (knowledge base)
    Started with: docker compose --profile training run --rm klarki-training ...
-
-klarki-opensearch  (port 9200)  [optional — profile: opensearch]
-   OpenSearch full-text search engine
-   Optional drop-in for BM25 (default is rank_bm25 in-memory)
-   Started with: docker compose --profile opensearch up -d
 ```
 
 ## Storage layout
@@ -123,7 +118,6 @@ GET /api/v1/reports/{id}/json → ComplianceReport as JSON
 | 11434 | klarki-ollama | Ollama HTTP API |
 | 8002 | klarki-triton | Triton HTTP API (optional) |
 | 8003 | klarki-triton | Triton gRPC API (optional) |
-| 9200 | klarki-opensearch | OpenSearch HTTP API (optional) |
 | 3000 | klarki-frontend (dev) | Vite dev server (./run.sh dev only) |
 
 All inter-service communication uses Docker internal DNS (service names as hostnames) on the `klarki-net` bridge network.

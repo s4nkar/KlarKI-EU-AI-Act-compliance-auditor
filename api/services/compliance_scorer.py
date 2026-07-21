@@ -1,7 +1,8 @@
 """Compliance scoring service — aggregates article scores into a full report.
 
-Computes weighted overall score and applies rule-based Annex III risk tier
-classification by scanning chunk text for high-risk keywords.
+Computes the weighted overall score. Risk tier is taken from the
+applicability engine's result (services/applicability_engine.py), which is
+the sole authority for Article 5/6/Annex III classification.
 """
 
 import uuid
@@ -37,26 +38,6 @@ ARTICLE_DOMAINS: dict[int, ArticleDomain] = {
 # Equal weighting across all 7 articles
 _ARTICLE_WEIGHT = 1.0 / 7.0
 
-_PROHIBITED_KEYWORDS = [
-    "social scoring", "soziales scoring",
-    "real-time biometric", "echtzeit-biometrie",
-    "subliminal manipulation", "unterschwellige manipulation",
-    "emotion recognition workplace", "emotion recognition education",
-    "gefühlserkennung arbeitsplatz", "emotionserkennung schule",
-]
-
-_HIGH_RISK_KEYWORDS = [
-    "biometric", "biometrisch",
-    "recruitment", "personalauswahl", "bewerbermanagement",
-    "credit score", "kreditbewertung", "kreditwürdigkeit",
-    "medical diagnosis", "medizinische diagnose",
-    "critical infrastructure", "kritische infrastruktur",
-    "law enforcement", "strafverfolgung",
-    "border control", "grenzkontrolle",
-    "education assessment", "bildungsbewertung",
-    "employment decision", "beschäftigungsentscheidung",
-]
-
 
 async def score_audit(
     article_scores: list[ArticleScore],
@@ -74,14 +55,17 @@ async def score_audit(
 ) -> ComplianceReport:
     """Aggregate per-article scores into a full ComplianceReport.
 
-    Risk tier precedence (Phase 3):
-      1. applicability engine result (Article 6 + Annex III pattern gate) — authoritative.
-      2. Old keyword scan fallback — used only when applicability is not available.
+    risk_tier is taken directly from the applicability engine result
+    (Article 5/6 + Annex III pattern gate) — the sole authority for this
+    determination. If applicability is not supplied (should only happen in
+    isolated tests), risk_tier defaults to MINIMAL rather than re-deriving it
+    from a second keyword scan, since that would just reintroduce a second
+    source of truth that can drift from applicability_engine.py.
     wizard_risk_tier is stored separately as a user self-assessment for comparison.
 
     Args:
         article_scores: List of ArticleScore objects (one per article 9–15).
-        chunks: All document chunks (used for fallback risk tier classification).
+        chunks: All document chunks.
         audit_id: Unique audit identifier (generated if not provided).
         source_files: Filenames of uploaded documents.
         language: Primary detected language.
@@ -134,7 +118,8 @@ async def score_audit(
         else:
             risk_tier = RiskTier.MINIMAL
     else:
-        risk_tier = classify_risk_tier(chunks)
+        logger.warning("risk_tier_no_applicability", audit_id=audit_id)
+        risk_tier = RiskTier.MINIMAL
 
     classified = sum(1 for c in chunks if c.domain is not None)
 
@@ -194,31 +179,3 @@ async def score_audit(
         chunks=len(chunks),
     )
     return report
-
-
-def classify_risk_tier(chunks: list[DocumentChunk]) -> RiskTier:
-    """Rule-based Annex III risk tier classification.
-
-    Scans all chunk text (lowercased) for prohibited and high-risk keywords.
-    Returns PROHIBITED if any Article 5 keywords are found,
-    HIGH if any Annex III keywords are found, otherwise MINIMAL.
-
-    Args:
-        chunks: All document chunks from the uploaded documents.
-
-    Returns:
-        RiskTier enum value.
-    """
-    combined = " ".join(c.text.lower() for c in chunks)
-
-    for kw in _PROHIBITED_KEYWORDS:
-        if kw in combined:
-            logger.info("risk_tier_prohibited", keyword=kw)
-            return RiskTier.PROHIBITED
-
-    for kw in _HIGH_RISK_KEYWORDS:
-        if kw in combined:
-            logger.info("risk_tier_high", keyword=kw)
-            return RiskTier.HIGH
-
-    return RiskTier.MINIMAL

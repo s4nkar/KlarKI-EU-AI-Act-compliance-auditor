@@ -224,6 +224,14 @@ def run(cmd: list[str], dry_run: bool = False) -> int:
 
 ROOT = Path(__file__).parent.parent  # project root
 
+# ---------------------------------------------------------------------------
+# Data generation kill-switch
+# Set to True while local-datagen-V2 is the authoritative data source.
+# The three generate-* stages will be skipped unless --gen-overwrite is passed.
+# Flip back to False to re-enable Ollama-based data generation.
+# ---------------------------------------------------------------------------
+_SKIP_DATAGEN: bool = True
+
 
 def stage_seed_ollama(args: argparse.Namespace) -> bool:
     """Stage 1 - pull Ollama model (pure Python, no bash dependency)."""
@@ -765,7 +773,9 @@ def main() -> None:
     skip_set: set[str] = set()
     if args.skip_seed:      skip_set.add("seed-ollama")
     if args.skip_kb:        skip_set.add("knowledge-base")
-    if args.skip_generate:  skip_set.update({"generate-data", "generate-specialist-data", "generate-ner-data"})
+    _datagen_stages = {"generate-data", "generate-specialist-data", "generate-ner-data"}
+    if args.skip_generate or (_SKIP_DATAGEN and not args.gen_overwrite):
+        skip_set.update(_datagen_stages)
     if args.skip_train:     skip_set.update({"train-bert", "train-specialist", "train-ner"})
     if args.skip_export:    skip_set.update({"export-bert", "export-e5"})
     if args.skip_benchmark: skip_set.add("benchmark")
