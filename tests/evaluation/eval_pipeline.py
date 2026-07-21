@@ -252,7 +252,7 @@ async def _run_async(verbose: bool) -> dict:
     # ── stage 9: emotion scan + scoring ─────────────────────────────────────
     if verbose:
         print("  Stage 9: Scoring …")
-    emotion_flag = await check_emotion_recognition(chunks)
+    emotion_flag = await check_emotion_recognition(chunks, applicability_result)
     report = await score_audit(
         article_scores=article_scores,
         chunks=chunks,

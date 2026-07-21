@@ -11,7 +11,7 @@
 | [inference-pipeline.md](inference-pipeline.md) | Full inference walkthrough: upload → chunking → classification → RAG → LangGraph → report |
 | [rag.md](rag.md) | RAG system deep-dive: BM25, vector search, RRF, cross-encoder, metadata filtering |
 | [models.md](models.md) | Every ML model: what it does, training targets, where it runs in inference |
-| [configuration.md](configuration.md) | Every knob you can turn: training data size, Triton, OpenSearch, Ollama model, etc. |
+| [configuration.md](configuration.md) | Every knob you can turn: training data size, Triton, Ollama model, etc. |
 
 ## Quick start
 

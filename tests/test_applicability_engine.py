@@ -84,6 +84,19 @@ def test_emotion_recognition_in_education_is_prohibited():
     assert result.is_prohibited is True
 
 
+def test_sentiment_analysis_in_workplace_is_prohibited():
+    """'Sentiment analysis' (not the literal phrase 'emotion recognition') in a
+    workplace context must also trigger is_prohibited — this vocabulary comes
+    from emotion_module.EMOTION_KEYWORDS, shared with this module precisely so
+    applicability_engine and emotion_module can't disagree on borderline text."""
+    result = _run(
+        "Our sentiment analysis tool monitors employee mood throughout the workday "
+        "at their workstations."
+    )
+    assert result.is_prohibited is True
+    assert any("emotion recognition" in s.lower() for s in result.prohibited_signals)
+
+
 def test_german_social_scoring_is_prohibited():
     """German 'Social-Scoring' keyword → is_prohibited=True."""
     result = _run(

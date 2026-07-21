@@ -87,30 +87,7 @@ When the `regulation` parameter is passed (e.g. `"eu_ai_act"`), it's added to th
 ### Language (soft sort)
 Not a hard filter — results are sorted to prefer same-language passages. This is intentional: a German document should still match against English regulatory text when German passages don't cover a topic.
 
-## OpenSearch: optional BM25 replacement
-
-By default BM25 runs in-memory (`rank_bm25` library) — fast and requires no extra service. For large document corpora in production, you can swap to OpenSearch:
-
-```bash
-# Start OpenSearch container
-docker compose --profile opensearch up -d
-
-# Enable in .env
-USE_OPENSEARCH=true
-
-# Index regulatory text into OpenSearch (in addition to ChromaDB)
-python scripts/build_knowledge_base.py --opensearch
-```
-
-When `USE_OPENSEARCH=true`, `rag_engine.py` sends BM25 queries to OpenSearch instead of rank_bm25. Vector search remains in ChromaDB — OpenSearch does not replace ChromaDB.
-
-OpenSearch advantages for production:
-- Persistent index (survives API container restart without rebuild)
-- Native server-side language/article/regulation filtering
-- Better scaling for large corpora (thousands of documents)
-- BM25 with Elasticsearch-style scoring (BM25+ with field boosting)
-
-For public demo use, rank_bm25 in-memory is perfectly adequate.
+BM25 runs in-memory (`rank_bm25` library) — fast and requires no extra service.
 
 ## ChromaDB collections
 

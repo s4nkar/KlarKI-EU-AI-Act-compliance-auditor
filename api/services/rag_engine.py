@@ -18,7 +18,6 @@ import asyncio
 import re
 import structlog
 
-from config import settings
 from models.schemas import ArticleDomain, DocumentChunk
 from services.chroma_client import ChromaClient
 from services.embedding_service import EmbeddingService
@@ -343,24 +342,7 @@ async def retrieve_requirements(
     bm25_results: list[dict] = []
     chunk_lang = chunk.language or "en"
 
-    if settings.use_opensearch:
-        # Server-side BM25 via OpenSearch (supports native metadata filtering)
-        from services.opensearch_client import OpenSearchClient
-        os_client = OpenSearchClient(
-            host=settings.opensearch_host,
-            port=settings.opensearch_port,
-        )
-        for collection in _COLLECTIONS:
-            hits = await os_client.search(
-                index=collection,
-                query=chunk.text,
-                article_num=article_num,
-                regulation=regulation,
-                lang=chunk_lang,
-                top_k=_CANDIDATES_PER_RETRIEVER,
-            )
-            bm25_results.extend(hits)
-    elif _bm25.ready:
+    if _bm25.ready:
         for collection in _COLLECTIONS:
             bm25_results.extend(
                 _bm25.search(

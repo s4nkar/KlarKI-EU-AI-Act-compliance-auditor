@@ -28,6 +28,7 @@ from models.schemas import (
     AnnexIIIMatch,
     ApplicabilityResult,
 )
+from services.emotion_module import EDUCATION_KEYWORDS, EMOTION_KEYWORDS, WORKPLACE_KEYWORDS
 from services.ml_classifiers import predict_high_risk as _ml_high_risk
 from services.ml_classifiers import predict_prohibited as _ml_prohibited
 
@@ -48,16 +49,24 @@ _PROHIBITED_PATTERNS: list[tuple[str, str]] = [
     (r"\bsocial\s+scor(?:ing|e)\b", "social scoring"),
     (r"\breal[-\s]time\s+(?:remote\s+)?biometric\s+identification\b",
      "real-time biometric identification"),
-    (r"\bemotion\s+recogni(?:tion|se|ze)\b.*\b(?:workplace|school|education|employee|employees|worker|workers|staff)\b",
-     "emotion recognition in workplace/education/employment"),
-    (r"\b(?:workplace|school|education|employee|employees|worker|workers|staff)\b.*\bemotion\s+recogni(?:tion|se|ze)\b",
-     "emotion recognition in workplace/education/employment"),
     (r"\bEchtzeitbiometrie\b", "Echtzeitbiometrie (DE)"),
     (r"\bSocial[-\s]Scoring\b", "Social-Scoring (DE)"),
     (r"\bunterbewusste\s+Techniken\b", "unterbewusste Techniken (DE)"),
-    (r"\bEmotionserkennung\b.*\b(?:Arbeitsplatz|Bildungseinrichtung|Schule)\b",
-     "Emotionserkennung am Arbeitsplatz/Bildungseinrichtung (DE)"),
 ]
+
+
+def _emotion_context_prohibited(full_text: str) -> str | None:
+    """Article 5(1)(f): emotion recognition in workplace/education context.
+
+    Shares its vocabulary with emotion_module.py's EmotionFlag detection so
+    the two can never disagree on what counts as "emotion recognition" or
+    "workplace/education" — see emotion_module.check_emotion_recognition.
+    """
+    lowered = full_text.lower()
+    hit = next((kw for kw in EMOTION_KEYWORDS if kw in lowered), None)
+    if hit and any(kw in lowered for kw in WORKPLACE_KEYWORDS + EDUCATION_KEYWORDS):
+        return f"emotion recognition ({hit}) in workplace/education context"
+    return None
 
 # ── Annex III category patterns ───────────────────────────────────────────────
 # Keyed by AnnexIIICategory. Each tuple: (pattern, human-readable label).
@@ -339,6 +348,10 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
         if re.search(pattern, full_text, re.IGNORECASE):
             prohibited_hits.append(label)
 
+    emotion_hit = _emotion_context_prohibited(full_text)
+    if emotion_hit:
+        prohibited_hits.append(emotion_hit)
+
     # NER PROHIBITED_USE entities extracted before the gate supply a direct signal.
     for chunk in chunks:
         for ent_text in chunk.metadata.get("ner_entities", {}).get("PROHIBITED_USE", []):
@@ -354,6 +367,7 @@ def check_applicability(chunks: list) -> ApplicabilityResult:
         return ApplicabilityResult(
             is_high_risk=False,
             is_prohibited=True,
+            prohibited_signals=prohibited_hits,
             annex_iii_matches=[],
             annex_i_triggered=False,
             applicable_articles=[5],

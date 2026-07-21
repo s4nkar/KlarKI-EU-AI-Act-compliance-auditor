@@ -377,7 +377,7 @@ async def _run_pipeline(
 
         # Aggregate article scores into a ComplianceReport
         _set_status(AuditStatus.SCORING)
-        emotion_flag = await check_emotion_recognition(chunks)
+        emotion_flag = await check_emotion_recognition(chunks, applicability_result)
         report = await score_audit(
             article_scores=article_scores,
             chunks=chunks,

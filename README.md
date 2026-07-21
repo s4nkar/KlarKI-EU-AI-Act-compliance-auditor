@@ -71,7 +71,6 @@ KlarKI is a **local-first EU AI Act + GDPR compliance auditor** for organisation
 |---|---|
 | **3-Node LangGraph per Article** | `legal_agent → technical_agent → synthesis_agent` - runs concurrently across all applicable articles |
 | **Hybrid RAG Retrieval** | BM25 + ChromaDB vector + Reciprocal Rank Fusion + cross-encoder re-ranking, filtered by article and regulation |
-| **Optional OpenSearch BM25** | Drop-in server-side BM25 replacement (`USE_OPENSEARCH=true`, `--profile opensearch`) |
 | **Deterministic Outputs** | `temperature=0, seed=42, top_k=1` on all LLM calls — same document always gives same result |
 
 ### Document Processing
@@ -109,7 +108,7 @@ KlarKI is a **local-first EU AI Act + GDPR compliance auditor** for organisation
 
 | Feature | Detail |
 |---|---|
-| **6 Docker services** | API, ChromaDB, Ollama, Frontend, Triton (GPU opt-in), OpenSearch (opt-in) |
+| **5 Docker services** | API, ChromaDB, Ollama, Frontend, Triton (GPU opt-in) |
 | **Structured Logging** | structlog with per-request context |
 | **Prometheus-style Metrics** | `/monitoring` endpoint for real-time system health |
 | **Classifier Metrics Dashboard** | `/metrics` - BERT, NER, specialist classifier F1 / precision / recall, confusion matrices |
@@ -281,7 +280,6 @@ Click any article card for:
 | **Backend** | FastAPI 0.111 · Uvicorn · Pydantic v2 · Python 3.11 |
 | **Agent Workflow** | LangGraph · LangChain Core |
 | **Vector Database** | ChromaDB ≥ 1.0.0 (3 collections: eu_ai_act, gdpr, compliance_checklist) |
-| **Search (opt-in)** | OpenSearch 2.13 (server-side BM25 replacement) |
 | **Embeddings** | `intfloat/multilingual-e5-small` via sentence-transformers (local, CPU) |
 | **BM25 (default)** | rank-bm25 (in-memory, partitioned by collection + article) |
 | **Re-ranking** | `cross-encoder/ms-marco-MiniLM-L-6-v2` |
@@ -509,7 +507,6 @@ Every compliance report records the backend used in the `classifier_backend` fie
 | `klarki-ollama` | Local LLM inference server | 11434 | default |
 | `klarki-training` | Python 3.11 container for all training jobs | — | `--profile training` (ephemeral, used by `./run.sh setup/retrain`) |
 | `klarki-triton` | NVIDIA Triton ONNX inference | 8002 (HTTP) / 8003 (gRPC) | `--profile triton` |
-| `klarki-opensearch` | Server-side BM25 search | 9200 | `--profile opensearch` |
 
 ```bash
 # Production mode (Ollama + ChromaDB, GPU auto-detected)
@@ -524,7 +521,6 @@ Every compliance report records the backend used in the `classifier_backend` fie
 # Manual docker compose examples (for reference)
 docker compose up -d                           # Ollama + ChromaDB default mode
 docker compose --profile triton up -d          # GPU inference
-docker compose --profile opensearch up -d      # With OpenSearch BM25
 ```
 
 ---
@@ -666,7 +662,6 @@ All routes are prefixed `/api/v1`. Responses use the `APIResponse` envelope: `{"
 |---|---|---|
 | `OLLAMA_MODEL` | `phi3:mini` | LLM model (swap for larger models on better hardware) |
 | `USE_TRITON` | `false` | `true` to use NVIDIA Triton/gBERT instead of Ollama |
-| `USE_OPENSEARCH` | `false` | `true` to use OpenSearch for server-side BM25 |
 | `EMBEDDING_MODEL` | `intfloat/multilingual-e5-small` | Local sentence-transformer model |
 | `UPLOAD_MAX_SIZE_MB` | `10` | Max upload file size in MB |
 | `DEBUG` | `true` | Pretty-print structured logs |
