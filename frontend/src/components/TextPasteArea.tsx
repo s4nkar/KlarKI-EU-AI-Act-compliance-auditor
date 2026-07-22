@@ -15,10 +15,10 @@ export default function TextPasteArea({ value, onChange }: TextPasteAreaProps) {
         onChange={e => onChange(e.target.value)}
         placeholder="Paste your AI policy, risk management documentation, or any compliance text here…"
         rows={11}
-        className="w-full rounded-xl border border-slate-200 px-4 py-3.5 text-sm text-slate-700
+        className="w-full rounded-xl border-2 border-black px-4 py-3.5 text-sm text-slate-700
           placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-400
           focus:border-transparent resize-none leading-relaxed bg-slate-50
-          hover:border-slate-300 transition-colors"
+          hover:border-black transition-colors"
       />
       <div className="flex items-center justify-between mt-1.5 px-0.5">
         <span className="text-xs text-slate-400">

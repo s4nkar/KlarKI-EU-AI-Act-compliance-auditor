@@ -88,7 +88,7 @@ export default function RiskWizard() {
         {/* Page header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
-            <span className="badge bg-brand-100 text-brand-700 border border-brand-200">Step 1 of 2</span>
+            <span className="badge bg-brand-100 text-brand-700 border-2 border-black">Step 1 of 2</span>
           </div>
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
             Annex III Risk Classification
@@ -101,7 +101,7 @@ export default function RiskWizard() {
 
         {/* Error banner */}
         {error && (
-          <div className="mb-5 flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+          <div className="mb-5 flex items-center gap-3 p-4 bg-red-50 border-2 border-black rounded-xl text-sm text-red-700">
             <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -139,14 +139,14 @@ export default function RiskWizard() {
                 const cardColor =
                   answer === true
                     ? isLast
-                      ? 'border-red-200 bg-red-50'
-                      : 'border-amber-200 bg-amber-50'
+                      ? 'border-black bg-red-50'
+                      : 'border-black bg-amber-50'
                     : answer === false
-                      ? 'border-emerald-200 bg-emerald-50'
-                      : 'border-slate-200 bg-white hover:border-slate-300'
+                      ? 'border-black bg-emerald-50'
+                      : 'border-black bg-white hover:border-black'
 
                 return (
-                  <div key={q.id} className={`rounded-xl border p-4 transition-all duration-150 ${cardColor}`}>
+                  <div key={q.id} className={`rounded-xl border-2 p-4 transition-all duration-150 ${cardColor}`}>
                     <div className="flex items-start gap-4">
                       <span className={`flex items-center justify-center w-7 h-7 rounded-lg shrink-0 text-xs font-bold mt-0.5 ${
                         answer === undefined
@@ -165,22 +165,22 @@ export default function RiskWizard() {
                       <div className="flex gap-2 shrink-0">
                         <button
                           onClick={() => setAnswers(a => ({ ...a, [q.id]: true }))}
-                          className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold border transition-all duration-150 ${
+                          className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-150 ${
                             answer === true
                               ? isLast
-                                ? 'bg-red-500 text-white border-red-500 shadow-sm'
-                                : 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                              : 'border-slate-300 bg-white text-slate-600 hover:border-amber-400 hover:text-amber-700 hover:bg-amber-50'
+                                ? 'bg-red-500 text-white border-black shadow-sm'
+                                : 'bg-amber-500 text-white border-black shadow-sm'
+                              : 'border-black bg-white text-slate-600 hover:border-black hover:text-amber-700 hover:bg-amber-50'
                           }`}
                         >
                           Yes
                         </button>
                         <button
                           onClick={() => setAnswers(a => ({ ...a, [q.id]: false }))}
-                          className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold border transition-all duration-150 ${
+                          className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-150 ${
                             answer === false
-                              ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
-                              : 'border-slate-300 bg-white text-slate-600 hover:border-emerald-400 hover:text-emerald-700 hover:bg-emerald-50'
+                              ? 'bg-emerald-500 text-white border-black shadow-sm'
+                              : 'border-black bg-white text-slate-600 hover:border-black hover:text-emerald-700 hover:bg-emerald-50'
                           }`}
                         >
                           No
@@ -231,10 +231,10 @@ function ResultCard({ tier, onReset }: { tier: RiskTier; onReset: () => void }) 
   const description = TIER_DESCRIPTIONS[tier]
 
   const wrapperColor: Record<RiskTier, string> = {
-    prohibited: 'from-red-50 border-red-200',
-    high:       'from-amber-50 border-amber-200',
-    limited:    'from-blue-50 border-blue-200',
-    minimal:    'from-emerald-50 border-emerald-200',
+    prohibited: 'from-red-50 border-black',
+    high:       'from-amber-50 border-black',
+    limited:    'from-blue-50 border-black',
+    minimal:    'from-emerald-50 border-black',
   }
 
   return (

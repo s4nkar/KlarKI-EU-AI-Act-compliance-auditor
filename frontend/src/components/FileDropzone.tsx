@@ -30,7 +30,7 @@ export default function FileDropzone({ files, onChange }: FileDropzoneProps) {
 
   if (files.length > 0) {
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+      <div className="rounded-xl border-2 border-black bg-emerald-50 p-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
             <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -63,8 +63,8 @@ export default function FileDropzone({ files, onChange }: FileDropzoneProps) {
         {...getRootProps()}
         className={`relative border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200 ${
           isDragActive
-            ? 'border-brand-500 bg-brand-50 scale-[1.01]'
-            : 'border-slate-200 hover:border-brand-400 hover:bg-slate-50'
+            ? 'border-black bg-brand-50 scale-[1.01]'
+            : 'border-black hover:border-black hover:bg-slate-50'
         }`}
       >
         <input {...getInputProps()} />

@@ -9,7 +9,7 @@ export default function EmotionWarning({ flag }: { flag: EmotionFlag }) {
 
   return (
     <div className={`relative rounded-2xl border-2 p-5 mb-6 overflow-hidden ${
-      isProhibited ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'
+      isProhibited ? 'bg-red-50 border-black' : 'bg-amber-50 border-black'
     }`}>
       {/* Decorative stripe */}
       <div className={`absolute top-0 left-0 right-0 h-1 ${

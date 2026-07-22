@@ -77,7 +77,7 @@ function StatCard({ label, value, sub, accent }: {
   label: string; value: string | number; sub?: string; accent?: string
 }) {
   return (
-    <div className={`bg-white border rounded-lg p-4 ${accent ?? 'border-slate-200'}`}>
+    <div className={`bg-white border-2 rounded-lg p-4 ${accent ?? 'border-black'}`}>
       <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{label}</div>
       <div className="text-2xl font-bold text-slate-800">{value}</div>
       {sub && <div className="text-xs text-slate-500 mt-1">{sub}</div>}
@@ -87,7 +87,7 @@ function StatCard({ label, value, sub, accent }: {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 mt-8 border-l-4 border-blue-500 pl-3">
+    <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 mt-8 border-l-4 border-black pl-3">
       {children}
     </h2>
   )
@@ -277,7 +277,7 @@ export default function Monitoring() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm mb-6">
+        <div className="bg-red-50 border-2 border-black text-red-700 rounded-lg px-4 py-3 text-sm mb-6">
           {error}
         </div>
       )}
@@ -292,8 +292,8 @@ export default function Monitoring() {
           <SectionTitle>Service Health</SectionTitle>
           <div className="grid grid-cols-3 gap-3 mb-2">
             {(Object.entries(data.services) as [string, boolean][]).map(([name, ok]) => (
-              <div key={name} className={`border rounded-lg px-4 py-3 flex items-center ${
-                ok ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+              <div key={name} className={`border-2 rounded-lg px-4 py-3 flex items-center ${
+                ok ? 'bg-green-50 border-green-200' : 'bg-red-50 border-black'
               }`}>
                 <StatusDot ok={ok} />
                 <span className="font-medium text-sm capitalize">{name}</span>
@@ -318,13 +318,13 @@ export default function Monitoring() {
               <StatCard
                 label="Failed"
                 value={data.pipeline.failed}
-                accent={data.pipeline.failed > 0 ? 'border-red-300' : 'border-slate-200'}
+                accent={data.pipeline.failed > 0 ? 'border-black' : 'border-black'}
               />
               <StatCard label="Active Now" value={data.pipeline.active} sub="in progress" />
               <StatCard
                 label="Success Rate"
                 value={`${data.pipeline.success_rate}%`}
-                accent={data.pipeline.success_rate >= 90 ? 'border-green-200' : 'border-amber-200'}
+                accent={data.pipeline.success_rate >= 90 ? 'border-green-200' : 'border-black'}
               />
               <StatCard
                 label="Avg Duration"
@@ -333,7 +333,7 @@ export default function Monitoring() {
               />
             </div>
             {/* Donut */}
-            <div className="bg-white border border-slate-200 rounded-lg p-4">
+            <div className="bg-white border-2 border-black rounded-lg p-4">
               <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
                 Audit Outcomes
               </div>
@@ -344,15 +344,15 @@ export default function Monitoring() {
           {/* ── Stage Timing ──────────────────────────────────────── */}
           <SectionTitle>Pipeline Stage Timing</SectionTitle>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-white border border-slate-200 rounded-lg p-4">
+            <div className="bg-white border-2 border-black rounded-lg p-4">
               <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                 Avg vs p95 (seconds)
               </div>
               <StageTimingChart stages={data.stages} />
             </div>
-            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div className="bg-white border-2 border-black rounded-lg overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
+                <thead className="bg-slate-50 border-b border-black">
                   <tr>
                     {['Stage', 'Runs', 'Avg', 'p95', 'Max'].map(h => (
                       <th key={h} className="text-left px-4 py-2 text-xs font-semibold text-slate-500 uppercase">{h}</th>
@@ -381,7 +381,7 @@ export default function Monitoring() {
           {/* ── LangGraph Nodes ───────────────────────────────────── */}
           <SectionTitle>LangGraph Agent Nodes</SectionTitle>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-white border border-slate-200 rounded-lg p-4">
+            <div className="bg-white border-2 border-black rounded-lg p-4">
               <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                 Avg Latency per Node (seconds)
               </div>
@@ -389,12 +389,12 @@ export default function Monitoring() {
             </div>
             <div className="grid grid-cols-1 gap-3">
               {Object.keys(data.graph_nodes).length === 0 ? (
-                <div className="bg-white border border-slate-200 rounded-lg p-6 text-center text-slate-400 text-sm">
+                <div className="bg-white border-2 border-black rounded-lg p-6 text-center text-slate-400 text-sm">
                   No LangGraph data yet — run an audit first
                 </div>
               ) : (
                 Object.entries(data.graph_nodes).map(([node, ns], idx) => (
-                  <div key={node} className="bg-white border border-slate-200 rounded-lg p-4 flex items-center gap-4">
+                  <div key={node} className="bg-white border-2 border-black rounded-lg p-4 flex items-center gap-4">
                     <div
                       className="w-3 h-10 rounded-full flex-shrink-0"
                       style={{ background: COLORS.nodes[idx % COLORS.nodes.length] }}
@@ -419,7 +419,7 @@ export default function Monitoring() {
           {/* ── ChromaDB ──────────────────────────────────────────── */}
           <SectionTitle>ChromaDB Collections</SectionTitle>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-white border border-slate-200 rounded-lg p-4">
+            <div className="bg-white border-2 border-black rounded-lg p-4">
               <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
                 Document count per collection
               </div>
@@ -427,7 +427,7 @@ export default function Monitoring() {
             </div>
             <div className="grid grid-cols-3 gap-3 content-start">
               {Object.entries(data.chromadb.collections).map(([col, count]) => (
-                <div key={col} className="bg-white border border-slate-200 rounded-lg p-4">
+                <div key={col} className="bg-white border-2 border-black rounded-lg p-4">
                   <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
                     {col.replace(/_/g, ' ')}
                   </div>
@@ -442,9 +442,9 @@ export default function Monitoring() {
 
           {/* ── Model Registry ────────────────────────────────────── */}
           <SectionTitle>Model Registry</SectionTitle>
-          <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+          <div className="bg-white border-2 border-black rounded-lg overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="bg-slate-50 border-b border-black">
                 <tr>
                   {['Model', 'Version', 'Score', 'Metric', 'Data Ver', 'Trained At', 'On Disk'].map(h => (
                     <th key={h} className="text-left px-4 py-2 text-xs font-semibold text-slate-500 uppercase">{h}</th>
@@ -492,7 +492,7 @@ export default function Monitoring() {
           <SectionTitle>Training Data Registry</SectionTitle>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {data.data.map(d => (
-              <div key={d.data_type} className="bg-white border border-slate-200 rounded-lg p-4">
+              <div key={d.data_type} className="bg-white border-2 border-black rounded-lg p-4">
                 <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
                   {d.data_type}
                 </div>
@@ -518,7 +518,7 @@ export default function Monitoring() {
             <>
               <SectionTitle>System Resources</SectionTitle>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white border border-slate-200 rounded-lg p-4">
+                <div className="bg-white border-2 border-black rounded-lg p-4">
                   <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">CPU</div>
                   <div className="text-3xl font-bold text-slate-800 mb-2">
                     {data.system.cpu_percent ?? '—'}%
@@ -534,7 +534,7 @@ export default function Monitoring() {
                     />
                   </div>
                 </div>
-                <div className="bg-white border border-slate-200 rounded-lg p-4">
+                <div className="bg-white border-2 border-black rounded-lg p-4">
                   <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Memory</div>
                   {data.system.memory_used_mb != null && data.system.memory_total_mb != null ? (
                     <MemoryBar used={data.system.memory_used_mb} total={data.system.memory_total_mb} />

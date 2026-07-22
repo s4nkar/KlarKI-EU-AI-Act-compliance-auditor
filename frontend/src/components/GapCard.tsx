@@ -8,8 +8,8 @@ interface GapCardProps {
 
 const SEVERITY_CONFIG = {
   critical: {
-    badge: 'bg-red-100 text-red-700 border border-red-200',
-    border: 'border-red-100',
+    badge: 'bg-red-100 text-red-700 border-2 border-black',
+    border: 'border-black',
     icon: (
       <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -18,8 +18,8 @@ const SEVERITY_CONFIG = {
     ),
   },
   major: {
-    badge: 'bg-amber-100 text-amber-700 border border-amber-200',
-    border: 'border-amber-100',
+    badge: 'bg-amber-100 text-amber-700 border-2 border-black',
+    border: 'border-black',
     icon: (
       <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -28,8 +28,8 @@ const SEVERITY_CONFIG = {
     ),
   },
   minor: {
-    badge: 'bg-blue-100 text-blue-700 border border-blue-200',
-    border: 'border-blue-100',
+    badge: 'bg-blue-100 text-blue-700 border-2 border-black',
+    border: 'border-black',
     icon: (
       <svg className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -44,7 +44,7 @@ export default function GapCard({ gap }: GapCardProps) {
   const label = gap.severity.charAt(0).toUpperCase() + gap.severity.slice(1)
 
   return (
-    <div className={`bg-white border rounded-xl p-4 flex gap-3 ${cfg.border}`}>
+    <div className={`bg-white border-2 rounded-xl p-4 flex gap-3 ${cfg.border}`}>
       {cfg.icon}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 mb-1.5 flex-wrap">
