@@ -11,21 +11,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# CPU-only PyTorch — avoids the 2.6 GB CUDA wheel on x86_64.
-# ARM64 (Apple Silicon / linux/aarch64) has no +cpu variant on the WHL index;
-# standard PyPI torch is already CPU-only on that platform.
-# Use --prefix=/install so torch and all its deps (typing_extensions, numpy…)
-# land in the prefix and get copied to Stage 2.
-RUN arch=$(uname -m) && \
-    if [ "$arch" = "x86_64" ]; then \
-        pip install --no-cache-dir --prefix=/install torch==2.3.1+cpu \
-            --index-url https://download.pytorch.org/whl/cpu; \
-    else \
-        pip install --no-cache-dir --prefix=/install torch==2.3.1; \
-    fi
+# CPU-only PyTorch wheel, pre-fetched by the shared klarki-torch:cpu image
+# (docker/torch-base.Dockerfile) instead of downloading it here — avoids fetching
+# the same ~200 MB wheel in every image that needs torch.
+# klarki-torch:cpu must exist locally first: ./run.sh builds it automatically.
+COPY --from=klarki-torch:cpu /wheels /wheels
 
+# torch is installed in this SAME command as requirements.txt (not a separate RUN) —
+# see docker/torch-base.Dockerfile for why splitting it into two pip calls silently
+# drags in several GB of unrelated CUDA packages.
 COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install --find-links=/wheels \
+        "$(cat /wheels/torch_spec.txt)" -r requirements.txt
 
 
 # ── Stage 2: Runtime ──────────────────────────────────────────────────────────

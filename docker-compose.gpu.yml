@@ -17,7 +17,7 @@ services:
   klarki-training:
     build:
       args:
-        USE_GPU: "1"
+        TORCH_IMAGE: klarki-torch:gpu
     deploy:
       resources:
         reservations:
@@ -29,7 +29,7 @@ services:
   klarki-test:
     build:
       args:
-        USE_GPU: "1"
+        TORCH_IMAGE: klarki-torch:gpu
     deploy:
       resources:
         reservations:
