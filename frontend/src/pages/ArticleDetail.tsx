@@ -116,7 +116,7 @@ export default function ArticleDetail() {
         <div className="lg:col-span-2">
           <h2 className="section-label">Compliance Gaps</h2>
           {sortedGaps.length === 0 ? (
-            <div className="card border-emerald-200 bg-emerald-50 p-8 text-center">
+            <div className="card border-black bg-emerald-50 p-8 text-center">
               <svg className="w-10 h-10 text-emerald-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
@@ -142,7 +142,7 @@ export default function ArticleDetail() {
           ) : (
             <ul className="flex flex-col gap-2">
               {articleScore.recommendations.map((rec, i) => (
-                <li key={i} className="flex gap-3 text-sm bg-white border border-slate-200 rounded-xl p-3.5 hover:border-brand-200 hover:bg-brand-50 transition-colors">
+                <li key={i} className="flex gap-3 text-sm bg-white border-2 border-black rounded-xl p-3.5 hover:border-black hover:bg-brand-50 transition-colors">
                   <svg className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                   </svg>
@@ -176,15 +176,15 @@ function ScoreReasoningPanel({ reasoning, score, gaps }: { reasoning: string; sc
   const contradiction = score >= 70 && (hasCritical || hasMajor)
 
   const band = hasCritical
-    ? { label: 'Critical gaps present', bg: 'bg-red-50',   border: 'border-red-200',   text: 'text-red-800',   badge: 'bg-red-100 text-red-700' }
+    ? { label: 'Critical gaps present', bg: 'bg-red-50',   border: 'border-black',   text: 'text-red-800',   badge: 'bg-red-100 text-red-700' }
     : hasMajor
-      ? { label: 'Major gaps present',  bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', badge: 'bg-amber-100 text-amber-700' }
+      ? { label: 'Major gaps present',  bg: 'bg-amber-50', border: 'border-black', text: 'text-amber-800', badge: 'bg-amber-100 text-amber-700' }
       : hasMinor
-        ? { label: 'Minor gaps only',   bg: 'bg-blue-50',  border: 'border-blue-200',  text: 'text-blue-800',  badge: 'bg-blue-100 text-blue-700' }
-        : { label: 'No gaps',           bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-700' }
+        ? { label: 'Minor gaps only',   bg: 'bg-blue-50',  border: 'border-black',  text: 'text-blue-800',  badge: 'bg-blue-100 text-blue-700' }
+        : { label: 'No gaps',           bg: 'bg-emerald-50', border: 'border-black', text: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-700' }
 
   return (
-    <div className={`rounded-xl border p-5 ${band.bg} ${band.border}`}>
+    <div className={`rounded-xl border-2 p-5 ${band.bg} ${band.border}`}>
       <div className="flex items-center gap-2.5 mb-3">
         <p className={`text-sm font-bold uppercase tracking-widest ${band.text} opacity-70`}>Why this score?</p>
         <span className={`badge ${band.badge}`}>{band.label}</span>
@@ -225,12 +225,12 @@ function RegulatoryPassagesPanel({ passages, articleNum }: { passages: Regulator
       </button>
 
       {open && (
-        <div className="border-t border-slate-100 divide-y divide-slate-100">
+        <div className="border-t border-black divide-y divide-slate-100">
           {passages.map((p, i) => (
             <div key={i} className="px-5 py-4">
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 {p.title && (
-                  <span className="badge bg-brand-100 text-brand-700 border border-brand-200">{p.title}</span>
+                  <span className="badge bg-brand-100 text-brand-700 border-2 border-black">{p.title}</span>
                 )}
                 {p.article_ref && (
                   <span className="text-xs text-slate-500">{p.article_ref}</span>
@@ -257,13 +257,13 @@ function AuditReadinessPanel({ gaps, articleNum, articleName }: { gaps: GapItem[
   const canDefend = critical.length === 0 && major.length === 0
 
   const cfg = canDefend
-    ? { border: 'border-emerald-200', header: 'bg-emerald-50', text: 'text-emerald-800' }
+    ? { border: 'border-black', header: 'bg-emerald-50', text: 'text-emerald-800' }
     : critical.length > 0
-      ? { border: 'border-red-200', header: 'bg-red-50', text: 'text-red-800' }
-      : { border: 'border-amber-200', header: 'bg-amber-50', text: 'text-amber-800' }
+      ? { border: 'border-black', header: 'bg-red-50', text: 'text-red-800' }
+      : { border: 'border-black', header: 'bg-amber-50', text: 'text-amber-800' }
 
   return (
-    <div className={`mt-6 rounded-2xl border overflow-hidden ${cfg.border}`}>
+    <div className={`mt-6 rounded-2xl border-2 overflow-hidden ${cfg.border}`}>
       <div className={`px-5 py-4 ${cfg.header} flex items-center gap-3`}>
         {canDefend ? (
           <svg className="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -282,7 +282,7 @@ function AuditReadinessPanel({ gaps, articleNum, articleName }: { gaps: GapItem[
 
       <div className="bg-white px-5 py-5">
         {/* Verdict */}
-        <div className="flex items-start gap-3 mb-5 pb-5 border-b border-slate-100">
+        <div className="flex items-start gap-3 mb-5 pb-5 border-b border-black">
           <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-white text-base ${
             canDefend ? 'bg-emerald-500' : critical.length > 0 ? 'bg-red-500' : 'bg-amber-500'
           }`}>
@@ -314,7 +314,7 @@ function AuditReadinessPanel({ gaps, articleNum, articleName }: { gaps: GapItem[
           ))}
         </div>
 
-        <p className="text-xs text-slate-400 mt-5 pt-4 border-t border-slate-100">
+        <p className="text-xs text-slate-400 mt-5 pt-4 border-t border-black">
           This checklist is generated from the automated gap analysis. Final audit readiness must be verified by a qualified legal or compliance professional.
         </p>
       </div>
@@ -326,13 +326,13 @@ function ChecklistItem({ gap }: { gap: GapItem }) {
   const [checked, setChecked] = useState(false)
 
   const cfg = {
-    critical: 'border-red-200 bg-red-50 text-red-700',
-    major:    'border-amber-200 bg-amber-50 text-amber-700',
-    minor:    'border-slate-200 bg-slate-50 text-slate-600',
+    critical: 'border-black bg-red-50 text-red-700',
+    major:    'border-black bg-amber-50 text-amber-700',
+    minor:    'border-black bg-slate-50 text-slate-600',
   }[gap.severity]
 
   return (
-    <label className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-opacity ${cfg} ${checked ? 'opacity-40' : ''}`}>
+    <label className={`flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-opacity ${cfg} ${checked ? 'opacity-40' : ''}`}>
       <input
         type="checkbox"
         checked={checked}
@@ -341,7 +341,7 @@ function ChecklistItem({ gap }: { gap: GapItem }) {
       />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5 flex-wrap">
-          <span className="badge bg-white/60 border border-current/20 uppercase text-[10px]">{gap.severity}</span>
+          <span className="badge bg-white/60 border-2 border-current/20 uppercase text-[10px]">{gap.severity}</span>
           <span className="text-sm font-semibold">{gap.title}</span>
         </div>
         <p className="text-xs opacity-80 leading-snug">{gap.description}</p>

@@ -58,6 +58,23 @@ _has_nvidia_gpu() {
   command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1
 }
 
+# Build the shared torch layer (docker/torch-base.Dockerfile) that api/Dockerfile,
+# api/Dockerfile.dev, tests/Dockerfile, and training/Dockerfile all COPY --from=
+# instead of each downloading their own copy of torch. Skipped once the tag
+# exists locally; to pick up a torch version bump, remove the tag first:
+#   docker rmi klarki-torch:cpu klarki-torch:gpu
+_build_torch_base() {
+  local variant="$1" # cpu | gpu
+  local tag="klarki-torch:$variant"
+  if docker image inspect "$tag" >/dev/null 2>&1; then
+    return 0
+  fi
+  info "Building shared torch base image ($tag)... (one-time; reused by api/tests/training)"
+  local use_gpu=0
+  [ "$variant" = "gpu" ] && use_gpu=1
+  docker build -t "$tag" --build-arg USE_GPU="$use_gpu" -f docker/torch-base.Dockerfile docker
+}
+
 # Run a command inside the training container (Python 3.11, isolated from host).
 # Automatically uses the GPU overlay + CUDA torch when nvidia-smi is detected;
 # falls back to CPU-only torch on machines without an NVIDIA GPU.
@@ -67,6 +84,9 @@ _run_training() {
   local compose_files="-f docker-compose.yml"
   if _has_nvidia_gpu && [ -f docker-compose.gpu.yml ]; then
     compose_files="-f docker-compose.yml -f docker-compose.gpu.yml"
+    _build_torch_base gpu
+  else
+    _build_torch_base cpu
   fi
   docker compose $compose_files --profile training build klarki-training
   docker compose $compose_files --profile training run --rm klarki-training "$@"
@@ -78,6 +98,9 @@ _run_testing() {
   local compose_files="-f docker-compose.yml"
   if _has_nvidia_gpu && [ -f docker-compose.gpu.yml ]; then
     compose_files="-f docker-compose.yml -f docker-compose.gpu.yml"
+    _build_torch_base gpu
+  else
+    _build_torch_base cpu
   fi
   docker compose $compose_files --profile testing build klarki-test
   docker compose $compose_files --profile testing run --rm klarki-test "$@"
@@ -101,6 +124,8 @@ cmd_setup() {
   else
     info "No GPU detected — running in CPU-only mode (Ollama on CPU, slower but fully functional)."
   fi
+
+  _build_torch_base cpu
 
   info "Building and starting infrastructure containers..."
   # shellcheck disable=SC2086
@@ -129,6 +154,7 @@ cmd_up() {
   else
     echo "No GPU detected — running in CPU-only mode."
   fi
+  _build_torch_base cpu
   # shellcheck disable=SC2086
   docker compose $COMPOSE up --build -d
 }
@@ -144,6 +170,7 @@ cmd_dev() {
   fi
 
   COMPOSE=$(_compose_files)
+  _build_torch_base cpu
   # shellcheck disable=SC2086
   docker compose $COMPOSE -f docker-compose.dev.yml up --build -d
   echo ""
@@ -177,6 +204,7 @@ cmd_triton() {
 
   info "Enabling Triton backend in API..."
   _sed_inplace 's/USE_TRITON=false/USE_TRITON=true/' .env
+  _build_torch_base cpu
   docker compose $(_compose_files) up -d --build klarki-api
 
   success "Triton is live. Run './run.sh bench' to compare latency."

@@ -227,10 +227,10 @@ export default function ClassifierMetrics() {
   }
 
   const f1Theme = data.macro_f1 >= 0.85
-    ? { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', bar: '#10b981', label: 'Above 85% target' }
+    ? { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-black', bar: '#10b981', label: 'Above 85% target' }
     : data.macro_f1 >= 0.70
-      ? { text: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-200',  bar: '#f59e0b', label: 'Below 85% target' }
-      : { text: 'text-red-600',    bg: 'bg-red-50',    border: 'border-red-200',    bar: '#ef4444', label: 'Needs retraining' }
+      ? { text: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-black',  bar: '#f59e0b', label: 'Below 85% target' }
+      : { text: 'text-red-600',    bg: 'bg-red-50',    border: 'border-black',    bar: '#ef4444', label: 'Needs retraining' }
 
   const maxCellValue = Math.max(...data.confusion_matrix.flatMap(r => r))
 
@@ -241,7 +241,7 @@ export default function ClassifierMetrics() {
         <div className="flex items-center gap-3 mb-1">
           <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Model Metrics</h1>
           {fromStatic && (
-            <span className="badge bg-amber-100 text-amber-700 border border-amber-200">
+            <span className="badge bg-amber-100 text-amber-700 border-2 border-black">
               Static snapshot · Start the API for live data
             </span>
           )}
@@ -294,7 +294,7 @@ export default function ClassifierMetrics() {
       <div className="card overflow-hidden mb-7">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/80">
+            <tr className="border-b border-black bg-slate-50/80">
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Class</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Precision</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Recall</th>
@@ -451,7 +451,7 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
 
   if (!data) {
     return (
-      <div className="border-t border-slate-200 pt-8 mb-10">
+      <div className="border-t border-black pt-8 mb-10">
         <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Evaluation Suite</h1>
         <p className="text-sm text-slate-500 mb-4">
           Run <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded-md font-mono text-slate-700">./run.sh test</code> to execute the evaluation suite and populate this section.
@@ -477,10 +477,10 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
   }
 
   const statusStyle = (s: string) =>
-    s === 'pass' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    : s === 'warn' ? 'bg-amber-50 text-amber-700 border-amber-200'
-    : s === 'skip' ? 'bg-slate-100 text-slate-500 border-slate-200'
-    : 'bg-red-50 text-red-700 border-red-200'
+    s === 'pass' ? 'bg-emerald-50 text-emerald-700 border-black'
+    : s === 'warn' ? 'bg-amber-50 text-amber-700 border-black'
+    : s === 'skip' ? 'bg-slate-100 text-slate-500 border-black'
+    : 'bg-red-50 text-red-700 border-black'
 
   const statusDot = (s: string) =>
     s === 'pass' ? '#10b981' : s === 'warn' ? '#f59e0b' : s === 'skip' ? '#94a3b8' : '#ef4444'
@@ -502,7 +502,7 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
   }
 
   return (
-    <div className="border-t border-slate-200 pt-8 mb-10">
+    <div className="border-t border-black pt-8 mb-10">
       <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Evaluation Suite</h1>
       <p className="text-sm text-slate-500 mb-6">
         Results from the last <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded-md font-mono text-slate-700">./run.sh test</code> run.
@@ -524,7 +524,7 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{meta.label}</p>
                   <p className="text-xs text-slate-400 mt-0.5">{meta.desc}</p>
                 </div>
-                <span className={`badge border ${statusStyle(r.status)}`}>
+                <span className={`badge border-2 ${statusStyle(r.status)}`}>
                   <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: statusDot(r.status) }} />
                   {r.status}
                 </span>
@@ -592,7 +592,7 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
                       </button>
                     )}
                     {expanded[key] && hasDetails(r) && (
-                      <div className="mt-3 pt-3 border-t border-slate-100">
+                      <div className="mt-3 pt-3 border-t border-black">
                         {r.per_class && <EvalPerClassDetail data={r.per_class} />}
                         {r.per_label && <EvalPerLabelDetail data={r.per_label} />}
                         {r.by_outcome && <EvalByOutcomeDetail data={r.by_outcome} />}
@@ -620,7 +620,7 @@ function SpecialistSection({ data }: { data: SpecialistMetricsData }) {
   const anyTrained = allKeys.some(k => k in data)
 
   return (
-    <div className="border-t border-slate-200 pt-8 mb-7">
+    <div className="border-t border-black pt-8 mb-7">
       <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">
         Phase 3 Specialist Classifiers
       </h1>
@@ -651,10 +651,10 @@ function SpecialistSection({ data }: { data: SpecialistMetricsData }) {
           )
 
           const theme = m.macro_f1 >= 0.85
-            ? { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', bar: '#10b981' }
+            ? { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-black', bar: '#10b981' }
             : m.macro_f1 >= 0.70
-              ? { text: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-200',  bar: '#f59e0b' }
-              : { text: 'text-red-600',    bg: 'bg-red-50',    border: 'border-red-200',    bar: '#ef4444' }
+              ? { text: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-black',  bar: '#f59e0b' }
+              : { text: 'text-red-600',    bg: 'bg-red-50',    border: 'border-black',    bar: '#ef4444' }
 
           return (
             <div key={key} className={`card p-6 border-2 ${theme.border} ${theme.bg}`}>
@@ -724,7 +724,7 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
   }
 
   return (
-    <div className="border-t border-slate-200 pt-8 mb-7">
+    <div className="border-t border-black pt-8 mb-7">
       <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Model Version Registry</h1>
       <p className="text-sm text-slate-500 mb-6">
         Active model versions, training history, and data-version traceability across all five classifiers.
@@ -735,7 +735,7 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
       <div className="card overflow-hidden mb-6">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/80">
+            <tr className="border-b border-black bg-slate-50/80">
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Model</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Active Ver.</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Score</th>
@@ -759,7 +759,7 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
                   </td>
                   <td className="px-4 py-3.5 text-center">
                     {info.active
-                      ? <span className="badge bg-brand-50 text-brand-700 border border-brand-200">{info.active}</span>
+                      ? <span className="badge bg-brand-50 text-brand-700 border-2 border-black">{info.active}</span>
                       : <span className="text-slate-400 text-xs italic">untrained</span>}
                   </td>
                   <td className={`px-4 py-3.5 text-center tabular-nums ${scoreTheme}`}>
@@ -798,7 +798,7 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
                 {[...info.versions].reverse().map(v => {
                   const scoreStr = v.score != null ? `${(v.score * 100).toFixed(1)}%` : '—'
                   return (
-                    <div key={v.version} className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${v.is_active ? 'bg-brand-50 border border-brand-200' : 'bg-slate-50'}`}>
+                    <div key={v.version} className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${v.is_active ? 'bg-brand-50 border-2 border-black' : 'bg-slate-50'}`}>
                       <div className="flex items-center gap-2">
                         <span className={`font-bold ${v.is_active ? 'text-brand-700' : 'text-slate-500'}`}>
                           {v.version}
@@ -827,7 +827,7 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
           <div className="card overflow-hidden mb-2">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/80">
+                <tr className="border-b border-black bg-slate-50/80">
                   <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Dataset</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Active Ver.</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Records</th>
@@ -844,7 +844,7 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         {info.active
-                          ? <span className="badge bg-slate-100 text-slate-600 border border-slate-200">{info.active}</span>
+                          ? <span className="badge bg-slate-100 text-slate-600 border-2 border-black">{info.active}</span>
                           : <span className="text-slate-400 text-xs italic">none</span>}
                       </td>
                       <td className="px-4 py-3.5 text-center text-slate-600 tabular-nums">
@@ -874,7 +874,7 @@ function EvalPerClassDetail({ data }: {
   return (
     <table className="w-full text-xs">
       <thead>
-        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-black">
           <th className="pb-1.5">Class</th>
           <th className="pb-1.5 text-center">P</th>
           <th className="pb-1.5 text-center">R</th>
@@ -886,7 +886,7 @@ function EvalPerClassDetail({ data }: {
         {entries.map(([cls, m]) => {
           const color = m.f1 >= 0.85 ? 'text-emerald-600' : m.f1 >= 0.70 ? 'text-amber-600' : 'text-red-600'
           return (
-            <tr key={cls} className="border-b border-slate-50 last:border-0">
+            <tr key={cls} className="border-b border-black last:border-0">
               <td className="py-1 text-slate-600 capitalize font-medium">{cls.replace(/_/g, ' ')}</td>
               <td className="py-1 text-center text-slate-500 tabular-nums">{(m.precision * 100).toFixed(0)}%</td>
               <td className="py-1 text-center text-slate-500 tabular-nums">{(m.recall * 100).toFixed(0)}%</td>
@@ -906,7 +906,7 @@ function EvalPerLabelDetail({ data }: {
   return (
     <table className="w-full text-xs">
       <thead>
-        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-black">
           <th className="pb-1.5">Label</th>
           <th className="pb-1.5 text-center">F1</th>
           <th className="pb-1.5 text-center">TP</th>
@@ -918,7 +918,7 @@ function EvalPerLabelDetail({ data }: {
         {Object.entries(data).map(([lbl, m]) => {
           const color = m.f1 >= 0.80 ? 'text-emerald-600' : m.f1 >= 0.60 ? 'text-amber-600' : 'text-red-600'
           return (
-            <tr key={lbl} className="border-b border-slate-50 last:border-0">
+            <tr key={lbl} className="border-b border-black last:border-0">
               <td className="py-1">
                 <code className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">{lbl}</code>
               </td>
@@ -986,7 +986,7 @@ function EvalChecksDetail({ data, articleScores }: {
         ))}
       </div>
       {articleScores && Object.keys(articleScores).length > 0 && (
-        <div className="mt-2 pt-2 border-t border-slate-100">
+        <div className="mt-2 pt-2 border-t border-black">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Article Scores</p>
           <div className="flex gap-3 flex-wrap">
             {Object.entries(articleScores).map(([art, score]) => {
@@ -1007,14 +1007,14 @@ function EvalChecksDetail({ data, articleScores }: {
 
 function NerMetricsSection({ data }: { data: NerMetricsData }) {
   const theme = data.overall_f1 >= 0.80
-    ? { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', label: 'Above 80% target' }
+    ? { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-black', label: 'Above 80% target' }
     : data.overall_f1 >= 0.60
-      ? { text: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-200',  label: 'Below 80% target' }
-      : { text: 'text-red-600',    bg: 'bg-red-50',    border: 'border-red-200',    label: 'Needs retraining' }
+      ? { text: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-black',  label: 'Below 80% target' }
+      : { text: 'text-red-600',    bg: 'bg-red-50',    border: 'border-black',    label: 'Needs retraining' }
 
   return (
     <>
-      <div className="border-t border-slate-200 pt-8 mb-7">
+      <div className="border-t border-black pt-8 mb-7">
         <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">NER Model Metrics</h1>
         <p className="text-sm text-slate-500">
           spaCy entity recogniser on the held-out dev set ({data.val_size} sentences).
@@ -1045,7 +1045,7 @@ function NerMetricsSection({ data }: { data: NerMetricsData }) {
       <div className="card overflow-hidden mb-10">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/80">
+            <tr className="border-b border-black bg-slate-50/80">
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Entity Type</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Precision</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Recall</th>

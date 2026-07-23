@@ -16,19 +16,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# CPU-only PyTorch — same as prod; keeps dev image lean.
-# ARM64 (Apple Silicon / linux/aarch64) has no +cpu variant on the WHL index;
-# standard PyPI torch is already CPU-only on that platform.
-RUN arch=$(uname -m) && \
-    if [ "$arch" = "x86_64" ]; then \
-        pip install --no-cache-dir torch==2.3.1+cpu \
-            --index-url https://download.pytorch.org/whl/cpu; \
-    else \
-        pip install --no-cache-dir torch==2.3.1; \
-    fi
+# CPU-only PyTorch wheel, pre-fetched by the shared klarki-torch:cpu image
+# (docker/torch-base.Dockerfile) instead of downloading it here — same torch as
+# prod, fetched once and reused. ./run.sh builds it automatically.
+COPY --from=klarki-torch:cpu /wheels /wheels
 
+# torch is installed in this SAME command as the requirements files (not a
+# separate RUN) — see docker/torch-base.Dockerfile for why splitting it into two
+# pip calls silently drags in several GB of unrelated CUDA packages.
 COPY requirements.txt requirements-dev.txt ./
-RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
+RUN pip install --no-cache-dir --find-links=/wheels \
+        "$(cat /wheels/torch_spec.txt)" -r requirements.txt -r requirements-dev.txt
 
 RUN mkdir -p /data/uploads
 

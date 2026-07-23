@@ -71,7 +71,7 @@ export default function Dashboard() {
 
       {/* ── Human Review Warning ──────────────────────────────────────────── */}
       {report.requires_human_review && (
-        <div className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
+        <div className="mb-6 rounded-xl border-2 border-black bg-amber-50 p-4">
           <div className="flex items-start gap-3">
             <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -114,7 +114,7 @@ export default function Dashboard() {
             {report.source_files.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {report.source_files.map((f, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-[10px] font-mono text-slate-500 border border-slate-200">
+                  <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-[10px] font-mono text-slate-500 border-2 border-black">
                     <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
@@ -134,24 +134,24 @@ export default function Dashboard() {
       {totalGaps > 0 && (
         <div className="flex flex-wrap gap-3 mb-6">
           {criticalGaps > 0 && (
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200">
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 border-2 border-black">
               <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
               <span className="text-sm font-semibold text-red-700">{criticalGaps} Critical Gap{criticalGaps !== 1 ? 's' : ''}</span>
             </div>
           )}
           {majorGaps > 0 && (
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-50 border-2 border-black">
               <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
               <span className="text-sm font-semibold text-amber-700">{majorGaps} Major Gap{majorGaps !== 1 ? 's' : ''}</span>
             </div>
           )}
           {minorGaps > 0 && (
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-200">
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 border-2 border-black">
               <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
               <span className="text-sm font-semibold text-blue-700">{minorGaps} Minor Gap{minorGaps !== 1 ? 's' : ''}</span>
             </div>
           )}
-          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 border border-slate-200">
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 border-2 border-black">
             <span className="text-sm text-slate-600">{totalGaps} total gaps across {sorted.length} articles</span>
           </div>
         </div>
@@ -219,7 +219,7 @@ function PrioritiesSection({ articleScores, auditId }: { articleScores: ArticleS
           <Link
             key={i}
             to={`/audit/${auditId}/article/${gap.article_num}`}
-            className="flex items-start gap-3 p-3 rounded-xl border border-slate-100 hover:border-brand-200 hover:bg-brand-50 transition-colors group"
+            className="flex items-start gap-3 p-3 rounded-xl border-2 border-black hover:border-black hover:bg-brand-50 transition-colors group"
           >
             <div className="flex flex-col items-center gap-1 shrink-0 w-16">
               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold w-full text-center ${
@@ -258,11 +258,11 @@ function ActorPanel({ actor }: { actor: ActorClassification }) {
   const isLow = actor.confidence < 0.60
 
   return (
-    <div className={`card p-4 ${isLow ? 'border-amber-300' : ''}`}>
+    <div className={`card p-4 ${isLow ? 'border-black' : ''}`}>
       <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Article 3 — Actor Role</p>
 
       {isLow && (
-        <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1.5 bg-amber-50 rounded-lg border border-amber-200">
+        <div className="flex items-center gap-1.5 mb-2 px-2.5 py-1.5 bg-amber-50 rounded-lg border-2 border-black">
           <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
@@ -286,7 +286,7 @@ function ActorPanel({ actor }: { actor: ActorClassification }) {
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Detected signals</p>
           <div className="flex flex-wrap gap-1">
             {actor.matched_signals.map((s, i) => (
-              <span key={i} className="px-1.5 py-0.5 rounded-full bg-blue-50 text-[10px] text-blue-700 border border-blue-100">{s}</span>
+              <span key={i} className="px-1.5 py-0.5 rounded-full bg-blue-50 text-[10px] text-blue-700 border-2 border-black">{s}</span>
             ))}
           </div>
         </div>
@@ -314,7 +314,7 @@ function ApplicabilityPanel({ applicability }: { applicability: ApplicabilityRes
 
       {/* Annex I safety-component signal */}
       {applicability.annex_i_triggered && (
-        <div className="flex items-center gap-1.5 mb-2 px-2 py-1 bg-orange-50 rounded-lg border border-orange-200">
+        <div className="flex items-center gap-1.5 mb-2 px-2 py-1 bg-orange-50 rounded-lg border-2 border-black">
           <svg className="w-3 h-3 text-orange-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
@@ -326,12 +326,12 @@ function ApplicabilityPanel({ applicability }: { applicability: ApplicabilityRes
       {applicability.annex_iii_matches.length > 0 && (
         <div className="mb-2 space-y-1.5">
           {applicability.annex_iii_matches.map(match => (
-            <div key={match.category} className="rounded-lg bg-slate-50 p-2 border border-slate-100">
+            <div key={match.category} className="rounded-lg bg-slate-50 p-2 border-2 border-black">
               <p className="text-[10px] font-bold text-slate-600 mb-1">Annex III — {match.category_name}</p>
               {match.matched_keywords.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {match.matched_keywords.map((kw, i) => (
-                    <span key={i} className="px-1.5 py-0.5 rounded bg-amber-50 text-[10px] text-amber-700 border border-amber-100">{kw}</span>
+                    <span key={i} className="px-1.5 py-0.5 rounded bg-amber-50 text-[10px] text-amber-700 border-2 border-black">{kw}</span>
                   ))}
                 </div>
               )}
@@ -346,7 +346,7 @@ function ApplicabilityPanel({ applicability }: { applicability: ApplicabilityRes
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">EU AI Act obligations</p>
           <div className="flex flex-wrap gap-1">
             {applicability.applicable_articles.map(n => (
-              <span key={n} className="px-1.5 py-0.5 rounded bg-blue-50 text-[10px] font-bold text-blue-700 border border-blue-100">Art. {n}</span>
+              <span key={n} className="px-1.5 py-0.5 rounded bg-blue-50 text-[10px] font-bold text-blue-700 border-2 border-black">Art. {n}</span>
             ))}
           </div>
         </div>
@@ -358,7 +358,7 @@ function ApplicabilityPanel({ applicability }: { applicability: ApplicabilityRes
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">GDPR obligations</p>
           <div className="flex flex-wrap gap-1">
             {applicability.gdpr_applicable_articles.map(n => (
-              <span key={n} className="px-1.5 py-0.5 rounded bg-purple-50 text-[10px] font-bold text-purple-700 border border-purple-100">Art. {n}</span>
+              <span key={n} className="px-1.5 py-0.5 rounded bg-purple-50 text-[10px] font-bold text-purple-700 border-2 border-black">Art. {n}</span>
             ))}
           </div>
         </div>
@@ -438,7 +438,7 @@ function EvidenceSummaryPanel({ evidence }: { evidence: EvidenceMap }) {
       <p className="text-[10px] text-slate-400 text-center mb-1">{evidence.total_obligations} total obligations checked</p>
 
       {(aiActItems.length > 0 || gdprItems.length > 0) && (
-        <div className="border-t border-slate-100 pt-2 mt-2 space-y-0.5">
+        <div className="border-t border-black pt-2 mt-2 space-y-0.5">
           <EvidenceCoverageBar items={aiActItems} label="EU AI Act" color="text-blue-600" />
           <EvidenceCoverageBar items={gdprItems}  label="GDPR"      color="text-purple-600" />
         </div>
@@ -480,7 +480,7 @@ function EvidenceObligationsSection({ evidence }: { evidence: EvidenceMap }) {
       </button>
 
       {open && (
-        <div className="border-t border-slate-100">
+        <div className="border-t border-black">
           {aiActItems.length > 0 && (
             <ObligationGroup title="EU AI Act" items={aiActItems} accentColor="blue" />
           )}
@@ -533,7 +533,7 @@ function ObligationRow({ item }: { item: EvidenceItem }) {
       <div className="flex items-center gap-2 mb-1.5 flex-wrap">
         <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{item.obligation_id}</span>
         {item.article && (
-          <span className="text-[10px] font-semibold text-slate-600 bg-white border border-slate-200 px-1.5 py-0.5 rounded">{item.article}</span>
+          <span className="text-[10px] font-semibold text-slate-600 bg-white border-2 border-black px-1.5 py-0.5 rounded">{item.article}</span>
         )}
         <div className="ml-auto flex items-center gap-2">
           <div className="w-16 h-1 rounded-full bg-slate-200">
@@ -554,7 +554,7 @@ function ObligationRow({ item }: { item: EvidenceItem }) {
       {(item.satisfied_evidence.length > 0 || item.missing_evidence.length > 0) && (
         <div className="flex flex-wrap gap-1">
           {item.satisfied_evidence.map((e, i) => (
-            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-[10px] text-emerald-700 border border-emerald-200">
+            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-[10px] text-emerald-700 border-2 border-black">
               <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
@@ -562,7 +562,7 @@ function ObligationRow({ item }: { item: EvidenceItem }) {
             </span>
           ))}
           {item.missing_evidence.map((e, i) => (
-            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-[10px] text-red-700 border border-red-200 font-medium">
+            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-[10px] text-red-700 border-2 border-black font-medium">
               <svg className="w-2.5 h-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -579,7 +579,7 @@ function ObligationRow({ item }: { item: EvidenceItem }) {
 
 function StatBox({ label, value, mono }: { label: string; value: string | number; mono?: boolean }) {
   return (
-    <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
+    <div className="rounded-xl bg-slate-50 border-2 border-black px-3 py-2.5">
       <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
       <p className={`text-sm font-bold text-slate-800 truncate ${mono ? 'font-mono' : ''}`}>{value}</p>
     </div>
@@ -600,25 +600,25 @@ function RiskTierComparison({ wizardTier, documentTier }: { wizardTier: RiskTier
   if (wizardTier === documentTier) {
     message = 'The document-derived risk tier matches your self-assessment. Your audit is internally consistent.'
     cfg = {
-      bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-800',
+      bg: 'bg-emerald-50', border: 'border-black', text: 'text-emerald-800',
       icon: <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
     }
   } else if (docRank > wizRank) {
     message = 'The document audit found a higher risk tier than your self-assessment. The document contains keywords associated with higher-risk AI use cases. Review the flagged areas carefully before deployment.'
     cfg = {
-      bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800',
+      bg: 'bg-red-50', border: 'border-black', text: 'text-red-800',
       icon: <svg className="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>,
     }
   } else {
     message = `The document audit derived a lower risk tier than your self-assessment. The wizard result (${riskTierLabel(wizardTier).label}) remains the primary signal — a qualified assessor should confirm the final tier.`
     cfg = {
-      bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800',
+      bg: 'bg-amber-50', border: 'border-black', text: 'text-amber-800',
       icon: <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
     }
   }
 
   return (
-    <div className={`mb-6 rounded-xl border p-4 ${cfg.bg} ${cfg.border}`}>
+    <div className={`mb-6 rounded-xl border-2 p-4 ${cfg.bg} ${cfg.border}`}>
       <div className="flex items-center gap-2 mb-2.5">
         {cfg.icon}
         <p className={`text-xs font-bold uppercase tracking-widest ${cfg.text} opacity-70`}>Risk Tier Comparison</p>

@@ -23,20 +23,20 @@ const ARTICLE_ICONS: Record<number, string> = {
 
 function gapTheme(criticalCount: number, majorCount: number, minorCount: number) {
   if (criticalCount > 0) return {
-    bar: 'bg-red-500', num: 'text-red-600', badge: 'bg-red-50 text-red-700 border-red-200',
-    dot: 'bg-red-500', border: 'hover:border-red-200',
+    bar: 'bg-red-500', num: 'text-red-600', badge: 'bg-red-50 text-red-700 border-black',
+    dot: 'bg-red-500', border: 'hover:border-black',
   }
   if (majorCount > 0) return {
-    bar: 'bg-amber-500', num: 'text-amber-600', badge: 'bg-amber-50 text-amber-700 border-amber-200',
-    dot: 'bg-amber-500', border: 'hover:border-amber-200',
+    bar: 'bg-amber-500', num: 'text-amber-600', badge: 'bg-amber-50 text-amber-700 border-black',
+    dot: 'bg-amber-500', border: 'hover:border-black',
   }
   if (minorCount > 0) return {
-    bar: 'bg-blue-400', num: 'text-blue-600', badge: 'bg-blue-50 text-blue-700 border-blue-200',
-    dot: 'bg-blue-400', border: 'hover:border-blue-200',
+    bar: 'bg-blue-400', num: 'text-blue-600', badge: 'bg-blue-50 text-blue-700 border-black',
+    dot: 'bg-blue-400', border: 'hover:border-black',
   }
   return {
-    bar: 'bg-emerald-500', num: 'text-emerald-600', badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    dot: 'bg-emerald-500', border: 'hover:border-emerald-200',
+    bar: 'bg-emerald-500', num: 'text-emerald-600', badge: 'bg-emerald-50 text-emerald-700 border-black',
+    dot: 'bg-emerald-500', border: 'hover:border-black',
   }
 }
 
@@ -120,7 +120,7 @@ export default function ArticleCard({ score, auditId }: ArticleCardProps) {
 
       {/* Worst gap preview */}
       {worstGap && (
-        <p className="mt-3 text-xs text-slate-400 truncate border-t border-slate-100 pt-2.5">
+        <p className="mt-3 text-xs text-slate-400 truncate border-t border-black pt-2.5">
           {worstGap.title}
         </p>
       )}
