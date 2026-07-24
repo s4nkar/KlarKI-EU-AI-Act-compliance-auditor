@@ -305,12 +305,13 @@ async def _run_pipeline(
         # Runs before the legal gate so PROHIBITED_USE / RISK_TIER entities
         # are available to applicability_engine. Domain correction happens
         # after classify_chunks (Phase 2 below).
-        _set_status(AuditStatus.CLASSIFYING)
+        _set_status(AuditStatus.EXTRACTING_ENTITIES)
         _t0 = _time.time()
         chunks = await extract_ner_entities_async(chunks)
 
         # ── Stage 3: actor + applicability gate ──────────────────────────────
         # Both are deterministic and use NER entity metadata written above.
+        _set_status(AuditStatus.CLASSIFYING_RISK)
         actor_result, applicability_result = await asyncio.gather(
             asyncio.to_thread(classify_actor, raw_text, chunks),
             asyncio.to_thread(check_applicability, chunks),
@@ -326,6 +327,7 @@ async def _run_pipeline(
         )
 
         # ── Stage 4: chunk classification (BERT/Ollama) ───────────────────────
+        _set_status(AuditStatus.CLASSIFYING_CHUNKS)
         chunks, classifier_backend = await classify_chunks(chunks, ollama)
 
         # ── Stage 5: NER domain correction ───────────────────────────────────
@@ -367,6 +369,7 @@ async def _run_pipeline(
         _monitor.record_stage("analysing", _time.time() - _t0)
 
         # Phase 3 — evidence mapping (EU AI Act + GDPR, deterministic)
+        _set_status(AuditStatus.MAPPING_EVIDENCE)
         evidence_map = await asyncio.to_thread(
             map_evidence,
             chunks,

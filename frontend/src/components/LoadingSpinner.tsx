@@ -3,16 +3,28 @@
 import type { AuditStatus } from '../types'
 
 const STAGES: { status: AuditStatus; label: string; desc: string }[] = [
-  { status: 'uploading',   label: 'Uploading',    desc: 'Sending your document to the pipeline' },
-  { status: 'parsing',     label: 'Parsing',      desc: 'Extracting text from the document'      },
-  { status: 'classifying', label: 'Classifying',  desc: 'Categorising content with BERT'         },
-  { status: 'analysing',   label: 'Analysing',    desc: 'Identifying compliance gaps via LLM'    },
-  { status: 'scoring',     label: 'Scoring',      desc: 'Computing article compliance scores'    },
-  { status: 'complete',    label: 'Complete',     desc: 'Audit finished successfully'            },
+  { status: 'uploading',           label: 'Uploading',           desc: 'Sending your document to the pipeline'            },
+  { status: 'parsing',             label: 'Parsing',             desc: 'Extracting text and splitting into propositions'  },
+  { status: 'extracting_entities', label: 'Extracting Entities', desc: 'Detecting legal and risk entities via NER'        },
+  { status: 'classifying_risk',    label: 'Assessing Risk',      desc: 'Determining actor role and Art. 5/6 applicability'},
+  { status: 'classifying_chunks',  label: 'Classifying Content', desc: 'Categorising each chunk by EU AI Act article'     },
+  { status: 'analysing',           label: 'Analysing',           desc: 'Running gap analysis per article (RAG + LLM)'     },
+  { status: 'mapping_evidence',    label: 'Mapping Evidence',    desc: 'Matching obligations to documentation evidence'   },
+  { status: 'scoring',             label: 'Scoring',             desc: 'Computing article compliance scores'              },
+  { status: 'complete',            label: 'Complete',            desc: 'Audit finished successfully'                      },
 ]
 
 const STATUS_ORDER: Record<AuditStatus, number> = {
-  uploading: 0, parsing: 1, classifying: 2, analysing: 3, scoring: 4, complete: 5, failed: 6,
+  uploading: 0,
+  parsing: 1,
+  extracting_entities: 2,
+  classifying_risk: 3,
+  classifying_chunks: 4,
+  analysing: 5,
+  mapping_evidence: 6,
+  scoring: 7,
+  complete: 8,
+  failed: 9,
 }
 
 export default function LoadingSpinner({ status }: { status: AuditStatus }) {
