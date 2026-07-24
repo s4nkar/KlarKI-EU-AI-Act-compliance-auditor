@@ -10,9 +10,9 @@ const RADIUS = 36
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
 function scoreTheme(score: number) {
-  if (score >= 70) return { stroke: '#10b981', text: '#059669', bg: '#d1fae5', label: 'Good' }
-  if (score >= 40) return { stroke: '#f59e0b', text: '#d97706', bg: '#fef3c7', label: 'Needs Work' }
-  return { stroke: '#ef4444', text: '#dc2626', bg: '#fee2e2', label: 'At Risk' }
+  if (score >= 70) return { stroke: '#34d399', text: '#34d399', bg: 'rgb(52 211 153 / 0.1)', label: 'Good' }
+  if (score >= 40) return { stroke: '#fbbf24', text: '#fbbf24', bg: 'rgb(251 191 36 / 0.1)', label: 'Needs Work' }
+  return { stroke: '#f87171', text: '#f87171', bg: 'rgb(248 113 113 / 0.1)', label: 'At Risk' }
 }
 
 export default function ScoreRadial({ score, size = 120, label }: ScoreRadialProps) {
@@ -32,7 +32,7 @@ export default function ScoreRadial({ score, size = 120, label }: ScoreRadialPro
         <circle
           cx="50" cy="50" r={RADIUS}
           fill="none"
-          stroke="#f1f5f9"
+          stroke="rgb(255 255 255 / 0.08)"
           strokeWidth="10"
         />
         {/* Progress arc */}

@@ -23,20 +23,20 @@ const ARTICLE_ICONS: Record<number, string> = {
 
 function gapTheme(criticalCount: number, majorCount: number, minorCount: number) {
   if (criticalCount > 0) return {
-    bar: 'bg-red-500', num: 'text-red-600', badge: 'bg-red-50 text-red-700 border-black',
-    dot: 'bg-red-500', border: 'hover:border-black',
+    bar: 'bg-red-500', num: 'text-red-400', badge: 'bg-red-500/10 text-red-400',
+    dot: 'bg-red-500', border: 'hover:border-red-500/30',
   }
   if (majorCount > 0) return {
-    bar: 'bg-amber-500', num: 'text-amber-600', badge: 'bg-amber-50 text-amber-700 border-black',
-    dot: 'bg-amber-500', border: 'hover:border-black',
+    bar: 'bg-amber-500', num: 'text-amber-400', badge: 'bg-amber-500/10 text-amber-400',
+    dot: 'bg-amber-500', border: 'hover:border-amber-500/30',
   }
   if (minorCount > 0) return {
-    bar: 'bg-blue-400', num: 'text-blue-600', badge: 'bg-blue-50 text-blue-700 border-black',
-    dot: 'bg-blue-400', border: 'hover:border-black',
+    bar: 'bg-blue-400', num: 'text-blue-400', badge: 'bg-blue-500/10 text-blue-400',
+    dot: 'bg-blue-400', border: 'hover:border-blue-500/30',
   }
   return {
-    bar: 'bg-emerald-500', num: 'text-emerald-600', badge: 'bg-emerald-50 text-emerald-700 border-black',
-    dot: 'bg-emerald-500', border: 'hover:border-black',
+    bar: 'bg-emerald-500', num: 'text-emerald-400', badge: 'bg-emerald-500/10 text-emerald-400',
+    dot: 'bg-emerald-500', border: 'hover:border-emerald-500/30',
   }
 }
 
@@ -60,27 +60,27 @@ export default function ArticleCard({ score, auditId }: ArticleCardProps) {
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors">
-            <svg className="w-4.5 h-4.5 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <div className="w-9 h-9 rounded-xl bg-brand-500/10 flex items-center justify-center shrink-0 transition-colors">
+            <svg className="w-4.5 h-4.5 text-brand-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d={iconPath} />
             </svg>
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-brand-600 uppercase tracking-wide leading-none mb-1">
+            <p className="text-xs font-medium text-brand-400 uppercase tracking-wide leading-none mb-1">
               Art. {score.article_num}
             </p>
-            <h3 className="text-sm font-semibold text-slate-800 leading-tight group-hover:text-brand-700 transition-colors">
+            <h3 className="text-sm font-semibold text-slate-100 leading-tight group-hover:text-brand-300 transition-colors">
               {name}
             </h3>
           </div>
         </div>
-        <span className={`text-2xl font-extrabold tabular-nums shrink-0 ${theme.num}`}>
+        <span className={`text-2xl font-bold tabular-nums shrink-0 ${theme.num}`}>
           {Math.round(score.score)}
         </span>
       </div>
 
       {/* Score bar */}
-      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-3">
+      <div className="w-full h-1.5 bg-surface-hover rounded-full overflow-hidden mb-3">
         <div
           className={`h-full rounded-full transition-all duration-500 ${theme.bar}`}
           style={{ width: `${score.score}%` }}
@@ -90,37 +90,37 @@ export default function ArticleCard({ score, auditId }: ArticleCardProps) {
       {/* Gap counts */}
       <div className="flex items-center gap-2.5 text-xs">
         {criticalCount > 0 && (
-          <span className="flex items-center gap-1 font-medium text-red-600">
+          <span className="flex items-center gap-1 font-medium text-red-400">
             <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
             {criticalCount} critical
           </span>
         )}
         {majorCount > 0 && (
-          <span className="flex items-center gap-1 font-medium text-amber-600">
+          <span className="flex items-center gap-1 font-medium text-amber-400">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
             {majorCount} major
           </span>
         )}
         {minorCount > 0 && (
-          <span className="flex items-center gap-1 font-medium text-blue-500">
+          <span className="flex items-center gap-1 font-medium text-blue-400">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
             {minorCount} minor
           </span>
         )}
         {score.gaps.length === 0 && (
-          <span className="flex items-center gap-1 font-medium text-emerald-600">
+          <span className="flex items-center gap-1 font-medium text-emerald-400">
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
             </svg>
             No gaps
           </span>
         )}
-        <span className="ml-auto text-slate-400">{score.chunk_count} chunks</span>
+        <span className="ml-auto text-slate-500">{score.chunk_count} chunks</span>
       </div>
 
       {/* Worst gap preview */}
       {worstGap && (
-        <p className="mt-3 text-xs text-slate-400 truncate border-t border-black pt-2.5">
+        <p className="mt-3 text-xs text-slate-500 truncate border-t border-line pt-2.5">
           {worstGap.title}
         </p>
       )}

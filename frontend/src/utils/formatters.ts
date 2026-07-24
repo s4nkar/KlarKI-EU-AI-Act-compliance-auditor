@@ -5,34 +5,34 @@ import type { RiskTier, Severity } from '../types'
 
 /** Return Tailwind color class for a compliance score 0–100. */
 export function scoreColor(score: number): string {
-  if (score >= 70) return 'text-green-600'
-  if (score >= 40) return 'text-amber-500'
-  return 'text-red-600'
+  if (score >= 70) return 'text-emerald-400'
+  if (score >= 40) return 'text-amber-400'
+  return 'text-red-400'
 }
 
 /** Return Tailwind background color class for a compliance score. */
 export function scoreBgColor(score: number): string {
-  if (score >= 70) return 'bg-green-100 text-green-800'
-  if (score >= 40) return 'bg-amber-100 text-amber-800'
-  return 'bg-red-100 text-red-800'
+  if (score >= 70) return 'bg-emerald-500/10 text-emerald-400'
+  if (score >= 40) return 'bg-amber-500/10 text-amber-400'
+  return 'bg-red-500/10 text-red-400'
 }
 
 /** Human-readable severity label with color. */
 export function severityLabel(severity: Severity): { label: string; className: string } {
   switch (severity) {
-    case 'critical': return { label: 'Critical', className: 'bg-red-100 text-red-800' }
-    case 'major':    return { label: 'Major',    className: 'bg-amber-100 text-amber-800' }
-    case 'minor':    return { label: 'Minor',    className: 'bg-blue-100 text-blue-800' }
+    case 'critical': return { label: 'Critical', className: 'bg-red-500/10 text-red-400' }
+    case 'major':    return { label: 'Major',    className: 'bg-amber-500/10 text-amber-400' }
+    case 'minor':    return { label: 'Minor',    className: 'bg-blue-500/10 text-blue-400' }
   }
 }
 
 /** Human-readable risk tier label and badge color. */
 export function riskTierLabel(tier: RiskTier): { label: string; className: string } {
   switch (tier) {
-    case 'prohibited': return { label: 'Prohibited',  className: 'bg-red-100 text-red-900' }
-    case 'high':       return { label: 'High Risk',   className: 'bg-amber-100 text-amber-900' }
-    case 'limited':    return { label: 'Limited Risk', className: 'bg-blue-100 text-blue-900' }
-    case 'minimal':    return { label: 'Minimal Risk', className: 'bg-green-100 text-green-900' }
+    case 'prohibited': return { label: 'Prohibited',   className: 'bg-red-500/10 text-red-400' }
+    case 'high':       return { label: 'High Risk',    className: 'bg-amber-500/10 text-amber-400' }
+    case 'limited':    return { label: 'Limited Risk', className: 'bg-blue-500/10 text-blue-400' }
+    case 'minimal':    return { label: 'Minimal Risk', className: 'bg-emerald-500/10 text-emerald-400' }
   }
 }
 

@@ -44,7 +44,7 @@ export default function ReportDownload({ auditId }: { auditId: string }) {
           </>
         )}
       </button>
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   )
 }

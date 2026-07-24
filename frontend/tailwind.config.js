@@ -1,58 +1,49 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
   theme: {
-    // Neo-brutalism: flatten every corner except full circles (dots, avatars).
-    borderRadius: {
-      none: '0px',
-      sm: '0px',
-      DEFAULT: '0px',
-      md: '0px',
-      lg: '0px',
-      xl: '0px',
-      '2xl': '0px',
-      '3xl': '0px',
-      full: '9999px',
-    },
     extend: {
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'system-ui', 'sans-serif'],
       },
       colors: {
-        // Repurposed as the primary coral/red CTA accent (was indigo).
+        // Indigo → violet accent. Compressed range vs. stock Tailwind indigo so
+        // 600/700 stay legible as text/icons on a near-black background instead
+        // of going muddy — most usages sit directly on `canvas`/`surface`, not white.
         brand: {
-          50:  '#fff1ef',
-          100: '#ffe1dc',
-          200: '#ffc3ba',
-          300: '#ff9c8c',
-          400: '#ff7a63',
-          500: '#ff6b52',
-          600: '#f2452f',
-          700: '#d1301c',
-          800: '#a02717',
-          900: '#7a1f12',
+          50:  '#f2f1ff',
+          100: '#e5e3fe',
+          200: '#cbc7fd',
+          300: '#ada6fb',
+          400: '#9089f8',
+          500: '#7c6ef5',
+          600: '#6c5ce9',
+          700: '#5d4bd6',
+          800: '#4c3bb0',
+          900: '#3d2f8c',
         },
-        cream: '#faf5e9',
-        yellow: {
-          400: '#ffdd55',
-          500: '#f5c518',
+        // Page background + card surfaces for the dark theme.
+        canvas: '#0a0a0f',
+        surface: {
+          DEFAULT: '#121218',
+          raised: '#17171f',
+          hover: '#1c1c26',
         },
-        lavender: '#c9bffa',
+        line: {
+          DEFAULT: 'rgba(255,255,255,0.08)',
+          strong: 'rgba(255,255,255,0.14)',
+        },
       },
       boxShadow: {
-        // Hard offset shadows, no blur — the signature neo-brutalist "sticker" look.
-        sm: '2px 2px 0 0 #000',
-        DEFAULT: '3px 3px 0 0 #000',
-        md: '4px 4px 0 0 #000',
-        lg: '6px 6px 0 0 #000',
-        xl: '8px 8px 0 0 #000',
-        '2xl': '10px 10px 0 0 #000',
-        card: '4px 4px 0 0 #000',
-        'card-hover': '6px 6px 0 0 #000',
-        nav: '0 3px 0 0 #000',
+        card: '0 1px 2px 0 rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.06)',
+        'card-hover': '0 8px 24px -4px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.1)',
+        glow: '0 0 0 1px rgb(124 110 245 / 0.4), 0 0 24px -4px rgb(124 110 245 / 0.5)',
+        panel: '0 4px 32px -8px rgb(0 0 0 / 0.6)',
       },
       backgroundImage: {
-        'gradient-brand': 'linear-gradient(135deg, #ff6b52 0%, #f2452f 100%)',
+        'gradient-brand': 'linear-gradient(135deg, #7c6ef5 0%, #a78bfa 100%)',
+        'gradient-radial-glow': 'radial-gradient(circle at 50% 0%, rgb(124 110 245 / 0.16), transparent 60%)',
       },
     },
   },
