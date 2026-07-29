@@ -46,6 +46,8 @@ interface SpecialistMetric {
   classifier_type: string
   macro_f1: number
   per_class: PerClassMetric[]
+  confusion_matrix?: number[][]
+  labels?: string[]
   train_size: number
   val_size: number
   base_model: string
@@ -150,6 +152,7 @@ export default function ClassifierMetrics() {
   const [loading, setLoading]             = useState(true)
   const [error, setError]                 = useState<string | null>(null)
   const [fromStatic, setFromStatic]       = useState(false)
+  const [modelTab, setModelTab]           = useState<'all' | 'bert' | 'ner' | 'actor' | 'risk' | 'prohibited'>('all')
 
   useEffect(() => {
     Promise.allSettled([
@@ -226,18 +229,10 @@ export default function ClassifierMetrics() {
     )
   }
 
-  const f1Theme = data.macro_f1 >= 0.85
-    ? { text: 'text-emerald-400', bg: 'bg-emerald-500/[0.06]', border: 'border-emerald-500/20', bar: '#34d399', label: 'Above 85% target' }
-    : data.macro_f1 >= 0.70
-      ? { text: 'text-amber-400',  bg: 'bg-amber-500/[0.06]',  border: 'border-amber-500/20',  bar: '#fbbf24', label: 'Below 85% target' }
-      : { text: 'text-red-400',    bg: 'bg-red-500/[0.06]',    border: 'border-red-500/20',    bar: '#f87171', label: 'Needs retraining' }
-
-  const maxCellValue = Math.max(...data.confusion_matrix.flatMap(r => r))
-
   return (
     <Layout>
       {/* Page header */}
-      <div className="mb-7">
+      <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
           <h1 className="text-3xl font-extrabold text-white tracking-tight">Model Metrics</h1>
           {fromStatic && (
@@ -247,17 +242,165 @@ export default function ClassifierMetrics() {
           )}
         </div>
         <p className="text-slate-500 text-sm">
-          BERT classifier evaluation on the held-out validation set ({data.val_size} examples).
-          Base model:{' '}
-          <code className="text-xs bg-surface-raised text-slate-300 px-1.5 py-0.5 rounded-md font-mono">
-            {data.base_model}
-          </code>
+          Held-out validation metrics, per-class evaluation tables, and confusion matrices across all five model classifiers.
         </p>
       </div>
 
-      {/* ── Hero stats ──────────────────────────────────────────────────────── */}
+      {/* Model navigation tabs */}
+      <div className="flex flex-wrap items-center gap-2 mb-8 border-b border-line pb-4">
+        {[
+          { id: 'all', label: 'All Models Overview' },
+          { id: 'bert', label: 'BERT Domain Classifier' },
+          { id: 'ner', label: 'spaCy NER' },
+          { id: 'actor', label: 'Actor Classifier (Art. 3)' },
+          { id: 'risk', label: 'Risk Classifier (Art. 6)' },
+          { id: 'prohibited', label: 'Prohibited Classifier (Art. 5)' },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setModelTab(tab.id as any)}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              modelTab === tab.id
+                ? 'bg-brand-500 text-white shadow-sm'
+                : 'bg-surface-raised text-slate-400 hover:text-slate-200 hover:bg-surface-hover'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 1. BERT Classifier */}
+      {(modelTab === 'all' || modelTab === 'bert') && (
+        <ClassificationModelSection
+          title="BERT Domain Classifier"
+          subtitle={`EU AI Act 8-domain article classifier evaluation on held-out validation set (${data.val_size} examples).`}
+          data={data}
+          targetF1={0.85}
+          trainCmd="python training/train_classifier.py"
+        />
+      )}
+
+      {/* 2. spaCy NER Model */}
+      {(modelTab === 'all' || modelTab === 'ner') && nerData && (
+        <NerMetricsSection data={nerData} />
+      )}
+
+      {/* 3. Actor Specialist Classifier */}
+      {(modelTab === 'all' || modelTab === 'actor') && (
+        <ClassificationModelSection
+          title="Actor Classifier (Article 3)"
+          subtitle="4-class role detection: Provider / Deployer / Importer / Distributor."
+          data={specialistData.actor ?? null}
+          targetF1={0.90}
+          trainCmd="python training/scripts/train_specialist_classifiers.py --type actor"
+        />
+      )}
+
+      {/* 4. Risk Specialist Classifier */}
+      {(modelTab === 'all' || modelTab === 'risk') && (
+        <ClassificationModelSection
+          title="Risk Classifier (Article 6 + Annex III)"
+          subtitle="High-risk vs Not high-risk binary classifier gate."
+          data={specialistData.risk ?? null}
+          targetF1={0.93}
+          trainCmd="python training/scripts/train_specialist_classifiers.py --type risk"
+        />
+      )}
+
+      {/* 5. Prohibited Specialist Classifier */}
+      {(modelTab === 'all' || modelTab === 'prohibited') && (
+        <ClassificationModelSection
+          title="Prohibited Classifier (Article 5)"
+          subtitle="Article 5 prohibited practice binary classifier gate."
+          data={specialistData.prohibited ?? null}
+          targetF1={0.95}
+          trainCmd="python training/scripts/train_specialist_classifiers.py --type prohibited"
+        />
+      )}
+
+      {/* Model version registry */}
+      {versionsData && <VersionRegistrySection data={versionsData} />}
+
+      {/* Evaluation suite results */}
+      <EvaluationSection data={evalData} />
+    </Layout>
+  )
+}
+
+// ── Sub-components ──────────────────────────────────────────────────────────
+
+interface ClassificationModelSectionProps {
+  title: string
+  subtitle: string
+  data: {
+    macro_f1: number
+    per_class: PerClassMetric[]
+    confusion_matrix?: number[][]
+    labels?: string[]
+    val_size: number
+    train_size: number
+    base_model?: string
+  } | null
+  targetF1?: number
+  trainCmd?: string
+}
+
+function ClassificationModelSection({
+  title,
+  subtitle,
+  data,
+  targetF1 = 0.85,
+  trainCmd,
+}: ClassificationModelSectionProps) {
+  if (!data) {
+    return (
+      <div className="border-t border-line pt-8 mb-7">
+        <h2 className="text-2xl font-extrabold text-white tracking-tight mb-1">{title}</h2>
+        <p className="text-sm text-slate-500 mb-4">{subtitle}</p>
+        <div className="card p-6 text-center">
+          <p className="text-sm font-semibold text-slate-300 mb-1">Model Not Yet Trained</p>
+          <p className="text-xs text-slate-500 mb-3">Run setup or training script to generate model metrics.</p>
+          {trainCmd && (
+            <code className="text-xs bg-surface-raised text-brand-300 px-3 py-1.5 rounded font-mono inline-block">
+              {trainCmd}
+            </code>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const f1Theme = data.macro_f1 >= targetF1
+    ? { text: 'text-emerald-400', bg: 'bg-emerald-500/[0.06]', border: 'border-emerald-500/20', bar: '#34d399', label: `Above ${(targetF1 * 100).toFixed(0)}% target` }
+    : data.macro_f1 >= 0.70
+      ? { text: 'text-amber-400',  bg: 'bg-amber-500/[0.06]',  border: 'border-amber-500/20',  bar: '#fbbf24', label: `Below ${(targetF1 * 100).toFixed(0)}% target` }
+      : { text: 'text-red-400',    bg: 'bg-red-500/[0.06]',    border: 'border-red-500/20',    bar: '#f87171', label: 'Needs retraining' }
+
+  const labels = data.labels || data.per_class.map(c => c.label)
+  const maxCellValue = data.confusion_matrix && data.confusion_matrix.length > 0
+    ? Math.max(...data.confusion_matrix.flatMap(r => r), 1)
+    : 1
+
+  return (
+    <div className="border-t border-line pt-8 mb-7">
+      <div className="mb-6">
+        <h2 className="text-2xl font-extrabold text-white tracking-tight mb-1">{title}</h2>
+        <p className="text-sm text-slate-500">
+          {subtitle}
+          {data.base_model && (
+            <>
+              {' · '}Base model:{' '}
+              <code className="text-xs bg-surface-raised text-slate-300 px-1.5 py-0.5 rounded-md font-mono">
+                {data.base_model}
+              </code>
+            </>
+          )}
+        </p>
+      </div>
+
+      {/* Hero stats */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-7">
-        {/* Macro F1 hero */}
         <div className={`sm:col-span-1 card p-6 flex flex-col items-center justify-center text-center border-2 ${f1Theme.border} ${f1Theme.bg}`}>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Macro F1</p>
           <p className={`text-5xl font-extrabold tabular-nums ${f1Theme.text}`}>
@@ -266,12 +409,11 @@ export default function ClassifierMetrics() {
           <p className={`text-xs mt-2 font-medium ${f1Theme.text} opacity-75`}>{f1Theme.label}</p>
         </div>
 
-        {/* Other stats */}
         <div className="sm:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <MetaCard
             label="Classes"
-            value={data.labels.length}
-            sub="EU AI Act article domains"
+            value={labels.length}
+            sub="Target output categories"
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>}
           />
           <MetaCard
@@ -283,14 +425,14 @@ export default function ClassifierMetrics() {
           <MetaCard
             label="Validation Examples"
             value={data.val_size.toLocaleString()}
-            sub="15% held-out split"
+            sub="Held-out split"
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>}
           />
         </div>
       </div>
 
-      {/* ── Per-class metrics ────────────────────────────────────────────────── */}
-      <h2 className="section-label">Per-Class Performance</h2>
+      {/* Per-class metrics table */}
+      <h3 className="section-label">Per-Class Performance</h3>
       <div className="card overflow-hidden mb-7">
         <table className="w-full text-sm">
           <thead>
@@ -305,7 +447,7 @@ export default function ClassifierMetrics() {
           </thead>
           <tbody className="divide-y divide-line">
             {data.per_class.map((cls, i) => {
-              const theme = cls.f1 >= 0.85
+              const theme = cls.f1 >= targetF1
                 ? { text: 'text-emerald-400', bar: '#10b981' }
                 : cls.f1 >= 0.70
                   ? { text: 'text-amber-400', bar: '#f59e0b' }
@@ -344,79 +486,69 @@ export default function ClassifierMetrics() {
         </table>
       </div>
 
-      {/* ── Confusion matrix ─────────────────────────────────────────────────── */}
-      <h2 className="section-label">Confusion Matrix</h2>
-      <div className="card p-5 overflow-x-auto mb-7">
-        <p className="text-xs text-slate-400 mb-4">
-          Rows = actual class · Columns = predicted class ·
-          <span className="text-emerald-400 font-medium"> Green = correct</span>
-          {' · '}
-          <span className="text-red-400 font-medium">Red = misclassified</span>
-        </p>
-        <table className="text-xs border-separate border-spacing-0.5">
-          <thead>
-            <tr>
-              <th className="w-36 pr-3 text-right text-slate-400 font-normal pb-2 text-[11px]">
-                Actual ↓ / Predicted →
-              </th>
-              {data.labels.map(l => (
-                <th key={l} className="w-12 text-center pb-2 font-semibold text-slate-500 text-[10px] leading-tight">
-                  {l.replace(/_/g, ' ').split(' ').map((w, i) => <div key={i}>{w}</div>)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.confusion_matrix.map((row, ri) => (
-              <tr key={ri}>
-                <td className="pr-3 text-right font-semibold text-slate-400 py-0.5 text-[11px] whitespace-nowrap">
-                  {data.labels[ri].replace(/_/g, ' ')}
-                </td>
-                {row.map((val, ci) => {
-                  const intensity = maxCellValue > 0 ? val / maxCellValue : 0
-                  const isDiag = ri === ci
-                  const bg = isDiag
-                    ? `rgba(52, 211, 153, ${0.08 + intensity * 0.32})`
-                    : intensity > 0
-                      ? `rgba(248, 113, 113, ${0.06 + intensity * 0.32})`
-                      : 'transparent'
-                  return (
-                    <td
-                      key={ci}
-                      className="w-12 h-9 text-center font-bold rounded-lg"
-                      style={{
-                        backgroundColor: bg,
-                        color: isDiag
-                          ? '#6ee7b7'
-                          : intensity > 0.3 ? '#fca5a5' : val > 0 ? '#fca5a5' : '#64748b',
-                      }}
-                    >
-                      {val > 0 ? val : <span className="text-slate-700">·</span>}
+      {/* Confusion matrix */}
+      {data.confusion_matrix && data.confusion_matrix.length > 0 && (
+        <>
+          <h3 className="section-label">Confusion Matrix</h3>
+          <div className="card p-5 overflow-x-auto mb-7">
+            <p className="text-xs text-slate-400 mb-4">
+              Rows = actual class · Columns = predicted class ·
+              <span className="text-emerald-400 font-medium"> Green = correct</span>
+              {' · '}
+              <span className="text-red-400 font-medium">Red = misclassified</span>
+            </p>
+            <table className="text-xs border-separate border-spacing-0.5">
+              <thead>
+                <tr>
+                  <th className="w-36 pr-3 text-right text-slate-400 font-normal pb-2 text-[11px]">
+                    Actual ↓ / Predicted →
+                  </th>
+                  {labels.map(l => (
+                    <th key={l} className="w-16 text-center pb-2 font-semibold text-slate-500 text-[10px] leading-tight">
+                      {l.replace(/_/g, ' ').split(' ').map((w, i) => <div key={i}>{w}</div>)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.confusion_matrix.map((row, ri) => (
+                  <tr key={ri}>
+                    <td className="pr-3 text-right font-semibold text-slate-400 py-0.5 text-[11px] whitespace-nowrap">
+                      {labels[ri]?.replace(/_/g, ' ')}
                     </td>
-                  )
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* NER metrics section */}
-      {nerData && <NerMetricsSection data={nerData} />}
-
-      {/* Phase 3 specialist classifiers */}
-      <SpecialistSection data={specialistData} />
-
-      {/* Model version registry */}
-      {versionsData && <VersionRegistrySection data={versionsData} />}
-
-      {/* Evaluation suite results */}
-      <EvaluationSection data={evalData} />
-    </Layout>
+                    {row.map((val, ci) => {
+                      const intensity = maxCellValue > 0 ? val / maxCellValue : 0
+                      const isDiag = ri === ci
+                      const bg = isDiag
+                        ? `rgba(52, 211, 153, ${0.08 + intensity * 0.32})`
+                        : intensity > 0
+                          ? `rgba(248, 113, 113, ${0.06 + intensity * 0.32})`
+                          : 'transparent'
+                      return (
+                        <td
+                          key={ci}
+                          className="w-16 h-9 text-center font-bold rounded-lg"
+                          style={{
+                            backgroundColor: bg,
+                            color: isDiag
+                              ? '#6ee7b7'
+                              : intensity > 0.3 ? '#fca5a5' : val > 0 ? '#fca5a5' : '#64748b',
+                          }}
+                        >
+                          {val > 0 ? val : <span className="text-slate-700">·</span>}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
-
-// ── Sub-components ──────────────────────────────────────────────────────────
 
 function MetaCard({ label, value, sub, icon }: { label: string; value: string | number; sub: string; icon: React.ReactNode }) {
   return (
@@ -609,99 +741,7 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
   )
 }
 
-const SPECIALIST_META: Record<string, { label: string; desc: string; purpose: string }> = {
-  actor:      { label: 'Actor Classifier',      desc: 'Article 3 role detection', purpose: 'Provider / Deployer / Importer / Distributor' },
-  risk:       { label: 'Risk Classifier',       desc: 'Article 6 + Annex III gate', purpose: 'High-risk vs Not high-risk' },
-  prohibited: { label: 'Prohibited Classifier', desc: 'Article 5 prohibition gate', purpose: 'Prohibited vs Not prohibited' },
-}
 
-function SpecialistSection({ data }: { data: SpecialistMetricsData }) {
-  const allKeys = Object.keys(SPECIALIST_META)
-  const anyTrained = allKeys.some(k => k in data)
-
-  return (
-    <div className="border-t border-line pt-8 mb-7">
-      <h1 className="text-2xl font-extrabold text-white tracking-tight mb-1">
-        Phase 3 Specialist Classifiers
-      </h1>
-      <p className="text-sm text-slate-500 mb-6">
-        Lightweight BERT classifiers for deterministic legal decision-making — no LLM calls.
-        {!anyTrained && (
-          <span className="ml-2 text-amber-400">
-            Not yet trained. Run{' '}
-            <code className="text-xs bg-surface-raised px-1.5 py-0.5 rounded-md font-mono text-slate-300">
-              ./run.sh setup
-            </code>{' '}
-            to train them.
-          </span>
-        )}
-      </p>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-7">
-        {allKeys.map(key => {
-          const meta = SPECIALIST_META[key]
-          const m = data[key]
-          if (!m) return (
-            <div key={key} className="card p-6 opacity-60 flex flex-col gap-2">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{meta.label}</p>
-              <p className="text-xs text-slate-400">{meta.desc}</p>
-              <p className="text-xs text-slate-400 italic mt-1">{meta.purpose}</p>
-              <div className="mt-4 text-sm text-slate-400">Not yet trained</div>
-            </div>
-          )
-
-          const theme = m.macro_f1 >= 0.85
-            ? { text: 'text-emerald-400', bg: 'bg-emerald-500/[0.06]', border: 'border-emerald-500/20', bar: '#34d399' }
-            : m.macro_f1 >= 0.70
-              ? { text: 'text-amber-400',  bg: 'bg-amber-500/[0.06]',  border: 'border-amber-500/20',  bar: '#fbbf24' }
-              : { text: 'text-red-400',    bg: 'bg-red-500/[0.06]',    border: 'border-red-500/20',    bar: '#f87171' }
-
-          return (
-            <div key={key} className={`card p-6 border-2 ${theme.border} ${theme.bg}`}>
-              <div className="mb-4">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{meta.label}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{meta.desc}</p>
-                <p className="text-xs text-slate-400 mt-0.5 italic">{meta.purpose}</p>
-              </div>
-
-              <div className="flex items-baseline gap-2 mb-4">
-                <span className={`text-4xl font-extrabold tabular-nums ${theme.text}`}>
-                  {(m.macro_f1 * 100).toFixed(1)}%
-                </span>
-                <span className="text-xs text-slate-400 font-medium">Macro F1</span>
-              </div>
-
-              <div className="text-xs text-slate-400 mb-4">
-                {m.train_size.toLocaleString()} train · {m.val_size} val ·{' '}
-                {m.per_class.length} classes
-              </div>
-
-              <div className="space-y-2">
-                {m.per_class.map((cls, i) => {
-                  const barColor = cls.f1 >= 0.85 ? '#10b981' : cls.f1 >= 0.70 ? '#f59e0b' : '#ef4444'
-                  return (
-                    <div key={i}>
-                      <div className="flex justify-between text-xs mb-0.5">
-                        <span className="text-slate-400 font-medium capitalize">{cls.label.replace(/_/g, ' ')}</span>
-                        <span className="text-slate-500 tabular-nums">{(cls.f1 * 100).toFixed(1)}%</span>
-                      </div>
-                      <div className="h-1.5 bg-surface-hover rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${cls.f1 * 100}%`, backgroundColor: barColor }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 
 function VersionRegistrySection({ data }: { data: VersionsData }) {

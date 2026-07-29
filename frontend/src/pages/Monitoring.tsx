@@ -453,77 +453,54 @@ export default function Monitoring() {
             </div>
           </div>
 
-          {/* ── Model Registry ────────────────────────────────────── */}
-          <SectionTitle>Model Registry</SectionTitle>
-          <div className="bg-surface border border-line rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-raised border-b border-line">
-                <tr>
-                  {['Model', 'Version', 'Score', 'Metric', 'Data Ver', 'Trained At', 'On Disk'].map(h => (
-                    <th key={h} className="text-left px-4 py-2 text-xs font-semibold text-slate-500 uppercase">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.models.map((m, i) => (
-                  <tr key={`${m.model_type}-${m.version ?? 'none'}`}
-                      className={i % 2 === 0 ? 'bg-surface' : 'bg-surface-raised'}>
-                    <td className="px-4 py-2 font-medium text-slate-200">{m.model_type}</td>
-                    <td className="px-4 py-2">
-                      {m.version ? (
-                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                          m.is_active ? 'bg-blue-500/10 text-blue-400' : 'bg-surface-hover text-slate-400'
-                        }`}>
-                          {m.version}{m.is_active ? ' ✓' : ''}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500 text-xs">not trained</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 font-mono text-slate-300">
-                      {m.score !== null ? m.score.toFixed(3) : '—'}
-                    </td>
-                    <td className="px-4 py-2 text-slate-500 text-xs">{m.metric_key}</td>
-                    <td className="px-4 py-2 text-slate-500 text-xs">{m.data_version ?? '—'}</td>
-                    <td className="px-4 py-2 text-slate-500 text-xs">
-                      {m.created_at ? m.created_at.replace('T', ' ') : '—'}
-                    </td>
-                    <td className="px-4 py-2">
+          {/* ── Runtime Model Deployment Health ───────────────────────────── */}
+          <SectionTitle>Runtime Model Deployment Health</SectionTitle>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-2">
+            {data.models.map(m => {
+              const modelLabels: Record<string, string> = {
+                bert: 'BERT Domain Classifier',
+                ner: 'spaCy NER Model',
+                actor: 'Actor Classifier (Art. 3)',
+                risk: 'Risk Classifier (Art. 6)',
+                prohibited: 'Prohibited Classifier (Art. 5)',
+              }
+              const label = modelLabels[m.model_type] ?? m.model_type
+              return (
+                <div key={m.model_type} className="bg-surface border border-line rounded-lg p-4 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-slate-100 text-sm">{label}</span>
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                         m.on_disk ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
                       }`}>
-                        {m.on_disk ? 'present' : 'missing'}
+                        {m.on_disk ? '● Active' : '○ Missing'}
                       </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Data Registry ─────────────────────────────────────── */}
-          <SectionTitle>Training Data Registry</SectionTitle>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {data.data.map(d => (
-              <div key={d.data_type} className="bg-surface border border-line rounded-lg p-4">
-                <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                  {d.data_type}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-400 mb-3">
+                      <span>Active Version:</span>
+                      {m.version ? (
+                        <span className="px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-300 font-mono font-semibold">
+                          {m.version}
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 italic">untrained</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-line/60 flex items-center justify-between text-xs text-slate-400">
+                    <div>
+                      Score:{' '}
+                      <span className="font-bold text-slate-200 tabular-nums">
+                        {m.score !== null ? `${(m.score * 100).toFixed(1)}%` : '—'}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono">
+                      {m.data_version ? `Data: ${m.data_version}` : ''}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-xl font-bold text-white">
-                  {d.current_records !== null ? d.current_records.toLocaleString() : '—'}
-                </div>
-                <div className="text-xs text-slate-500 mb-2">records</div>
-                <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${
-                  d.file_exists ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
-                }`}>
-                  {d.file_exists ? 'present' : 'missing'}
-                </span>
-                {d.active_version && (
-                  <span className="ml-1.5 text-xs text-slate-500">{d.active_version}</span>
-                )}
-                <div className="text-xs text-slate-500 mt-1">{d.total_versions} version(s)</div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* ── System Resources ──────────────────────────────────── */}
