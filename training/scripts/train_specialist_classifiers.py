@@ -249,12 +249,32 @@ def train(
     print(f"  Device: {device}")
     model = model.to(device)
 
+    # Fit modest GPUs (e.g. 4GB laptop cards) without changing training dynamics:
+    # shrink the micro-batch and enable gradient checkpointing when VRAM is tight.
+    grad_checkpointing = False
+    if torch.cuda.is_available():
+        vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+        if vram_gb < 6.0:
+            if batch_size > 8:
+                print(_c(_AMBER, f"  [vram] GPU has {vram_gb:.1f} GB — reducing micro-batch "
+                                 f"{batch_size}->8 and enabling gradient checkpointing."))
+                batch_size = 8
+            grad_checkpointing = True
+
+    # Hold the effective batch at ~32 regardless of micro-batch size.
+    _EFFECTIVE_BATCH = 32
+    grad_accum = max(1, _EFFECTIVE_BATCH // batch_size)
+    print(_c(_DIM, f"  Micro-batch={batch_size}, grad-accum={grad_accum} "
+                   f"(effective batch={batch_size * grad_accum}), "
+                   f"grad-checkpointing={grad_checkpointing}"))
+
     training_args = TrainingArguments(
         output_dir=cfg["output_dir"],
         num_train_epochs=epochs,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
-        gradient_accumulation_steps=2,
+        gradient_accumulation_steps=grad_accum,
+        gradient_checkpointing=grad_checkpointing,
         learning_rate=lr,
         weight_decay=0.01,
         warmup_ratio=0.06,
@@ -407,6 +427,14 @@ def train(
         metrics_payload["gold_macro_f1"] = gold["macro_f1"]
         metrics_payload["gold_accuracy"] = gold["accuracy"]
         metrics_payload["gold_n"] = gold["n"]
+        metrics_payload["gold_passed"] = bool(gold["passed"])
+        # Binary safety-critical models (risk/prohibited) also report the
+        # compound recall/tnr the gold gate now enforces — persist for the
+        # dashboard and any future recall/tnr-based promotion gating.
+        if "recall" in gold:
+            metrics_payload["gold_recall"] = gold["recall"]
+        if "tnr" in gold:
+            metrics_payload["gold_tnr"] = gold["tnr"]
         colour = _GREEN if gold["passed"] else _RED
         verdict = "PASS" if gold["passed"] else "FAIL"
         gold_f1_str = _c(colour, f"{gold['macro_f1']:.4f}")
@@ -414,8 +442,8 @@ def train(
         print(f"\nGold-set macro F1    : {gold_f1_str}  "
               f"(threshold {gold['threshold']:.2f}, n={gold['n']})  [{verdict_str}]")
         if not gold["passed"]:
-            print(_c(_RED, "  [!!] Below gold threshold — model will NOT be promoted "
-                           "(synthetic val is misleadingly high; fix training data)."))
+            print(_c(_RED, "  [!!] Fails gold gate — will NOT be promoted over a passing "
+                           "version (synthetic val is misleadingly high; fix training data)."))
 
     metrics_path = out_path / "metrics.json"
     with open(metrics_path, "w", encoding="utf-8") as f:

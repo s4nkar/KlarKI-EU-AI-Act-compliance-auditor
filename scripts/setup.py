@@ -782,24 +782,35 @@ def main() -> None:
     if args.skip_phase5:
         skip_set.update(s[0] for s in STAGES if s[2])  # phase5_only=True
 
+    # When local-datagen-V2 is the authoritative data source (_SKIP_DATAGEN),
+    # retrain/force-retrain must NOT run the Ollama generate-* stages: they would
+    # overwrite the deterministic v2 datasets in training/data/ with LLM-noisy
+    # data, silently changing label semantics between runs (a prime source of
+    # model variance). Instead, retrain on the committed v2 data. Pass
+    # --gen-overwrite to explicitly opt back into Ollama regeneration.
+    if args.gen_overwrite or not _SKIP_DATAGEN:
+        _retrain_ids = [
+            "generate-data", "train-bert",
+            "generate-specialist-data", "train-specialist",
+            "generate-ner-data", "train-ner",
+            "export-bert", "export-e5",
+        ]
+        _retrain_gen_overwrite = True
+    else:
+        _retrain_ids = [
+            "train-bert", "train-specialist", "train-ner",
+            "export-bert", "export-e5",
+        ]
+        _retrain_gen_overwrite = False
+
     if args.force_retrain:
-        # force-retrain: regenerate data unconditionally + always train new version
-        args.gen_overwrite = True
-        run_ids = [
-            "generate-data", "train-bert",
-            "generate-specialist-data", "train-specialist",
-            "generate-ner-data", "train-ner",
-            "export-bert", "export-e5",
-        ]
+        # force-retrain: always train a new version (per-stage force flag handles it)
+        args.gen_overwrite = _retrain_gen_overwrite
+        run_ids = _retrain_ids
     elif args.retrain:
-        # retrain: regenerate data, then train only if data content actually changed
-        args.gen_overwrite = True
-        run_ids = [
-            "generate-data", "train-bert",
-            "generate-specialist-data", "train-specialist",
-            "generate-ner-data", "train-ner",
-            "export-bert", "export-e5",
-        ]
+        # retrain: train only if data content actually changed (per-stage gate)
+        args.gen_overwrite = _retrain_gen_overwrite
+        run_ids = _retrain_ids
     elif args.only_stages:
         run_ids = list(args.only_stages)
     else:

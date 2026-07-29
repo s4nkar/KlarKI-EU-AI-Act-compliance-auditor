@@ -214,6 +214,24 @@ class VersionManager:
         active_ver = section.get("active")
         if active_ver and active_ver in section["versions"] and active_ver != version:
             prev_metrics = section["versions"][active_ver].get("metrics", {})
+            # Compound gold gate as a promotion criterion: never replace a model
+            # that PASSES the honest gold gate with one that FAILS it, even if the
+            # failing model's macro_f1 is nominally higher (e.g. a prohibited model
+            # that trades away TNR). If no active model passes, fall through to the
+            # score comparison so the system always keeps its best available model.
+            new_passed = bool(metrics.get("gold_passed", True))
+            prev_passed = bool(prev_metrics.get("gold_passed", True))
+            if prev_passed and not new_passed:
+                print(
+                    f"  [version] {model_type}@{version} FAILS gold gate while "
+                    f"{model_type}@{active_ver} passes → keeping {active_ver}"
+                )
+                best_dir = Path(section["versions"][active_ver]["versioned_dir"])
+                if best_dir.is_dir():
+                    shutil.rmtree(source_dir)
+                    shutil.copytree(best_dir, source_dir)
+                self._save(registry)
+                return version
             # If the previous version predates gold gating, fall back to the
             # primary key for a fair like-for-like comparison.
             if metric_key == "gold_macro_f1" and "gold_macro_f1" not in prev_metrics:
