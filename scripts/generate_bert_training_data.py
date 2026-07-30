@@ -40,6 +40,11 @@ import httpx
 ROOT = Path(__file__).parent.parent
 REGULATORY_DIR = ROOT / "data" / "regulatory"
 
+# Stamped onto every record so clause_labels.jsonl is self-describing about
+# which of the (currently 3) generator pipelines produced it — scripts/,
+# local-datagen, or local-datagen-V2 — without needing tribal knowledge.
+_GENERATOR_TAG = "scripts/generate_bert_training_data.py"
+
 # Each classifier label maps to a primary regulation article.
 # The article text is loaded and included in the generation prompt as reference,
 # grounding synthetic examples in the official regulation language.
@@ -513,6 +518,7 @@ async def main() -> None:
     with open(output_path, "a", encoding="utf-8") as out_f:
         for rec in reg_records:
             if rec["text"] not in existing_texts:
+                rec["generator"] = _GENERATOR_TAG
                 out_f.write(json.dumps(rec, ensure_ascii=False) + "\n")
                 existing_texts.add(rec["text"])
                 reg_written += 1
@@ -559,7 +565,8 @@ async def main() -> None:
                 written = 0
                 for text in texts:
                     if text not in existing_texts:
-                        record = {"text": text, "label": label, "lang": lang_code, "source": "generated"}
+                        record = {"text": text, "label": label, "lang": lang_code, "source": "generated",
+                                  "generator": _GENERATOR_TAG}
                         out_f.write(json.dumps(record, ensure_ascii=False) + "\n")
                         existing_texts.add(text)
                         written += 1

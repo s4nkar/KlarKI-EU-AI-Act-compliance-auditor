@@ -195,22 +195,32 @@ def train(
     max_length: int,
     seed: int,
     base_model: str = BASE_MODEL,
+    output_dir: str | None = None,
 ) -> None:
     cfg = CLASSIFIER_CONFIGS[classifier_type]
     labels: list[str] = cfg["labels"]
     label2id = {l: i for i, l in enumerate(labels)}
     id2label  = {i: l for i, l in enumerate(labels)}
     f1_target: float = cfg["f1_target"]
+    out_dir: str = output_dir or cfg["output_dir"]
 
     print(f"\n{'='*60}")
     print(f"  {cfg['description']}")
     print(f"  Labels: {labels}")
     print(f"  Data:   {cfg['data_file']}")
-    print(f"  Output: {cfg['output_dir']}")
+    print(f"  Output: {out_dir}")
     print(f"{'='*60}\n")
 
     records = load_jsonl(cfg["data_file"])
     print(f"Loaded {len(records)} examples")
+
+    # Surface which generator(s) produced this data — there are currently 3
+    # (scripts/, local-datagen, local-datagen-V2) and silently training on an
+    # unexpected one has caused real confusion before.
+    from collections import Counter
+    gen_counts = Counter(r.get("generator", "unknown") for r in records)
+    colour = _AMBER if len(gen_counts) > 1 or "unknown" in gen_counts else _GREEN
+    print(_c(colour, f"  Generator provenance: {dict(gen_counts)}"))
 
     # Filter out records with unknown labels
     records = [r for r in records if r["label"] in label2id]
@@ -269,7 +279,7 @@ def train(
                    f"grad-checkpointing={grad_checkpointing}"))
 
     training_args = TrainingArguments(
-        output_dir=cfg["output_dir"],
+        output_dir=out_dir,
         num_train_epochs=epochs,
         per_device_train_batch_size=batch_size,
         per_device_eval_batch_size=batch_size,
@@ -349,7 +359,7 @@ def train(
     print(classification_report(y_true, preds, target_names=labels, zero_division=0))
 
     # Save model + tokenizer
-    out_path = Path(cfg["output_dir"])
+    out_path = Path(out_dir)
     out_path.mkdir(parents=True, exist_ok=True)
     trainer.save_model(str(out_path))
     tokenizer.save_pretrained(str(out_path))
@@ -449,7 +459,7 @@ def train(
     with open(metrics_path, "w", encoding="utf-8") as f:
         json.dump(metrics_payload, f, indent=2)
     print(f"Metrics saved to {metrics_path}")
-    print(f"\nNext: python scripts/export_onnx.py --model-path {cfg['output_dir']} "
+    print(f"\nNext: python scripts/export_onnx.py --model-path {out_dir} "
           f"--output-path model_repository/{classifier_type}_classifier/1/model.onnx")
 
 
@@ -467,6 +477,8 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=2e-5)
     parser.add_argument("--max-length", type=int, default=256)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--output", default=None,
+                        help="Override output dir (default: CLASSIFIER_CONFIGS[type]['output_dir'])")
     args = parser.parse_args()
 
     train(
@@ -477,6 +489,7 @@ def main() -> None:
         max_length=args.max_length,
         seed=args.seed,
         base_model=args.base_model,
+        output_dir=args.output,
     )
 
 

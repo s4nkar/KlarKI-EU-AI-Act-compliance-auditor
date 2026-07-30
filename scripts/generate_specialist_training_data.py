@@ -36,6 +36,13 @@ from pathlib import Path
 import httpx
 
 ROOT = Path(__file__).parent.parent
+
+# Stamped onto every new record so actor/risk/prohibited_labels.jsonl are
+# self-describing about which of the (currently 3) generator pipelines
+# produced them — scripts/, local-datagen, or local-datagen-V2 — without
+# needing tribal knowledge. Pre-existing records (loaded, not regenerated
+# this run) are left with whatever tag they already had.
+_GENERATOR_TAG = "scripts/generate_specialist_training_data.py"
 REGULATORY_DIR = ROOT / "data" / "regulatory"
 OUTPUT_DIR = ROOT / "training" / "data"
 
@@ -385,6 +392,7 @@ async def generate_classifier(
     for ex in new_examples:
         if ex["text"] not in seen:
             seen.add(ex["text"])
+            ex["generator"] = _GENERATOR_TAG
             deduped.append(ex)
 
     all_examples = (existing if not overwrite else []) + deduped

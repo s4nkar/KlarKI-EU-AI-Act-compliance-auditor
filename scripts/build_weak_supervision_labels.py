@@ -30,6 +30,12 @@ from pathlib import Path
 from typing import Iterator
 
 ROOT = Path(__file__).parent.parent
+
+# Stamped onto every record so actor/risk/prohibited_labels.jsonl are
+# self-describing about which of the (currently 3) generator pipelines
+# produced them — scripts/, local-datagen, or local-datagen-V2 — without
+# needing tribal knowledge.
+_GENERATOR_TAG = "scripts/build_weak_supervision_labels.py"
 DATA_DIR = ROOT / "data" / "regulatory"
 OUTPUT_DIR = ROOT / "training" / "data"
 
@@ -306,6 +312,7 @@ def build_labels(
                     "label": label,
                     "lang": lang,
                     "source": "regulatory",
+                    "generator": _GENERATOR_TAG,
                 })
                 label_counts[label] = label_counts.get(label, 0) + 1
 

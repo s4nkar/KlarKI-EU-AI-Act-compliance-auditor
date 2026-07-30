@@ -416,19 +416,24 @@ def stage_train_bert(args: argparse.Namespace) -> bool:
             print(_c(YELLOW, "  --  artifacts/bert_classifier/ already exists -- skipping BERT training."))
             print(_c(DIM, "      Run with --retrain (data-change-aware) or --force-retrain."))
             return True
+    # Train into a disposable candidate dir, never the active path — bert_dir
+    # may already be a symlink to the current best version, and writing
+    # straight through it would clobber that version before we've compared
+    # the new one against it. save_and_promote() moves the winner into place.
+    candidate_dir = ROOT / "training" / "artifacts" / "bert_classifier_candidate"
+    if candidate_dir.exists():
+        shutil.rmtree(candidate_dir)
     cmd = [
         sys.executable,
         str(ROOT / "training" / "scripts" / "train_classifier.py"),
         "--data",       str(ROOT / "training" / "data" / "clause_labels.jsonl"),
-        "--output",     str(ROOT / "training" / "artifacts" / "bert_classifier"),
+        "--output",     str(candidate_dir),
         "--epochs",     str(args.bert_epochs),
         "--batch-size", str(args.bert_batch),
     ]
     ok = run(cmd, args.dry_run) == 0
     if ok:
-        _vm_save_model("bert", ROOT / "training" / "artifacts" / "bert_classifier",
-                       ROOT / "training" / "artifacts" / "bert_classifier" / "metrics.json",
-                       data_type="bert")
+        _vm_save_model("bert", candidate_dir, candidate_dir / "metrics.json", data_type="bert")
     return ok
 
 
@@ -484,20 +489,24 @@ def stage_train_ner(args: argparse.Namespace) -> bool:
             print(_c(YELLOW, "  --  artifacts/spacy_ner_model/model-final already exists -- skipping NER training."))
             print(_c(DIM, "      Run with --retrain (data-change-aware) or --force-retrain."))
             return True
+    # Train into a disposable candidate dir, never the active path — see the
+    # matching comment in stage_train_bert for why (active dir may be a
+    # symlink to the current best version).
+    candidate_dir = ROOT / "training" / "artifacts" / "spacy_ner_model_candidate"
+    if candidate_dir.exists():
+        shutil.rmtree(candidate_dir)
     cmd = [
         sys.executable,
         str(ROOT / "training" / "scripts" / "train_ner.py"),
         "--data",       str(ROOT / "training" / "data" / "ner_annotations.jsonl"),
-        "--output",     str(ROOT / "training" / "artifacts" / "spacy_ner_model"),
+        "--output",     str(candidate_dir),
         "--epochs",     str(args.ner_epochs),
         "--batch-size", str(args.ner_batch),
         "--patience",   str(args.ner_patience),
     ]
     ok = run(cmd, args.dry_run) == 0
     if ok:
-        _vm_save_model("ner", ROOT / "training" / "artifacts" / "spacy_ner_model",
-                       ROOT / "training" / "artifacts" / "spacy_ner_model" / "metrics.json",
-                       data_type="ner")
+        _vm_save_model("ner", candidate_dir, candidate_dir / "metrics.json", data_type="ner")
     return ok
 
 
@@ -599,18 +608,25 @@ def stage_train_specialist(args: argparse.Namespace) -> bool:
                 print(_c(YELLOW, f"  --  {classifier_type}_classifier already trained -- skipping."))
                 continue
 
+        # Train into a disposable candidate dir, never the active path — see the
+        # matching comment in stage_train_bert for why (active dir may be a
+        # symlink to the current best version).
+        candidate_dir = artifacts_dir / f"{classifier_type}_classifier_candidate"
+        if candidate_dir.exists():
+            shutil.rmtree(candidate_dir)
         cmd = [
             sys.executable,
             str(script),
             "--type", classifier_type,
             "--epochs", str(args.bert_epochs),
             "--batch-size", str(args.bert_batch),
+            "--output", str(candidate_dir),
         ]
         if run(cmd, args.dry_run) != 0:
             print(_c(RED, f"     WARNING: {classifier_type} classifier training failed, continuing"))
             all_ok = False
         else:
-            _vm_save_model(classifier_type, model_dir, model_dir / "metrics.json",
+            _vm_save_model(classifier_type, candidate_dir, candidate_dir / "metrics.json",
                            data_type=classifier_type)
 
     if not args.dry_run and all(

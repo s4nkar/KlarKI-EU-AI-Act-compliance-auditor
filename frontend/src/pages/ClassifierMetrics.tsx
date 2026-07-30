@@ -121,8 +121,8 @@ interface EvalResult {
   balanced_accuracy?: number
   by_outcome?: {
     prohibited?: { n_examples: number; n_correct: number; precision: number; recall: number; f1: number }
-    high_risk?:  { n_examples: number; n_correct: number; precision: number; recall: number; f1: number }
-    minimal?:    { n_examples: number; n_correct: number }
+    high_risk?: { n_examples: number; n_correct: number; precision: number; recall: number; f1: number }
+    minimal?: { n_examples: number; n_correct: number }
   }
   mode?: string
   n_samples?: number
@@ -144,15 +144,15 @@ interface EvalResult {
 type EvalResultsMap = Record<string, EvalResult>
 
 export default function ClassifierMetrics() {
-  const [data, setData]                   = useState<ClassifierMetricsData | null>(null)
-  const [nerData, setNerData]             = useState<NerMetricsData | null>(null)
-  const [specialistData, setSpecialist]   = useState<SpecialistMetricsData>({})
-  const [versionsData, setVersions]       = useState<VersionsData | null>(null)
-  const [evalData, setEvalData]           = useState<EvalResultsMap | null>(null)
-  const [loading, setLoading]             = useState(true)
-  const [error, setError]                 = useState<string | null>(null)
-  const [fromStatic, setFromStatic]       = useState(false)
-  const [modelTab, setModelTab]           = useState<'all' | 'bert' | 'ner' | 'actor' | 'risk' | 'prohibited'>('all')
+  const [data, setData] = useState<ClassifierMetricsData | null>(null)
+  const [nerData, setNerData] = useState<NerMetricsData | null>(null)
+  const [specialistData, setSpecialist] = useState<SpecialistMetricsData>({})
+  const [versionsData, setVersions] = useState<VersionsData | null>(null)
+  const [evalData, setEvalData] = useState<EvalResultsMap | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [fromStatic, setFromStatic] = useState(false)
+  const [modelTab, setModelTab] = useState<'all' | 'bert' | 'ner' | 'actor' | 'risk' | 'prohibited'>('all')
 
   useEffect(() => {
     Promise.allSettled([
@@ -217,8 +217,8 @@ export default function ClassifierMetrics() {
             <div className="bg-surface rounded-xl p-4 text-left mb-6">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">To generate metrics, run:</p>
               <code className="block text-xs text-slate-300 font-mono leading-relaxed">
-                ./run.sh setup<br/>
-                <span className="text-slate-400"># or individually:</span><br/>
+                ./run.sh setup<br />
+                <span className="text-slate-400"># or individually:</span><br />
                 python training/train_classifier.py
               </code>
             </div>
@@ -259,11 +259,10 @@ export default function ClassifierMetrics() {
           <button
             key={tab.id}
             onClick={() => setModelTab(tab.id as any)}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-              modelTab === tab.id
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${modelTab === tab.id
                 ? 'bg-brand-500 text-white shadow-sm'
                 : 'bg-surface-raised text-slate-400 hover:text-slate-200 hover:bg-surface-hover'
-            }`}
+              }`}
           >
             {tab.label}
           </button>
@@ -374,8 +373,8 @@ function ClassificationModelSection({
   const f1Theme = data.macro_f1 >= targetF1
     ? { text: 'text-emerald-400', bg: 'bg-emerald-500/[0.06]', border: 'border-emerald-500/20', bar: '#34d399', label: `Above ${(targetF1 * 100).toFixed(0)}% target` }
     : data.macro_f1 >= 0.70
-      ? { text: 'text-amber-400',  bg: 'bg-amber-500/[0.06]',  border: 'border-amber-500/20',  bar: '#fbbf24', label: `Below ${(targetF1 * 100).toFixed(0)}% target` }
-      : { text: 'text-red-400',    bg: 'bg-red-500/[0.06]',    border: 'border-red-500/20',    bar: '#f87171', label: 'Needs retraining' }
+      ? { text: 'text-amber-400', bg: 'bg-amber-500/[0.06]', border: 'border-amber-500/20', bar: '#fbbf24', label: `Below ${(targetF1 * 100).toFixed(0)}% target` }
+      : { text: 'text-red-400', bg: 'bg-red-500/[0.06]', border: 'border-red-500/20', bar: '#f87171', label: 'Needs retraining' }
 
   const labels = data.labels || data.per_class.map(c => c.label)
   const maxCellValue = data.confusion_matrix && data.confusion_matrix.length > 0
@@ -594,42 +593,42 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
   }
 
   const EVAL_META: Record<string, { label: string; desc: string }> = {
-    classifier:      { label: 'Gold Dataset',        desc: 'BERT on 80 hand-labeled examples' },
-    ner:             { label: 'NER Gold Eval',        desc: '8-label entity recognition — 31 gold sentences' },
-    rag:             { label: 'RAG Retrieval',        desc: 'Recall@K against ChromaDB' },
-    pipeline:        { label: 'End-to-End',           desc: 'Full pipeline on synthetic doc' },
-    hallucination:   { label: 'Hallucination',        desc: 'Citation & grounding checks' },
-    adversarial:     { label: 'Adversarial',          desc: '30 paraphrase robustness tests' },
-    consistency:     { label: 'Consistency',          desc: 'Determinism across repeated runs' },
-    actor:           { label: 'Actor Classifier',     desc: 'Pattern accuracy on 31 gold documents' },
-    applicability:   { label: 'Applicability Gate',   desc: 'Art.5/6/Annex III decision accuracy on 28 examples' },
-    evidence_mapper: { label: 'Evidence Mapper',      desc: 'Synonym hit-rate on 24 gold evidence chunks' },
-    risk:            { label: 'Risk Classifier (ML)', desc: 'High-risk vs not-high-risk on 40 policy-doc examples' },
-    prohibited:      { label: 'Prohibited Classifier (ML)', desc: 'Art.5 prohibited vs lawful on 40 policy-doc examples' },
+    classifier: { label: 'Gold Dataset', desc: 'BERT on 80 hand-labeled examples' },
+    ner: { label: 'NER Gold Eval', desc: '8-label entity recognition — 31 gold sentences' },
+    actor: { label: 'Actor Classifier', desc: 'Pattern accuracy on 31 gold documents' },
+    risk: { label: 'Risk Classifier (ML)', desc: 'High-risk vs not-high-risk on 40 policy-doc examples' },
+    prohibited: { label: 'Prohibited Classifier (ML)', desc: 'Art.5 prohibited vs lawful on 40 policy-doc examples' },
+    rag: { label: 'RAG Retrieval', desc: 'Recall@K against ChromaDB' },
+    pipeline: { label: 'End-to-End', desc: 'Full pipeline on synthetic doc' },
+    hallucination: { label: 'Hallucination', desc: 'Citation & grounding checks' },
+    adversarial: { label: 'Adversarial', desc: '30 paraphrase robustness tests' },
+    consistency: { label: 'Consistency', desc: 'Determinism across repeated runs' },
+    applicability: { label: 'Applicability Gate', desc: 'Art.5/6/Annex III decision accuracy on 28 examples' },
+    evidence_mapper: { label: 'Evidence Mapper', desc: 'Synonym hit-rate on 24 gold evidence chunks' },
   }
 
   const statusStyle = (s: string) =>
     s === 'pass' ? 'bg-emerald-500/10 text-emerald-400'
-    : s === 'warn' ? 'bg-amber-500/10 text-amber-400'
-    : s === 'skip' ? 'bg-surface-raised text-slate-500'
-    : 'bg-red-500/10 text-red-400'
+      : s === 'warn' ? 'bg-amber-500/10 text-amber-400'
+        : s === 'skip' ? 'bg-surface-raised text-slate-500'
+          : 'bg-red-500/10 text-red-400'
 
   const statusDot = (s: string) =>
     s === 'pass' ? '#34d399' : s === 'warn' ? '#fbbf24' : s === 'skip' ? '#64748b' : '#f87171'
 
   function keyMetric(key: string, r: EvalResult): string {
-    if (key === 'classifier')      return r.macro_f1 != null ? `Macro F1 ${(r.macro_f1 * 100).toFixed(1)}%` : '—'
-    if (key === 'ner')             return r.overall_f1 != null ? `Overall F1 ${(r.overall_f1 * 100).toFixed(1)}%  ·  ${r.n_gold ?? '—'} gold samples` : '—'
-    if (key === 'rag')             return r['recall@3'] != null ? `Recall@3 ${(r['recall@3'] * 100).toFixed(1)}%  ·  MRR ${r.mrr?.toFixed(3) ?? '—'}` : '—'
-    if (key === 'adversarial')     return r.adversarial_accuracy != null ? `Accuracy ${(r.adversarial_accuracy * 100).toFixed(1)}%` : '—'
-    if (key === 'consistency')     return r.bert?.consistency_rate != null ? `BERT ${(r.bert.consistency_rate * 100).toFixed(0)}%  ·  LLM ${r.ollama?.consistency_rate != null ? (r.ollama.consistency_rate * 100).toFixed(0) + '%' : '—'}` : '—'
-    if (key === 'hallucination')   return r.citation_rate != null ? `Citation rate ${(r.citation_rate * 100).toFixed(1)}%` : '—'
-    if (key === 'pipeline')        return r.checks_passed != null ? `${r.checks_passed}/${r.checks_total} checks passed` : '—'
-    if (key === 'actor')           return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  F1 ${r.macro_f1 != null ? (r.macro_f1 * 100).toFixed(1) + '%' : '—'}` : '—'
-    if (key === 'applicability')   return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Prohibited recall ${r.by_outcome?.prohibited?.recall != null ? (r.by_outcome.prohibited.recall * 100).toFixed(0) + '%' : '—'}` : '—'
+    if (key === 'classifier') return r.macro_f1 != null ? `Macro F1 ${(r.macro_f1 * 100).toFixed(1)}%` : '—'
+    if (key === 'ner') return r.overall_f1 != null ? `Overall F1 ${(r.overall_f1 * 100).toFixed(1)}%  ·  ${r.n_gold ?? '—'} gold samples` : '—'
+    if (key === 'rag') return r['recall@3'] != null ? `Recall@3 ${(r['recall@3'] * 100).toFixed(1)}%  ·  MRR ${r.mrr?.toFixed(3) ?? '—'}` : '—'
+    if (key === 'adversarial') return r.adversarial_accuracy != null ? `Accuracy ${(r.adversarial_accuracy * 100).toFixed(1)}%` : '—'
+    if (key === 'consistency') return r.bert?.consistency_rate != null ? `BERT ${(r.bert.consistency_rate * 100).toFixed(0)}%  ·  LLM ${r.ollama?.consistency_rate != null ? (r.ollama.consistency_rate * 100).toFixed(0) + '%' : '—'}` : '—'
+    if (key === 'hallucination') return r.citation_rate != null ? `Citation rate ${(r.citation_rate * 100).toFixed(1)}%` : '—'
+    if (key === 'pipeline') return r.checks_passed != null ? `${r.checks_passed}/${r.checks_total} checks passed` : '—'
+    if (key === 'actor') return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  F1 ${r.macro_f1 != null ? (r.macro_f1 * 100).toFixed(1) + '%' : '—'}` : '—'
+    if (key === 'applicability') return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Prohibited recall ${r.by_outcome?.prohibited?.recall != null ? (r.by_outcome.prohibited.recall * 100).toFixed(0) + '%' : '—'}` : '—'
     if (key === 'evidence_mapper') return r.tpr != null ? `TPR ${(r.tpr * 100).toFixed(1)}%  ·  TNR ${r.tnr != null ? (r.tnr * 100).toFixed(1) + '%' : '—'}` : '—'
-    if (key === 'risk')            return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Recall ${r.recall != null ? (r.recall * 100).toFixed(1) + '%' : '—'}` : '—'
-    if (key === 'prohibited')      return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Recall ${r.recall != null ? (r.recall * 100).toFixed(1) + '%' : '—'}` : '—'
+    if (key === 'risk') return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Recall ${r.recall != null ? (r.recall * 100).toFixed(1) + '%' : '—'}` : '—'
+    if (key === 'prohibited') return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Recall ${r.recall != null ? (r.recall * 100).toFixed(1) + '%' : '—'}` : '—'
     return '—'
   }
 
@@ -664,74 +663,74 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
               {r.status === 'skip'
                 ? <p className="text-xs text-slate-400 italic">{r.reason ?? 'Skipped'}</p>
                 : <div>
-                    <p className="text-sm font-semibold text-slate-300 tabular-nums">{keyMetric(key, r)}</p>
-                    {key === 'ner' && r.weak_labels && Object.keys(r.weak_labels).length > 0 && (
-                      <p className="text-xs text-amber-400 mt-1">
-                        Weak: {Object.keys(r.weak_labels).join(', ')}
-                      </p>
-                    )}
-                    {key === 'actor' && r.n_samples != null && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        {r.n_samples} gold docs · {r.mode === 'with_ml' ? 'pattern + ML' : 'pattern only'}
-                      </p>
-                    )}
-                    {key === 'applicability' && r.by_outcome && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        High-risk recall{' '}
-                        {r.by_outcome.high_risk?.recall != null
-                          ? `${(r.by_outcome.high_risk.recall * 100).toFixed(0)}%`
-                          : '—'}
-                        {' · '}
-                        {r.n_samples} examples
-                      </p>
-                    )}
-                    {key === 'evidence_mapper' && r.balanced_accuracy != null && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        Balanced acc. {(r.balanced_accuracy * 100).toFixed(1)}%
-                        {r.n_errors != null && r.n_errors > 0 && (
-                          <span className="text-amber-400"> · {r.n_errors} misses</span>
-                        )}
-                      </p>
-                    )}
-                    {key === 'risk' && r.tnr != null && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        Specificity {(r.tnr * 100).toFixed(1)}%
-                        {' · '}
-                        {r.n_samples ?? '—'} gold docs
-                        {r.f1 != null && <span> · F1 {(r.f1 * 100).toFixed(1)}%</span>}
-                      </p>
-                    )}
-                    {key === 'prohibited' && r.tnr != null && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        Specificity {(r.tnr * 100).toFixed(1)}%
-                        {' · '}
-                        {r.n_samples ?? '—'} gold docs
-                        {r.f1 != null && <span> · F1 {(r.f1 * 100).toFixed(1)}%</span>}
-                      </p>
-                    )}
-                    {hasDetails(r) && (
-                      <button
-                        onClick={() => toggle(key)}
-                        className="mt-3 flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 font-medium"
+                  <p className="text-sm font-semibold text-slate-300 tabular-nums">{keyMetric(key, r)}</p>
+                  {key === 'ner' && r.weak_labels && Object.keys(r.weak_labels).length > 0 && (
+                    <p className="text-xs text-amber-400 mt-1">
+                      Weak: {Object.keys(r.weak_labels).join(', ')}
+                    </p>
+                  )}
+                  {key === 'actor' && r.n_samples != null && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      {r.n_samples} gold docs · {r.mode === 'with_ml' ? 'pattern + ML' : 'pattern only'}
+                    </p>
+                  )}
+                  {key === 'applicability' && r.by_outcome && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      High-risk recall{' '}
+                      {r.by_outcome.high_risk?.recall != null
+                        ? `${(r.by_outcome.high_risk.recall * 100).toFixed(0)}%`
+                        : '—'}
+                      {' · '}
+                      {r.n_samples} examples
+                    </p>
+                  )}
+                  {key === 'evidence_mapper' && r.balanced_accuracy != null && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Balanced acc. {(r.balanced_accuracy * 100).toFixed(1)}%
+                      {r.n_errors != null && r.n_errors > 0 && (
+                        <span className="text-amber-400"> · {r.n_errors} misses</span>
+                      )}
+                    </p>
+                  )}
+                  {key === 'risk' && r.tnr != null && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Specificity {(r.tnr * 100).toFixed(1)}%
+                      {' · '}
+                      {r.n_samples ?? '—'} gold docs
+                      {r.f1 != null && <span> · F1 {(r.f1 * 100).toFixed(1)}%</span>}
+                    </p>
+                  )}
+                  {key === 'prohibited' && r.tnr != null && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Specificity {(r.tnr * 100).toFixed(1)}%
+                      {' · '}
+                      {r.n_samples ?? '—'} gold docs
+                      {r.f1 != null && <span> · F1 {(r.f1 * 100).toFixed(1)}%</span>}
+                    </p>
+                  )}
+                  {hasDetails(r) && (
+                    <button
+                      onClick={() => toggle(key)}
+                      className="mt-3 flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 font-medium"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded[key] ? 'rotate-180' : ''}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
                       >
-                        <svg
-                          className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded[key] ? 'rotate-180' : ''}`}
-                          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                        {expanded[key] ? 'Hide' : 'Show'} breakdown
-                      </button>
-                    )}
-                    {expanded[key] && hasDetails(r) && (
-                      <div className="mt-3 pt-3 border-t border-line">
-                        {r.per_class && <EvalPerClassDetail data={r.per_class} />}
-                        {r.per_label && <EvalPerLabelDetail data={r.per_label} />}
-                        {r.by_outcome && <EvalByOutcomeDetail data={r.by_outcome} />}
-                        {r.checks && <EvalChecksDetail data={r.checks} articleScores={r.article_scores} />}
-                      </div>
-                    )}
-                  </div>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      {expanded[key] ? 'Hide' : 'Show'} breakdown
+                    </button>
+                  )}
+                  {expanded[key] && hasDetails(r) && (
+                    <div className="mt-3 pt-3 border-t border-line">
+                      {r.per_class && <EvalPerClassDetail data={r.per_class} />}
+                      {r.per_label && <EvalPerLabelDetail data={r.per_label} />}
+                      {r.by_outcome && <EvalByOutcomeDetail data={r.by_outcome} />}
+                      {r.checks && <EvalChecksDetail data={r.checks} articleScores={r.article_scores} />}
+                    </div>
+                  )}
+                </div>
               }
             </div>
           )
@@ -746,15 +745,15 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
 
 function VersionRegistrySection({ data }: { data: VersionsData }) {
   const MODEL_LABELS: Record<string, string> = {
-    bert:       'BERT Domain Classifier',
-    ner:        'spaCy NER',
-    actor:      'Actor Classifier',
-    risk:       'Risk Classifier',
+    bert: 'BERT Domain Classifier',
+    ner: 'spaCy NER',
+    actor: 'Actor Classifier',
+    risk: 'Risk Classifier',
     prohibited: 'Prohibited Classifier',
   }
 
   const modelEntries = Object.entries(data.models)
-  const dataEntries  = Object.entries(data.data)
+  const dataEntries = Object.entries(data.data)
 
   if (modelEntries.length === 0) return null
 
@@ -790,8 +789,8 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
               const scoreVal = active?.score ?? null
               const scoreTheme = scoreVal == null ? 'text-slate-400'
                 : scoreVal >= 0.85 ? 'text-emerald-400 font-bold'
-                : scoreVal >= 0.70 ? 'text-amber-400 font-bold'
-                : 'text-red-400 font-bold'
+                  : scoreVal >= 0.70 ? 'text-amber-400 font-bold'
+                    : 'text-red-400 font-bold'
               return (
                 <tr key={key} className="hover:bg-surface-raised/70 transition-colors">
                   <td className="px-5 py-3.5">
@@ -1049,8 +1048,8 @@ function NerMetricsSection({ data }: { data: NerMetricsData }) {
   const theme = data.overall_f1 >= 0.80
     ? { text: 'text-emerald-400', bg: 'bg-emerald-500/[0.06]', border: 'border-emerald-500/20', label: 'Above 80% target' }
     : data.overall_f1 >= 0.60
-      ? { text: 'text-amber-400',  bg: 'bg-amber-500/[0.06]',  border: 'border-amber-500/20',  label: 'Below 80% target' }
-      : { text: 'text-red-400',    bg: 'bg-red-500/[0.06]',    border: 'border-red-500/20',    label: 'Needs retraining' }
+      ? { text: 'text-amber-400', bg: 'bg-amber-500/[0.06]', border: 'border-amber-500/20', label: 'Below 80% target' }
+      : { text: 'text-red-400', bg: 'bg-red-500/[0.06]', border: 'border-red-500/20', label: 'Needs retraining' }
 
   return (
     <>

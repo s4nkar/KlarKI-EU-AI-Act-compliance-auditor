@@ -236,6 +236,14 @@ def main() -> None:
     records = load_jsonl(args.data)
     print(f"  Loaded {len(records)} examples across {len(LABELS)} classes")
 
+    # Surface which generator(s) produced this data — there are currently 3
+    # (scripts/, local-datagen, local-datagen-V2) and silently training on an
+    # unexpected one has caused real confusion before.
+    from collections import Counter
+    gen_counts = Counter(r.get("generator", "unknown") for r in records)
+    colour = _AMBER if len(gen_counts) > 1 or "unknown" in gen_counts else _GREEN
+    print(_c(colour, f"  Generator provenance: {dict(gen_counts)}"))
+
     train_data, val_data = split_dataset(records, seed=args.seed)
     print(f"  Train: {len(train_data)}, Val: {len(val_data)}")
 
