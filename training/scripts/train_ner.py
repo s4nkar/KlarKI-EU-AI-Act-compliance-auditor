@@ -186,6 +186,29 @@ def load_annotations(path: str) -> list[dict]:
     return records
 
 
+def _case_augment(records: list[dict], prob: float, rng: random.Random) -> tuple[list[dict], int]:
+    """Lowercase a random subset of records wholesale.
+
+    Entity offsets are unaffected — str.lower() is length-preserving for the
+    EN/DE alphabets used here. Guards against the model keying off surface
+    capitalization instead of the words themselves (e.g. it previously only
+    recognised some PROHIBITED_USE phrases when Title-Cased, never in their
+    equally-valid lowercase mid-sentence form — a training-data casing
+    artifact, not a real distinction). Applied to TRAIN only, at low
+    probability, so natural casing signals that matter (German nouns are
+    always capitalized; REGULATION acronyms like GDPR) stay dominant.
+    """
+    augmented = []
+    n = 0
+    for rec in records:
+        if rng.random() < prob:
+            augmented.append({**rec, "text": rec["text"].lower()})
+            n += 1
+        else:
+            augmented.append(rec)
+    return augmented, n
+
+
 def build_doc_bin(records: list[dict], nlp) -> DocBin:
     """Convert annotation records to a spaCy DocBin.
 
@@ -219,6 +242,9 @@ def main() -> None:
                         help="Early stopping patience in epochs on dev F1 (default: 10)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--dropout", type=float, default=0.3)
+    parser.add_argument("--case-augment-prob", type=float, default=0.08,
+                        help="Fraction of TRAIN examples lowercased wholesale for case "
+                             "robustness (dev set untouched; default: 0.08; 0 disables)")
     args = parser.parse_args()
 
     # Full determinism: spacy.util.fix_random_seed seeds Python random, NumPy and
@@ -253,6 +279,17 @@ def main() -> None:
     records = load_annotations(args.data)
     print(_c(DIM, f"  Loaded {len(records)} annotated sentences"))
 
+    # Surface which generator(s) produced this data — there are currently 3
+    # (scripts/generate_ner_data.py, local-datagen, local-datagen-V2) and
+    # silently training on an unexpected one has caused real confusion before.
+    from collections import Counter
+    gen_counts = Counter(r.get("generator", "unknown") for r in records)
+    if len(gen_counts) > 1 or "unknown" in gen_counts:
+        colour = AMBER
+    else:
+        colour = GREEN
+    print(_c(colour, f"  Generator provenance: {dict(gen_counts)}"))
+
     if not records:
         print(_c(RED, "  ERROR: No annotations found. Check your JSONL file."))
         return
@@ -267,6 +304,12 @@ def main() -> None:
     train_records = records[:cut]
     dev_records   = records[cut:]
     print(_c(DIM, f"  Train: {len(train_records)} / Dev: {len(dev_records)}"))
+
+    if args.case_augment_prob > 0:
+        train_records, n_aug = _case_augment(
+            train_records, args.case_augment_prob, random.Random(args.seed))
+        print(_c(DIM, f"  Case augmentation: lowercased {n_aug}/{len(train_records)} "
+                      f"train examples (p={args.case_augment_prob}) for case robustness"))
 
     # Save DocBin files
     output_path = Path(args.output)

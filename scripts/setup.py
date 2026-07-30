@@ -48,6 +48,7 @@ Environment (defaults match .env.example):
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -105,10 +106,26 @@ def _vm_snapshot_data(data_type: str, path: Path) -> str | None:
     return None
 
 
+def _prune_checkpoints(model_dir: Path) -> None:
+    """Delete HuggingFace Trainer's intermediate checkpoint-*/ subdirectories.
+
+    Trainer keeps these for resuming/load_best_model_at_end during training,
+    but by the time we get here the final weights are already written at
+    model_dir's top level (trainer.save_model()). Leaving the checkpoints
+    behind doubles their cost again once save_and_promote copies model_dir
+    into a versioned archive (e.g. actor_classifier/ + actor_classifier_v1/
+    each carrying every intermediate checkpoint alongside the final model).
+    """
+    for ckpt in model_dir.glob("checkpoint-*"):
+        if ckpt.is_dir():
+            shutil.rmtree(ckpt, ignore_errors=True)
+
+
 def _vm_save_model(model_type: str, model_dir: Path, metrics_path: Path, data_type: str | None = None) -> None:
     """Save versioned model copy and promote if best (no-op if VM unavailable)."""
     if _VM and model_dir.is_dir():
         try:
+            _prune_checkpoints(model_dir)
             metrics: dict = {}
             if metrics_path.exists():
                 with open(metrics_path, encoding="utf-8") as f:

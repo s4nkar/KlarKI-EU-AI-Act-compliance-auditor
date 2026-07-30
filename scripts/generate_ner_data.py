@@ -39,6 +39,11 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 REGULATORY_DIR = ROOT / "data" / "regulatory"
 
+# Stamped onto every record so ner_annotations.jsonl is self-describing about
+# which of the (currently 3) generator pipelines produced it — scripts/,
+# local-datagen, or local-datagen-V2 — without needing tribal knowledge.
+_GENERATOR_TAG = "scripts/generate_ner_data.py"
+
 # ---------------------------------------------------------------------------
 # Controlled vocabularies — EN
 # ---------------------------------------------------------------------------
@@ -827,6 +832,7 @@ def main() -> None:
     with open(output_path, "a", encoding="utf-8") as f:
         for rec in reg_records:
             if rec["text"] not in existing_texts:
+                rec["generator"] = _GENERATOR_TAG
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
                 existing_texts.add(rec["text"])
                 reg_written += 1
@@ -842,6 +848,7 @@ def main() -> None:
     with open(output_path, "a", encoding="utf-8") as f:
         for rec in tmpl_records:
             if rec["text"] not in existing_texts:
+                rec["generator"] = _GENERATOR_TAG
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
                 existing_texts.add(rec["text"])
                 tmpl_written += 1
@@ -857,6 +864,7 @@ def main() -> None:
     with open(output_path, "a", encoding="utf-8") as f:
         for rec in neg_records:
             if rec["text"] not in existing_texts:
+                rec["generator"] = _GENERATOR_TAG
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
                 existing_texts.add(rec["text"])
                 neg_written += 1
