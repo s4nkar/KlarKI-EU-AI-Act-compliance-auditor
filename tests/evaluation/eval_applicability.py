@@ -25,7 +25,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 REPO_ROOT   = Path(__file__).resolve().parent.parent.parent
-GOLD_PATH   = Path(__file__).parent / "datasets" / "gold_applicability.jsonl"
+GOLD_PATH   = Path(__file__).parent / "gold" / "gold_applicability.jsonl"
 RESULTS_DIR = Path(__file__).parent / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 

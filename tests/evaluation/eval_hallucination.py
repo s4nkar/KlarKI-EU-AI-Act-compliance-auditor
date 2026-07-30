@@ -2,7 +2,7 @@
 Evaluation 4 — Hallucination / Citation Verification.
 
 Every compliance gap the system surfaces must be traceable to actual
-regulatory text.  This eval enforces three rules:
+regulatory text.  This eval enforces four rules:
 
   Rule 1 — Evidence linkage:
       Each ArticleScore must have ≥ 1 regulatory_passage retrieved.
@@ -17,8 +17,19 @@ regulatory text.  This eval enforces three rules:
       Recommendations must reference a regulatory concept
       (checked via keyword matching against a known vocabulary).
 
+  Rule 4 — Semantic entailment:
+      Each gap's description must be entailed by at least one of the
+      article's retrieved regulatory passages, per the NLI cross-encoder
+      already used in evidence_mapper.py (cross-encoder/nli-deberta-v3-small).
+      Rule 1 only checks that *some* passage was retrieved for an article;
+      Rule 4 checks that the reported gap is actually *about* what the
+      retrieved text says, catching gaps that cite a real passage but
+      describe something the passage doesn't support.
+
 Uses proposition_chunk_text (the production chunker) so the chunking
-strategy matches what the real pipeline produces.
+strategy matches what the real pipeline produces. Uses select_query_chunks
+(the production RAG chunk-selection ranker) so retrieval quality matches
+what the real pipeline would retrieve for the same document.
 
 applicable_articles is intentionally passed as None to analyse_article
 so all 7 articles run through LangGraph — the goal here is to verify
@@ -45,6 +56,9 @@ RESULTS_DIR = Path(__file__).parent / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 _API_DIR = next((p for p in [REPO_ROOT / "api", Path("/app")] if p.is_dir()), Path("/app"))
 sys.path.insert(0, str(_API_DIR))
+
+# Minimum NLI entailment score for a passage to count as supporting a gap description
+_NLI_ENTAILMENT_THRESHOLD = 0.5
 
 # Keywords that a grounded recommendation should contain
 REGULATORY_VOCAB = {
@@ -74,10 +88,40 @@ def _is_grounded_recommendation(text: str) -> bool:
     return any(kw in lower for kw in REGULATORY_VOCAB)
 
 
-def _check_article_score(score) -> list[str]:
-    """Return a list of violation strings for a single ArticleScore."""
+def _score_entailment(nli_model, pairs: list[tuple[str, str]]) -> list[bool]:
+    """Batch-score (premise, hypothesis) pairs; return per-pair entailment booleans.
+
+    Mirrors the scoring convention in evidence_mapper.py's _evidence_present:
+    predicted label must be ENTAILMENT and its score must clear the threshold.
+    """
+    labels: dict = getattr(
+        nli_model.model.config,
+        "id2label",
+        {0: "CONTRADICTION", 1: "ENTAILMENT", 2: "NEUTRAL"},
+    )
+    entailment_idx = next(
+        (idx for idx, lbl in labels.items() if "ENTAILMENT" in lbl.upper()),
+        None,
+    )
+    batch_scores = nli_model.predict(pairs)
+    results = []
+    for scores in batch_scores:
+        predicted_label = labels.get(int(scores.argmax()), "").upper()
+        if "ENTAILMENT" not in predicted_label:
+            results.append(False)
+            continue
+        if entailment_idx is not None and float(scores[entailment_idx]) < _NLI_ENTAILMENT_THRESHOLD:
+            results.append(False)
+            continue
+        results.append(True)
+    return results
+
+
+def _check_article_score(score, nli_model=None) -> tuple[list[str], dict]:
+    """Return (violation strings, entailment stats) for a single ArticleScore."""
     violations: list[str] = []
     art = score.article_num
+    entailment_stats = {"checked": 0, "entailed": 0}
 
     # Rule 1: articles where actual user chunks were analysed must have regulatory
     # passages backing their gaps. Articles with no classified chunks produce a
@@ -108,7 +152,41 @@ def _check_article_score(score) -> list[str]:
                 f"regulatory vocabulary: '{rec[:80]}'"
             )
 
-    return violations
+    # Rule 4: semantic entailment — does any retrieved passage actually support
+    # the gap's description, or does the LLM just cite a passage count without
+    # the gap content being about that passage at all?
+    if nli_model is not None and score.regulatory_passages and score.gaps:
+        pairs: list[tuple[str, str]] = []
+        pair_gap_index: list[int] = []
+        for gi, gap in enumerate(score.gaps):
+            if not gap.description or not gap.description.strip():
+                continue  # already flagged by Rule 2
+            for passage in score.regulatory_passages:
+                pairs.append((passage.text, gap.description))
+                pair_gap_index.append(gi)
+
+        if pairs:
+            try:
+                entailed_flags = _score_entailment(nli_model, pairs)
+                entailed_gaps = {
+                    gi for gi, ok in zip(pair_gap_index, entailed_flags) if ok
+                }
+                checked_gaps = set(pair_gap_index)
+                entailment_stats["checked"] = len(checked_gaps)
+                entailment_stats["entailed"] = len(entailed_gaps)
+                for gi in sorted(checked_gaps - entailed_gaps):
+                    gap = score.gaps[gi]
+                    violations.append(
+                        f"Article {art} gap[{gi}]: description not entailed by any "
+                        f"retrieved passage: '{gap.description[:80]}'"
+                    )
+            except Exception as exc:
+                logger_warn = f"Article {art}: NLI entailment scoring failed: {exc}"
+                # Non-fatal — fall back to Rules 1-3 only for this article, matching
+                # evidence_mapper.py's own NLI-unavailable fallback behaviour.
+                print(f"  [warn] {logger_warn}")
+
+    return violations, entailment_stats
 
 
 async def _run_async(strict: bool, verbose: bool) -> dict:
@@ -120,8 +198,9 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
         from services.classifier        import classify_chunks
         from services.embedding_service import EmbeddingService
         from services.chroma_client     import ChromaClient
-        from services.rag_engine        import retrieve_requirements, build_bm25_index
+        from services.rag_engine        import retrieve_requirements, build_bm25_index, select_query_chunks
         from services.gap_analyser      import analyse_article
+        from services.evidence_mapper   import _get_nli_model
         from services.ollama_client     import OllamaClient
         from models.schemas             import ArticleDomain
     except ImportError as e:
@@ -154,6 +233,12 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
     # Build BM25 index so hybrid retrieval works (built at app startup in production)
     await build_bm25_index(chroma)
 
+    # Same NLI cross-encoder evidence_mapper.py uses — reused here (not reloaded) so
+    # Rule 4 stays consistent with the production grounding model. None if unavailable.
+    nli_model = _get_nli_model()
+    if verbose and nli_model is None:
+        print("  [warn] NLI model unavailable — Rule 4 (semantic entailment) will be skipped")
+
     ARTICLE_DOMAINS = {
         9:  ArticleDomain.RISK_MANAGEMENT,
         10: ArticleDomain.DATA_GOVERNANCE,
@@ -166,12 +251,15 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
 
     all_violations: list[str] = []
     article_results: dict[int, dict] = {}
+    total_gaps_checked = 0
+    total_gaps_entailed = 0
 
     for art_num, domain in ARTICLE_DOMAINS.items():
         art_chunks = [c for c in classified if c.domain == domain]
+        query_chunks = await select_query_chunks(art_chunks, art_num, emb)
 
         passages: list[dict] = []
-        for chunk in art_chunks[:3]:
+        for chunk in query_chunks:
             try:
                 # No applicable_articles filter — hallucination eval deliberately
                 # runs LangGraph on all 7 articles to test LLM output quality
@@ -203,8 +291,10 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
                 print(f"  gap analysis failed for Article {art_num}: {ex}")
             continue
 
-        violations = _check_article_score(score)
+        violations, ent_stats = _check_article_score(score, nli_model)
         all_violations.extend(violations)
+        total_gaps_checked  += ent_stats["checked"]
+        total_gaps_entailed += ent_stats["entailed"]
 
         article_results[art_num] = {
             "gaps":            len(score.gaps),
@@ -212,6 +302,8 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
             "passages":        len(score.regulatory_passages),
             "chunk_count":     score.chunk_count,
             "violations":      violations,
+            "gaps_checked_for_entailment": ent_stats["checked"],
+            "gaps_entailed":               ent_stats["entailed"],
         }
 
         if verbose:
@@ -228,6 +320,14 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
         / max(len(articles_with_chunks), 1)
     )
 
+    # Entailment rate: fraction of gaps (with passages to check against) whose
+    # description was actually entailed by at least one retrieved passage.
+    # None (not 0.0) when the NLI model is unavailable, since the check never ran.
+    entailment_rate = (
+        round(total_gaps_entailed / total_gaps_checked, 4)
+        if total_gaps_checked > 0 else None
+    )
+
     if strict:
         status = "pass" if not all_violations else "fail"
     else:
@@ -239,6 +339,8 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
         "eval":                    "hallucination",
         "status":                  status,
         "citation_rate":           round(citation_rate, 4),
+        "entailment_rate":         entailment_rate,
+        "nli_model_available":     nli_model is not None,
         "total_violations":        len(all_violations),
         "violations":              all_violations,
         "article_results":         article_results,
@@ -269,6 +371,11 @@ def print_report(r: dict) -> None:
     print(f"  {status_icon} Hallucination / Citation Verification")
     print(f"  {'─'*52}")
     print(f"  Citation rate    : {r['citation_rate']*100:.1f}%  (threshold ≥ 90%)")
+    if r.get("entailment_rate") is not None:
+        print(f"  Entailment rate  : {r['entailment_rate']*100:.1f}%  "
+              f"(fraction of gap descriptions entailed by a retrieved passage)")
+    elif not r.get("nli_model_available", True):
+        print("  Entailment rate  : n/a (NLI model unavailable)")
     print(f"  Total violations : {r['total_violations']}")
 
     if r["violations"]:
@@ -304,8 +411,24 @@ def test_gap_content_quality() -> None:
     if r["status"] == "skip":
         import pytest
         pytest.skip(r.get("reason", ""))
-    quality_failures = [v for v in r.get("violations", []) if "description" in v or "title" in v]
+    quality_failures = [
+        v for v in r.get("violations", [])
+        if "empty title" in v or "empty description" in v or "suspiciously short description" in v
+    ]
     assert not quality_failures, "Gap content quality failures:\n" + "\n".join(quality_failures)
+
+
+def test_gap_descriptions_entailed() -> None:
+    """pytest: Every gap description must be entailed by a retrieved passage (Rule 4)."""
+    r = run(strict=False)
+    if r["status"] == "skip":
+        import pytest
+        pytest.skip(r.get("reason", ""))
+    if not r.get("nli_model_available", True):
+        import pytest
+        pytest.skip("NLI model unavailable — Rule 4 could not run")
+    ungrounded = [v for v in r.get("violations", []) if "not entailed by any retrieved passage" in v]
+    assert not ungrounded, "Ungrounded (non-entailed) gap descriptions:\n" + "\n".join(ungrounded)
 
 
 def test_citation_rate_above_90() -> None:

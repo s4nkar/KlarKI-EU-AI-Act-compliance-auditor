@@ -20,7 +20,7 @@ from pathlib import Path
 
 # ── paths ──────────────────────────────────────────────────────────────────
 REPO_ROOT   = Path(__file__).resolve().parent.parent.parent
-GOLD_PATH   = Path(__file__).parent / "datasets" / "gold_classifier.jsonl"
+GOLD_PATH   = Path(__file__).parent / "gold" / "gold_classifier.jsonl"
 MODEL_PATH  = next(
     (p for p in [REPO_ROOT / "training" / "artifacts" / "bert_classifier", Path("/training/artifacts/bert_classifier")] if p.exists()),
     Path("/training/artifacts/bert_classifier"),

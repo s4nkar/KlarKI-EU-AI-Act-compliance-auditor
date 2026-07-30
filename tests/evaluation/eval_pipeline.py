@@ -4,11 +4,12 @@ Evaluation 3 — End-to-End Pipeline Test.
 Mirrors _run_pipeline() in api/routers/audit.py exactly:
 
   proposition_chunk_text → detect_language
-  → classify_actor (asyncio.to_thread) → check_applicability (asyncio.to_thread)
-  → classify_chunks → enrich_chunks_with_ner (asyncio.to_thread)
+  → extract_ner_entities_async (NER Phase 1, asyncio.to_thread)
+  → classify_actor (asyncio.to_thread, NER-aware) → check_applicability (asyncio.to_thread)
+  → classify_chunks → apply_ner_domain_correction (NER Phase 2, asyncio.to_thread)
   → build_bm25_index
-  → [retrieve_requirements + analyse_article/LangGraph per article] (concurrent)
-  → map_evidence (asyncio.to_thread)
+  → [select_query_chunks + retrieve_requirements + analyse_article/LangGraph per article] (concurrent)
+  → map_evidence (asyncio.to_thread, EU AI Act + GDPR)
   → check_emotion_recognition → score_audit
 
 The synthetic document contains explicit "credit scoring" language so the
@@ -98,10 +99,10 @@ async def _run_async(verbose: bool) -> dict:
         from services.actor_classifier     import classify_actor
         from services.applicability_engine import check_applicability
         from services.classifier           import classify_chunks
-        from services.ner_service          import enrich_chunks_with_ner
+        from services.ner_service          import extract_ner_entities_async, apply_ner_domain_correction
         from services.embedding_service    import EmbeddingService
         from services.chroma_client        import ChromaClient
-        from services.rag_engine           import retrieve_requirements, build_bm25_index
+        from services.rag_engine           import retrieve_requirements, build_bm25_index, select_query_chunks
         from services.gap_analyser         import analyse_article
         from services.evidence_mapper      import map_evidence
         from services.emotion_module       import check_emotion_recognition
@@ -145,13 +146,24 @@ async def _run_async(verbose: bool) -> dict:
     if verbose:
         print(f"  Stage 2: Language detected → {lang}")
 
-    # ── stage 3: Phase 3 legal decision hierarchy ───────────────────────────
-    # Mirrors audit.py: both run via asyncio.to_thread before classify_chunks.
+    # ── stage 3: NER entity extraction (Phase 1) ────────────────────────────
+    # Mirrors audit.py: runs before the legal gate so PROHIBITED_USE / RISK_TIER
+    # entities are available to actor_classifier / applicability_engine.
     if verbose:
-        print("  Stage 3: Actor classification + applicability gate …")
-    actor_result        = await asyncio.to_thread(classify_actor, SYNTHETIC_DOCUMENT)
-    applicability_result = await asyncio.to_thread(check_applicability, chunks)
-    applicable_articles  = applicability_result.applicable_articles
+        print("  Stage 3: NER entity extraction (Phase 1) …")
+    chunks = await extract_ner_entities_async(chunks)
+
+    # ── stage 4: Phase 3 legal decision hierarchy ───────────────────────────
+    # Mirrors audit.py: both run via asyncio.gather, consuming NER metadata
+    # written above. classify_actor receives chunks so its NER-assisted
+    # PROVIDER-signal branch is exercised, matching production.
+    if verbose:
+        print("  Stage 4: Actor classification + applicability gate …")
+    actor_result, applicability_result = await asyncio.gather(
+        asyncio.to_thread(classify_actor, SYNTHETIC_DOCUMENT, chunks),
+        asyncio.to_thread(check_applicability, chunks),
+    )
+    applicable_articles = applicability_result.applicable_articles
     if verbose:
         print(f"    Actor: {actor_result.actor_type.value} "
               f"(conf={actor_result.confidence:.2f})")
@@ -159,28 +171,30 @@ async def _run_async(verbose: bool) -> dict:
               f"(prohibited={applicability_result.is_prohibited}, "
               f"high_risk={applicability_result.is_high_risk})")
 
-    # ── stage 4: chunk classification ──────────────────────────────────────
+    # ── stage 5: chunk classification ──────────────────────────────────────
     if verbose:
-        print("  Stage 4: Classifying chunks …")
+        print("  Stage 5: Classifying chunks …")
     chunks, _backend = await classify_chunks(chunks, ollama)
     unlabeled        = [c for c in chunks if c.domain is None]
     classified_count = len(chunks) - len(unlabeled)
     if verbose:
         print(f"    {classified_count}/{len(chunks)} chunks classified")
 
-    # ── stage 5: NER enrichment ─────────────────────────────────────────────
+    # ── stage 6: NER domain correction (Phase 2) ────────────────────────────
+    # Mirrors audit.py: now that chunk.domain is set, correct UNRELATED chunks
+    # that NER flagged as containing an unambiguous Article 9-15 reference.
     if verbose:
-        print("  Stage 5: NER enrichment …")
-    chunks = await asyncio.to_thread(enrich_chunks_with_ner, chunks)
+        print("  Stage 6: NER domain correction (Phase 2) …")
+    chunks = await asyncio.to_thread(apply_ner_domain_correction, chunks)
 
-    # ── stage 6: BM25 index (built at app startup in production) ────────────
+    # ── stage 7: BM25 index (built at app startup in production) ────────────
     if verbose:
-        print("  Stage 6: Building BM25 index …")
+        print("  Stage 7: Building BM25 index …")
     await build_bm25_index(chroma)
 
-    # ── stage 7: RAG + LangGraph gap analysis — all 7 articles concurrently ─
+    # ── stage 8: RAG + LangGraph gap analysis — all 7 articles concurrently ─
     if verbose:
-        print("  Stage 7: RAG + LangGraph gap analysis (7 articles concurrently) …")
+        print("  Stage 8: RAG + LangGraph gap analysis (7 articles concurrently) …")
 
     domain_chunks: dict[ArticleDomain, list] = {d: [] for d in ArticleDomain}
     for chunk in chunks:
@@ -188,10 +202,11 @@ async def _run_async(verbose: bool) -> dict:
             domain_chunks[chunk.domain].append(chunk)
 
     async def _process_article(article_num: int, domain: ArticleDomain):
-        art_chunks  = domain_chunks.get(domain, [])
+        art_chunks   = domain_chunks.get(domain, [])
+        query_chunks = await select_query_chunks(art_chunks, article_num, emb)
         reg_passages: list[dict] = []
 
-        for c in art_chunks[:3]:
+        for c in query_chunks:
             try:
                 retrieved = await retrieve_requirements(
                     chunk=c,
@@ -236,22 +251,23 @@ async def _run_async(verbose: bool) -> dict:
         *[_process_article(num, dom) for num, dom in ARTICLE_DOMAINS.items()]
     ))
 
-    # ── stage 8: evidence mapping (deterministic, no LLM) ───────────────────
+    # ── stage 9: evidence mapping (deterministic, no LLM, EU AI Act + GDPR) ──
     if verbose:
-        print("  Stage 8: Evidence mapping …")
+        print("  Stage 9: Evidence mapping …")
     evidence_map = await asyncio.to_thread(
         map_evidence,
         chunks,
         actor_result.actor_type,
         applicable_articles,
+        applicability_result.gdpr_applicable_articles,
     )
     if verbose:
         print(f"    {evidence_map.total_obligations} obligations, "
               f"coverage={evidence_map.overall_coverage:.0%}")
 
-    # ── stage 9: emotion scan + scoring ─────────────────────────────────────
+    # ── stage 10: emotion scan + scoring ────────────────────────────────────
     if verbose:
-        print("  Stage 9: Scoring …")
+        print("  Stage 10: Scoring …")
     emotion_flag = await check_emotion_recognition(chunks, applicability_result)
     report = await score_audit(
         article_scores=article_scores,

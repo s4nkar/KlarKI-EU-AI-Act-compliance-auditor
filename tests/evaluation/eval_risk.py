@@ -33,7 +33,7 @@ import time
 from pathlib import Path
 
 REPO_ROOT   = Path(__file__).resolve().parent.parent.parent
-GOLD_PATH   = Path(__file__).parent / "datasets" / "gold_risk.jsonl"
+GOLD_PATH   = Path(__file__).parent / "gold" / "gold_risk.jsonl"
 RESULTS_DIR = Path(__file__).parent / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 

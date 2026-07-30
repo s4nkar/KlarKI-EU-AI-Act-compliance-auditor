@@ -139,6 +139,54 @@ interface EvalResult {
   n_prohibited?: number
   n_not_prohibited?: number
   by_type?: Record<string, { recall: number; tp: number; fp: number; tn: number; fn: number }>
+  // Misclassified-example breakdowns (risk, prohibited, evidence_mapper)
+  errors?: Array<{
+    text: string
+    true?: string
+    pred?: string
+    confidence?: number
+    note?: string
+    term?: string
+    outcome?: string
+  }>
+  // Evidence mapper per-obligation-term breakdown
+  per_term?: Record<string, {
+    support: number
+    tpr: number
+    tnr: number
+    tp: number
+    fp: number
+    tn: number
+    fn: number
+  }>
+  // Adversarial per-concept paraphrase-robustness breakdown
+  by_concept?: Record<string, {
+    total: number
+    correct: number
+    failures: Array<{ text: string; expected: string; predicted: string }>
+  }>
+  // RAG per-query retrieval breakdown
+  per_query?: Array<{
+    query: string
+    expected_articles: number[]
+    'hit@1': number
+    'hit@3': number
+    'hit@5': number
+    first_hit_rank: number | null
+    top3_articles: number[]
+  }>
+  // Hallucination per-article breakdown
+  article_results?: Record<string, {
+    gaps: number
+    recommendations: number
+    passages: number
+    chunk_count: number
+    violations: string[]
+    gaps_checked_for_entailment?: number
+    gaps_entailed?: number
+  }>
+  entailment_rate?: number | null
+  nli_model_available?: boolean
 }
 
 type EvalResultsMap = Record<string, EvalResult>
@@ -576,7 +624,13 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
       (r.per_class && Object.keys(r.per_class).length > 0) ||
       (r.per_label && Object.keys(r.per_label).length > 0) ||
       r.by_outcome ||
-      (r.checks && Object.keys(r.checks).length > 0)
+      (r.checks && Object.keys(r.checks).length > 0) ||
+      (r.by_type && Object.keys(r.by_type).length > 0) ||
+      (r.per_term && Object.keys(r.per_term).length > 0) ||
+      (r.by_concept && Object.keys(r.by_concept).length > 0) ||
+      (r.per_query && r.per_query.length > 0) ||
+      (r.article_results && Object.keys(r.article_results).length > 0) ||
+      (r.errors && r.errors.length > 0)
     )
   }
 
@@ -622,7 +676,9 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
     if (key === 'rag') return r['recall@3'] != null ? `Recall@3 ${(r['recall@3'] * 100).toFixed(1)}%  ·  MRR ${r.mrr?.toFixed(3) ?? '—'}` : '—'
     if (key === 'adversarial') return r.adversarial_accuracy != null ? `Accuracy ${(r.adversarial_accuracy * 100).toFixed(1)}%` : '—'
     if (key === 'consistency') return r.bert?.consistency_rate != null ? `BERT ${(r.bert.consistency_rate * 100).toFixed(0)}%  ·  LLM ${r.ollama?.consistency_rate != null ? (r.ollama.consistency_rate * 100).toFixed(0) + '%' : '—'}` : '—'
-    if (key === 'hallucination') return r.citation_rate != null ? `Citation rate ${(r.citation_rate * 100).toFixed(1)}%` : '—'
+    if (key === 'hallucination') return r.citation_rate != null
+      ? `Citation rate ${(r.citation_rate * 100).toFixed(1)}%${r.entailment_rate != null ? `  ·  Entailment ${(r.entailment_rate * 100).toFixed(1)}%` : ''}`
+      : '—'
     if (key === 'pipeline') return r.checks_passed != null ? `${r.checks_passed}/${r.checks_total} checks passed` : '—'
     if (key === 'actor') return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  F1 ${r.macro_f1 != null ? (r.macro_f1 * 100).toFixed(1) + '%' : '—'}` : '—'
     if (key === 'applicability') return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Prohibited recall ${r.by_outcome?.prohibited?.recall != null ? (r.by_outcome.prohibited.recall * 100).toFixed(0) + '%' : '—'}` : '—'
@@ -728,6 +784,12 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
                       {r.per_label && <EvalPerLabelDetail data={r.per_label} />}
                       {r.by_outcome && <EvalByOutcomeDetail data={r.by_outcome} />}
                       {r.checks && <EvalChecksDetail data={r.checks} articleScores={r.article_scores} />}
+                      {r.by_type && <EvalByTypeDetail data={r.by_type} />}
+                      {r.per_term && <EvalPerTermDetail data={r.per_term} />}
+                      {r.by_concept && <EvalByConceptDetail data={r.by_concept} />}
+                      {r.per_query && <EvalPerQueryDetail data={r.per_query} />}
+                      {r.article_results && <EvalArticleResultsDetail data={r.article_results} />}
+                      {r.errors && r.errors.length > 0 && <EvalErrorsDetail data={r.errors} />}
                     </div>
                   )}
                 </div>
@@ -1004,6 +1066,225 @@ function EvalByOutcomeDetail({ data }: { data: NonNullable<EvalResult['by_outcom
           </span>
         </div>
       )}
+    </div>
+  )
+}
+
+function EvalByTypeDetail({ data }: {
+  data: Record<string, { recall: number; tp: number; fp: number; tn: number; fn: number }>
+}) {
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-line">
+          <th className="pb-1.5">Type</th>
+          <th className="pb-1.5 text-center">Recall</th>
+          <th className="pb-1.5 text-center">TP</th>
+          <th className="pb-1.5 text-center">FP</th>
+          <th className="pb-1.5 text-center">TN</th>
+          <th className="pb-1.5 text-center">FN</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Object.entries(data).map(([type, m]) => {
+          const color = m.recall >= 0.80 ? 'text-emerald-400' : m.recall >= 0.60 ? 'text-amber-400' : 'text-red-400'
+          return (
+            <tr key={type} className="border-b border-line last:border-0">
+              <td className="py-1 text-slate-400 capitalize font-medium">{type.replace(/_/g, ' ')}</td>
+              <td className={`py-1 text-center font-bold tabular-nums ${color}`}>{(m.recall * 100).toFixed(0)}%</td>
+              <td className="py-1 text-center text-emerald-400 tabular-nums">{m.tp}</td>
+              <td className="py-1 text-center text-red-500 tabular-nums">{m.fp}</td>
+              <td className="py-1 text-center text-slate-400 tabular-nums">{m.tn}</td>
+              <td className="py-1 text-center text-amber-400 tabular-nums">{m.fn}</td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
+function EvalPerTermDetail({ data }: {
+  data: Record<string, { support: number; tpr: number; tnr: number; tp: number; fp: number; tn: number; fn: number }>
+}) {
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-line">
+          <th className="pb-1.5">Term</th>
+          <th className="pb-1.5 text-center">N</th>
+          <th className="pb-1.5 text-center">TPR</th>
+          <th className="pb-1.5 text-center">TNR</th>
+          <th className="pb-1.5 text-center">FP</th>
+          <th className="pb-1.5 text-center">FN</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Object.entries(data).map(([term, m]) => {
+          const color = m.tpr >= 0.80 ? 'text-emerald-400' : m.tpr >= 0.60 ? 'text-amber-400' : 'text-red-400'
+          return (
+            <tr key={term} className="border-b border-line last:border-0">
+              <td className="py-1 text-slate-400 capitalize font-medium">{term.replace(/_/g, ' ')}</td>
+              <td className="py-1 text-center text-slate-500 tabular-nums">{m.support}</td>
+              <td className={`py-1 text-center font-bold tabular-nums ${color}`}>{(m.tpr * 100).toFixed(0)}%</td>
+              <td className="py-1 text-center text-slate-400 tabular-nums">{(m.tnr * 100).toFixed(0)}%</td>
+              <td className="py-1 text-center text-red-500 tabular-nums">{m.fp}</td>
+              <td className="py-1 text-center text-amber-400 tabular-nums">{m.fn}</td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
+function EvalByConceptDetail({ data }: {
+  data: Record<string, { total: number; correct: number; failures: Array<{ text: string; expected: string; predicted: string }> }>
+}) {
+  return (
+    <div className="space-y-2">
+      {Object.entries(data).map(([concept, info]) => {
+        const allCorrect = info.correct === info.total
+        return (
+          <div key={concept}>
+            <div className="flex justify-between items-baseline text-xs">
+              <span className="text-slate-400 font-medium capitalize">{concept.replace(/_/g, ' ')}</span>
+              <span className={`tabular-nums font-semibold ${allCorrect ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {info.correct}/{info.total}
+              </span>
+            </div>
+            {info.failures.length > 0 && (
+              <div className="mt-1 pl-3 border-l-2 border-red-500/30 space-y-0.5">
+                {info.failures.map((f, i) => (
+                  <p key={i} className="text-[11px] text-slate-500 truncate">
+                    <span className="text-red-400">{f.expected} → {f.predicted}</span>{'  '}
+                    "{f.text}"
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function EvalPerQueryDetail({ data }: {
+  data: Array<{
+    query: string
+    expected_articles: number[]
+    'hit@1': number
+    'hit@3': number
+    'hit@5': number
+    first_hit_rank: number | null
+    top3_articles: number[]
+  }>
+}) {
+  const misses = data.filter(q => !q['hit@3'])
+  const shown = misses.length > 0 ? misses : data
+  const label = misses.length > 0 ? `Recall@3 misses (${misses.length}/${data.length})` : `All queries (${data.length})`
+  return (
+    <div>
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">{label}</p>
+      <div className="space-y-1.5">
+        {shown.slice(0, 15).map((q, i) => (
+          <div key={i} className="text-xs">
+            <div className="flex justify-between items-baseline gap-2">
+              <span className="text-slate-400 truncate">"{q.query}"</span>
+              <span className={q['hit@3'] ? 'text-emerald-400' : 'text-red-400'}>
+                {q['hit@3'] ? '✓ hit@3' : '✗ miss'}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              expected Art. {q.expected_articles.join(', ')} · retrieved Art. {q.top3_articles.join(', ') || '—'}
+            </p>
+          </div>
+        ))}
+        {shown.length > 15 && (
+          <p className="text-[11px] text-slate-500">… and {shown.length - 15} more</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function EvalArticleResultsDetail({ data }: {
+  data: Record<string, {
+    gaps: number
+    recommendations: number
+    passages: number
+    chunk_count: number
+    violations: string[]
+    gaps_checked_for_entailment?: number
+    gaps_entailed?: number
+  }>
+}) {
+  return (
+    <div className="space-y-1.5">
+      {Object.entries(data).map(([art, info]) => (
+        <div key={art} className="text-xs">
+          <div className="flex justify-between items-baseline">
+            <span className="text-slate-400 font-medium">Article {art}</span>
+            <span className={info.violations.length === 0 ? 'text-emerald-400' : 'text-red-400'}>
+              {info.passages} passages · {info.gaps} gaps
+              {info.gaps_checked_for_entailment ? (
+                <> · entailed {info.gaps_entailed}/{info.gaps_checked_for_entailment}</>
+              ) : null}
+            </span>
+          </div>
+          {info.violations.length > 0 && (
+            <div className="mt-0.5 pl-3 border-l-2 border-red-500/30 space-y-0.5">
+              {info.violations.slice(0, 3).map((v, i) => (
+                <p key={i} className="text-[11px] text-slate-500 truncate">{v}</p>
+              ))}
+              {info.violations.length > 3 && (
+                <p className="text-[11px] text-slate-500">… and {info.violations.length - 3} more</p>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function EvalErrorsDetail({ data }: {
+  data: Array<{
+    text: string
+    true?: string
+    pred?: string
+    confidence?: number
+    note?: string
+    term?: string
+    outcome?: string
+  }>
+}) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
+        Misclassified examples ({data.length})
+      </p>
+      <div className="space-y-1.5">
+        {data.slice(0, 15).map((e, i) => (
+          <div key={i} className="text-xs">
+            <div className="flex items-baseline gap-2">
+              {e.term ? (
+                <span className="text-red-400 font-medium capitalize">{e.term.replace(/_/g, ' ')} · {e.outcome?.replace(/_/g, ' ')}</span>
+              ) : (
+                <span className="text-red-400 font-medium">{e.true} → {e.pred}</span>
+              )}
+              {e.confidence != null && (
+                <span className="text-slate-500 tabular-nums">conf {(e.confidence * 100).toFixed(0)}%</span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 truncate">"{e.text}"{e.note ? `  — ${e.note}` : ''}</p>
+          </div>
+        ))}
+        {data.length > 15 && (
+          <p className="text-[11px] text-slate-500">… and {data.length - 15} more</p>
+        )}
+      </div>
     </div>
   )
 }

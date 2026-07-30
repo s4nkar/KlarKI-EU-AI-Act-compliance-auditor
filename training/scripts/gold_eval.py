@@ -3,7 +3,7 @@
 The held-out validation F1 that training prints is computed on the *same*
 synthetic distribution the model trained on, so it can read ~99% while the
 model fails on realistic policy prose. The hand-curated gold datasets in
-tests/evaluation/datasets/ are the honest out-of-distribution signal.
+tests/evaluation/gold/ are the honest out-of-distribution signal.
 
 Recording `gold_macro_f1` in each model's metrics.json lets version_manager
 gate promotion on the honest number instead of the inflated val metric, and
@@ -17,7 +17,7 @@ import json
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_GOLD_DIR = _REPO_ROOT / "tests" / "evaluation" / "datasets"
+_GOLD_DIR = _REPO_ROOT / "tests" / "evaluation" / "gold"
 
 # Canonical promotion gates — the SINGLE source of truth for the gold thresholds.
 # These MUST stay identical to the pytest eval-suite gates in tests/evaluation/
