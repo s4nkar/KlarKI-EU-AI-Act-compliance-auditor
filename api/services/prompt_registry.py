@@ -1,20 +1,23 @@
-"""Prompt version registry for LangGraph agent nodes (services/agent_graph.py).
+"""Prompt version registry — used by every LLM-prompting service in api/
+(services/agent_graph.py's legal/technical/synthesis nodes, services/classifier.py's
+chunk-domain classifier).
 
-Prompts are plain text files under prompts/agent_graph/<node>/v<N>.txt, with
-an active version per node tracked in prompts/agent_graph/registry.json —
-the same v1/v2 versioning convention already used for trained models (see
+Prompts are plain text files under prompts/<name>/v<N>.txt, with an active
+version per prompt name tracked in prompts/registry.json — the same v1/v2
+versioning convention already used for trained models (see
 training/version_manager.py), just without the model-artifact machinery
 (hashing, symlink promotion) that a text file doesn't need.
 
 Placeholders use a {{TOKEN}} (double-brace) convention and are filled via
-plain str.replace(), not str.format() — the prompts themselves contain
+plain str.replace(), not str.format() — several of these prompts contain
 literal single-brace JSON examples ({"score": ...}), so str.format() would
-try to parse those as format fields and raise. This mirrors the same
-reasoning documented in classifier.py's _load_prompt().
+try to parse those as format fields and raise.
 
 Reads are uncached (fresh from disk each call) so flipping the active
 version in registry.json takes effect on the next request, with no API
-restart — same convention as classifier.py's _load_prompt().
+restart needed — as long as the prompts/ directory is live-mounted (true in
+docker-compose.dev.yml; the prod image bakes prompts/ in at build time, so
+prod needs a rebuild+restart for a new active version to actually be present).
 
 Usage:
     from services.prompt_registry import load_prompt
@@ -25,7 +28,7 @@ Usage:
 import json
 from pathlib import Path
 
-_PROMPTS_DIR = Path(__file__).parent.parent / "prompts" / "agent_graph"
+_PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 _REGISTRY_PATH = _PROMPTS_DIR / "registry.json"
 
 

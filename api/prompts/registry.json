@@ -41,5 +41,14 @@
         "note": "v2 + explicit callout of third-party/outside-counsel/legal-department/company-policy certification claims."
       }
     }
+  },
+  "classifier": {
+    "active": "v1",
+    "versions": {
+      "v1": {
+        "created_at": "2026-07-31",
+        "note": "Migrated from the old flat api/prompts/classify_chunk.txt file (pre-registry) with no content change, other than {chunk_text} -> {{CHUNK_TEXT}} to match the registry's double-brace placeholder convention. Few-shot domain-label classification prompt used by services/classifier.py when USE_TRITON=false."
+      }
+    }
   }
 }

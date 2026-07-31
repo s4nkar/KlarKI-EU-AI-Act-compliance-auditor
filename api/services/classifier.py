@@ -7,17 +7,14 @@ Both backends return the same list[DocumentChunk] with .domain populated,
 keeping the rest of the pipeline backend-agnostic.
 """
 
-from pathlib import Path
-
 import structlog
 
 from config import settings
 from models.schemas import ArticleDomain, DocumentChunk
 from services.ollama_client import OllamaClient
+from services.prompt_registry import load_prompt
 
 logger = structlog.get_logger()
-
-_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "classify_chunk.txt"
 
 # String label → ArticleDomain enum (shared by both backends)
 _LABEL_MAP: dict[str, ArticleDomain] = {
@@ -32,10 +29,6 @@ _LABEL_MAP: dict[str, ArticleDomain] = {
 }
 
 
-def _load_prompt() -> str:
-    return _PROMPT_PATH.read_text(encoding="utf-8")
-
-
 def _parse_label(raw: str) -> ArticleDomain:
     """Normalise a raw label string to ArticleDomain, defaulting to UNRELATED."""
     cleaned = raw.strip().lower().replace("-", "_").replace(" ", "_")
@@ -46,11 +39,11 @@ def _parse_label(raw: str) -> ArticleDomain:
 
 async def _classify_ollama(chunks: list[DocumentChunk], ollama: OllamaClient) -> tuple[list[DocumentChunk], str]:
     """Sequential few-shot classification via Ollama."""
-    prompt_template = _load_prompt()
+    prompt_template = load_prompt("classifier")
     total = len(chunks)
 
     for i, chunk in enumerate(chunks):
-        prompt = prompt_template.replace("{chunk_text}", chunk.text)
+        prompt = prompt_template.replace("{{CHUNK_TEXT}}", chunk.text)
         try:
             raw = await ollama.generate(prompt)
             chunk.domain = _parse_label(raw)

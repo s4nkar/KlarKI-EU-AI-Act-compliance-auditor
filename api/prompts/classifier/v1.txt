@@ -17,4 +17,4 @@ Examples:
 "Users are informed this provides AI-assisted recommendations" → transparency
 
 Classify this text. Respond with ONLY the label:
-{chunk_text}
+{{CHUNK_TEXT}}
