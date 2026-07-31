@@ -1,7 +1,7 @@
 // Model metrics dashboard: BERT, NER, specialist classifiers, version registry, eval suite.
 // Falls back to /static-metrics/bert.json for BERT when the backend API is not running.
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../components/Layout'
 import apiClient from '../api/client'
@@ -158,6 +158,7 @@ interface EvalResult {
     fp: number
     tn: number
     fn: number
+    example_match?: string | null
   }>
   // Adversarial per-concept paraphrase-robustness breakdown
   by_concept?: Record<string, {
@@ -184,6 +185,14 @@ interface EvalResult {
     violations: string[]
     gaps_checked_for_entailment?: number
     gaps_entailed?: number
+    gap_citations?: Array<{
+      title: string
+      description: string
+      entailed: boolean | null
+      score: number | null
+      passage_ref: string
+      passage_text: string
+    }>
   }>
   entailment_rate?: number | null
   nli_model_available?: boolean
@@ -1105,7 +1114,10 @@ function EvalByTypeDetail({ data }: {
 }
 
 function EvalPerTermDetail({ data }: {
-  data: Record<string, { support: number; tpr: number; tnr: number; tp: number; fp: number; tn: number; fn: number }>
+  data: Record<string, {
+    support: number; tpr: number; tnr: number; tp: number; fp: number; tn: number; fn: number
+    example_match?: string | null
+  }>
 }) {
   return (
     <table className="w-full text-xs">
@@ -1123,14 +1135,25 @@ function EvalPerTermDetail({ data }: {
         {Object.entries(data).map(([term, m]) => {
           const color = m.tpr >= 0.80 ? 'text-emerald-400' : m.tpr >= 0.60 ? 'text-amber-400' : 'text-red-400'
           return (
-            <tr key={term} className="border-b border-line last:border-0">
-              <td className="py-1 text-slate-400 capitalize font-medium">{term.replace(/_/g, ' ')}</td>
-              <td className="py-1 text-center text-slate-500 tabular-nums">{m.support}</td>
-              <td className={`py-1 text-center font-bold tabular-nums ${color}`}>{(m.tpr * 100).toFixed(0)}%</td>
-              <td className="py-1 text-center text-slate-400 tabular-nums">{(m.tnr * 100).toFixed(0)}%</td>
-              <td className="py-1 text-center text-red-500 tabular-nums">{m.fp}</td>
-              <td className="py-1 text-center text-amber-400 tabular-nums">{m.fn}</td>
-            </tr>
+            <Fragment key={term}>
+              <tr className="border-b border-line last:border-0">
+                <td className="py-1 text-slate-400 capitalize font-medium">{term.replace(/_/g, ' ')}</td>
+                <td className="py-1 text-center text-slate-500 tabular-nums">{m.support}</td>
+                <td className={`py-1 text-center font-bold tabular-nums ${color}`}>{(m.tpr * 100).toFixed(0)}%</td>
+                <td className="py-1 text-center text-slate-400 tabular-nums">{(m.tnr * 100).toFixed(0)}%</td>
+                <td className="py-1 text-center text-red-500 tabular-nums">{m.fp}</td>
+                <td className="py-1 text-center text-amber-400 tabular-nums">{m.fn}</td>
+              </tr>
+              {m.example_match && (
+                <tr className="border-b border-line last:border-0">
+                  <td colSpan={6} className="pb-1.5 pl-3">
+                    <p className="text-[11px] text-slate-500 border-l-2 border-emerald-500/30 pl-2">
+                      matched: "{m.example_match}"
+                    </p>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           )
         })}
       </tbody>
@@ -1218,10 +1241,18 @@ function EvalArticleResultsDetail({ data }: {
     violations: string[]
     gaps_checked_for_entailment?: number
     gaps_entailed?: number
+    gap_citations?: Array<{
+      title: string
+      description: string
+      entailed: boolean | null
+      score: number | null
+      passage_ref: string
+      passage_text: string
+    }>
   }>
 }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2.5">
       {Object.entries(data).map(([art, info]) => (
         <div key={art} className="text-xs">
           <div className="flex justify-between items-baseline">
@@ -1233,7 +1264,39 @@ function EvalArticleResultsDetail({ data }: {
               ) : null}
             </span>
           </div>
-          {info.violations.length > 0 && (
+
+          {info.gap_citations && info.gap_citations.length > 0 ? (
+            <div className="mt-1 space-y-1.5">
+              {info.gap_citations.map((c, i) => (
+                <div
+                  key={i}
+                  className={`pl-2 border-l-2 ${
+                    c.entailed === true ? 'border-emerald-500/40'
+                      : c.entailed === false ? 'border-red-500/40'
+                        : 'border-slate-500/30'
+                  }`}
+                >
+                  <div className="flex items-baseline gap-1.5">
+                    <span className={
+                      c.entailed === true ? 'text-emerald-400'
+                        : c.entailed === false ? 'text-red-400'
+                          : 'text-slate-400'
+                    }>
+                      {c.entailed === true ? '✓' : c.entailed === false ? '✗' : '?'}
+                    </span>
+                    <span className="text-slate-300 font-medium truncate">{c.title}</span>
+                    {c.score != null && (
+                      <span className="text-slate-500 tabular-nums text-[10px]">({c.score.toFixed(2)})</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate">{c.description}</p>
+                  <p className="text-[11px] text-slate-600 truncate">
+                    cited: <span className="text-slate-500">{c.passage_ref}</span> — "{c.passage_text}"
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : info.violations.length > 0 && (
             <div className="mt-0.5 pl-3 border-l-2 border-red-500/30 space-y-0.5">
               {info.violations.slice(0, 3).map((v, i) => (
                 <p key={i} className="text-[11px] text-slate-500 truncate">{v}</p>

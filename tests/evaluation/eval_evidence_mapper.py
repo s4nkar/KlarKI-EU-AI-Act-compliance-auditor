@@ -86,12 +86,16 @@ def run(verbose: bool = False, with_nli: bool = False) -> dict:
 
         # Update counts
         if term not in per_term:
-            per_term[term] = {"tp": 0, "fp": 0, "tn": 0, "fn": 0, "support": 0}
+            per_term[term] = {"tp": 0, "fp": 0, "tn": 0, "fn": 0, "support": 0, "example_match": None}
         per_term[term]["support"] += 1
 
         if expected and predicted:
             tp += 1
             per_term[term]["tp"] += 1
+            # Keep one example of successfully-matched evidence text per term —
+            # a reviewer needs to see *what* satisfied the obligation, not just tp count.
+            if per_term[term]["example_match"] is None:
+                per_term[term]["example_match"] = chunk_text[:150] + ("…" if len(chunk_text) > 150 else "")
         elif expected and not predicted:
             fn += 1
             per_term[term]["fn"] += 1
@@ -136,6 +140,7 @@ def run(verbose: bool = False, with_nli: bool = False) -> dict:
             "tpr": t_tpr,
             "tnr": t_tnr,
             "tp": t_tp, "fp": t_fp, "tn": t_tn, "fn": t_fn,
+            "example_match": counts.get("example_match"),
         }
 
     status = "pass" if tpr >= 0.80 else ("warn" if tpr >= 0.65 else "fail")
