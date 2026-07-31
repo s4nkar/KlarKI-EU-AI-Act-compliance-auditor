@@ -88,12 +88,12 @@ export default function RiskWizard() {
         {/* Page header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
-            <span className="badge bg-brand-100 text-brand-700 border-2 border-black">Step 1 of 2</span>
+            <span className="badge bg-brand-500/10 text-brand-400">Step 1 of 2</span>
           </div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-3xl font-bold text-white tracking-tight">
             Annex III Risk Classification
           </h1>
-          <p className="mt-2 text-slate-500 leading-relaxed">
+          <p className="mt-2 text-slate-400 leading-relaxed">
             Answer these questions to determine your AI system's risk tier under the EU AI Act.
             Your result will carry forward into the document audit.
           </p>
@@ -101,7 +101,7 @@ export default function RiskWizard() {
 
         {/* Error banner */}
         {error && (
-          <div className="mb-5 flex items-center gap-3 p-4 bg-red-50 border-2 border-black rounded-xl text-sm text-red-700">
+          <div className="mb-5 flex items-center gap-3 p-4 bg-red-500/[0.06] border border-red-500/20 rounded-xl text-sm text-red-300">
             <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -117,13 +117,13 @@ export default function RiskWizard() {
             {/* Progress bar */}
             {total > 0 && (
               <div className="mb-6">
-                <div className="flex items-center justify-between text-xs text-slate-500 mb-2">
+                <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
                   <span className="font-medium">{answered} of {total} answered</span>
                   <span>{Math.round(progress)}% complete</span>
                 </div>
-                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-surface-hover rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-brand-600 rounded-full transition-all duration-300"
+                    className="h-full bg-gradient-brand rounded-full transition-all duration-300"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
@@ -139,48 +139,48 @@ export default function RiskWizard() {
                 const cardColor =
                   answer === true
                     ? isLast
-                      ? 'border-black bg-red-50'
-                      : 'border-black bg-amber-50'
+                      ? 'border-red-500/25 bg-red-500/[0.05]'
+                      : 'border-amber-500/25 bg-amber-500/[0.05]'
                     : answer === false
-                      ? 'border-black bg-emerald-50'
-                      : 'border-black bg-white hover:border-black'
+                      ? 'border-emerald-500/25 bg-emerald-500/[0.05]'
+                      : 'border-line bg-surface hover:border-line-strong'
 
                 return (
-                  <div key={q.id} className={`rounded-xl border-2 p-4 transition-all duration-150 ${cardColor}`}>
+                  <div key={q.id} className={`rounded-xl border p-4 transition-all duration-150 ${cardColor}`}>
                     <div className="flex items-start gap-4">
                       <span className={`flex items-center justify-center w-7 h-7 rounded-lg shrink-0 text-xs font-bold mt-0.5 ${
                         answer === undefined
-                          ? 'bg-slate-100 text-slate-500'
+                          ? 'bg-surface-raised text-slate-500'
                           : answer === true && isLast
-                            ? 'bg-red-100 text-red-700'
+                            ? 'bg-red-500/10 text-red-400'
                             : answer === true
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-emerald-100 text-emerald-700'
+                              ? 'bg-amber-500/10 text-amber-400'
+                              : 'bg-emerald-500/10 text-emerald-400'
                       }`}>
                         {i + 1}
                       </span>
-                      <p className="text-sm text-slate-700 flex-1 leading-relaxed font-medium pt-0.5">
+                      <p className="text-sm text-slate-200 flex-1 leading-relaxed font-medium pt-0.5">
                         {q.text}
                       </p>
                       <div className="flex gap-2 shrink-0">
                         <button
                           onClick={() => setAnswers(a => ({ ...a, [q.id]: true }))}
-                          className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-150 ${
+                          className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold border transition-all duration-150 ${
                             answer === true
                               ? isLast
-                                ? 'bg-red-500 text-white border-black shadow-sm'
-                                : 'bg-amber-500 text-white border-black shadow-sm'
-                              : 'border-black bg-white text-slate-600 hover:border-black hover:text-amber-700 hover:bg-amber-50'
+                                ? 'bg-red-500 text-white border-red-500 shadow-sm'
+                                : 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                              : 'border-line bg-surface-raised text-slate-400 hover:border-amber-500/30 hover:text-amber-300 hover:bg-amber-500/5'
                           }`}
                         >
                           Yes
                         </button>
                         <button
                           onClick={() => setAnswers(a => ({ ...a, [q.id]: false }))}
-                          className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold border-2 transition-all duration-150 ${
+                          className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold border transition-all duration-150 ${
                             answer === false
-                              ? 'bg-emerald-500 text-white border-black shadow-sm'
-                              : 'border-black bg-white text-slate-600 hover:border-black hover:text-emerald-700 hover:bg-emerald-50'
+                              ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                              : 'border-line bg-surface-raised text-slate-400 hover:border-emerald-500/30 hover:text-emerald-300 hover:bg-emerald-500/5'
                           }`}
                         >
                           No
@@ -231,18 +231,18 @@ function ResultCard({ tier, onReset }: { tier: RiskTier; onReset: () => void }) 
   const description = TIER_DESCRIPTIONS[tier]
 
   const wrapperColor: Record<RiskTier, string> = {
-    prohibited: 'from-red-50 border-black',
-    high:       'from-amber-50 border-black',
-    limited:    'from-blue-50 border-black',
-    minimal:    'from-emerald-50 border-black',
+    prohibited: 'from-red-500/[0.07]',
+    high:       'from-amber-500/[0.07]',
+    limited:    'from-blue-500/[0.07]',
+    minimal:    'from-emerald-500/[0.07]',
   }
 
   return (
-    <div className={`card bg-gradient-to-b ${wrapperColor[tier]} to-white p-8`}>
+    <div className={`card bg-gradient-to-b ${wrapperColor[tier]} to-transparent p-8`}>
       <div className="flex flex-col items-center text-center">
         <div className="mb-4">{TIER_ICONS[tier]}</div>
         <span className={`badge text-sm px-4 py-1.5 ${className}`}>{label}</span>
-        <p className="mt-4 text-slate-600 text-sm leading-relaxed max-w-md">
+        <p className="mt-4 text-slate-400 text-sm leading-relaxed max-w-md">
           {description}
         </p>
       </div>

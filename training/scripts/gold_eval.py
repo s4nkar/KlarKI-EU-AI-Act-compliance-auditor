@@ -3,7 +3,7 @@
 The held-out validation F1 that training prints is computed on the *same*
 synthetic distribution the model trained on, so it can read ~99% while the
 model fails on realistic policy prose. The hand-curated gold datasets in
-tests/evaluation/datasets/ are the honest out-of-distribution signal.
+tests/evaluation/gold/ are the honest out-of-distribution signal.
 
 Recording `gold_macro_f1` in each model's metrics.json lets version_manager
 gate promotion on the honest number instead of the inflated val metric, and
@@ -17,14 +17,26 @@ import json
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_GOLD_DIR = _REPO_ROOT / "tests" / "evaluation" / "datasets"
+_GOLD_DIR = _REPO_ROOT / "tests" / "evaluation" / "gold"
 
-# model_type -> (gold filename, threshold the eval suite asserts)
-GOLD_SPECS: dict[str, tuple[str, float]] = {
-    "bert":       ("gold_classifier.jsonl", 0.85),
-    "actor":      ("gold_actor.jsonl",      0.80),
-    "risk":       ("gold_risk.jsonl",       0.80),
-    "prohibited": ("gold_prohibited.jsonl", 0.80),
+# Canonical promotion gates — the SINGLE source of truth for the gold thresholds.
+# These MUST stay identical to the pytest eval-suite gates in tests/evaluation/
+# so a model can never report a passing gold gate here while failing CI:
+#   bert   -> macro_f1 >= 0.85            (eval_classifier.py)
+#   actor  -> macro_f1 >= 0.80            (eval_actor.py)
+#   risk   -> accuracy >= 0.80 AND recall(high_risk)  >= 0.75            (eval_risk.py)
+#   prohibited -> accuracy >= 0.80 AND recall(prohibited) >= 0.85
+#                 AND tnr >= 0.75                                        (eval_prohibited.py)
+#
+# `macro_f1` gates use the multi-class macro-F1. Binary gates ("positive" set)
+# use the compound accuracy/recall/tnr criteria the safety-critical eval asserts.
+GOLD_SPECS: dict[str, dict] = {
+    "bert":       {"file": "gold_classifier.jsonl", "macro_f1": 0.85},
+    "actor":      {"file": "gold_actor.jsonl",      "macro_f1": 0.80},
+    "risk":       {"file": "gold_risk.jsonl",       "positive": "high_risk",
+                   "accuracy": 0.80, "recall": 0.75},
+    "prohibited": {"file": "gold_prohibited.jsonl", "positive": "prohibited",
+                   "accuracy": 0.80, "recall": 0.85, "tnr": 0.75},
 }
 
 
@@ -50,9 +62,13 @@ def evaluate_on_gold(
 ) -> dict | None:
     """Run `model` on the gold set for `model_type`.
 
-    Returns {accuracy, macro_f1, n, threshold, passed} or None if the gold
-    file / required libs are unavailable. Gold rows are filtered to the
-    model's label set so a binary model isn't scored on 8-class gold.
+    Returns {accuracy, macro_f1, n, threshold, passed, ...} or None if the gold
+    file / required libs are unavailable. Gold rows are filtered to the model's
+    label set so a binary model isn't scored on 8-class gold. For binary
+    safety-critical models (risk, prohibited) `passed` reflects the *compound*
+    accuracy/recall/tnr gate the CI eval suite asserts — not just macro_f1 — so
+    a model that would fail CI never reports a passing gold gate here. `recall`
+    and `tnr` are added to the payload for the binary models.
     """
     try:
         import torch
@@ -61,7 +77,7 @@ def evaluate_on_gold(
         spec = GOLD_SPECS.get(model_type)
         if spec is None:
             return None
-        fname, threshold = spec
+        fname = spec["file"]
         path = _GOLD_DIR / fname
         if not path.exists():
             print(f"  [gold] {fname} not found — gold gate skipped")
@@ -91,13 +107,38 @@ def evaluate_on_gold(
 
         acc = float(accuracy_score(y_true, preds))
         mf1 = float(f1_score(y_true, preds, average="macro", zero_division=0))
-        return {
+
+        payload: dict = {
             "accuracy": round(acc, 4),
             "macro_f1": round(mf1, 4),
             "n": len(rows),
-            "threshold": threshold,
-            "passed": mf1 >= threshold,
         }
+
+        positive = spec.get("positive")
+        if positive is not None:
+            # Compound binary gate (matches eval_risk.py / eval_prohibited.py).
+            tp = sum(1 for t, p in zip(y_true, preds) if t == positive and p == positive)
+            fn = sum(1 for t, p in zip(y_true, preds) if t == positive and p != positive)
+            fp = sum(1 for t, p in zip(y_true, preds) if t != positive and p == positive)
+            tn = sum(1 for t, p in zip(y_true, preds) if t != positive and p != positive)
+            recall = tp / (tp + fn) if (tp + fn) else 0.0
+            tnr = tn / (tn + fp) if (tn + fp) else 0.0
+            passed = acc >= spec["accuracy"] and recall >= spec["recall"]
+            if "tnr" in spec:
+                passed = passed and tnr >= spec["tnr"]
+            payload.update({
+                "recall": round(recall, 4),
+                "tnr": round(tnr, 4),
+                "threshold": spec["accuracy"],  # primary threshold shown in logs
+                "passed": bool(passed),
+            })
+        else:
+            threshold = spec["macro_f1"]
+            payload.update({
+                "threshold": threshold,
+                "passed": mf1 >= threshold,
+            })
+        return payload
     except Exception as exc:  # never break a training run over gold eval
         print(f"  [gold] evaluation skipped: {exc!r}")
         return None

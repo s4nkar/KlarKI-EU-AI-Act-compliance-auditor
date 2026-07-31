@@ -171,6 +171,24 @@ class VersionManager:
 
     # ── Model versioning ──────────────────────────────────────────────────────
 
+    def _point_active(self, model_type: str, target_versioned_dir: Path) -> None:
+        """Point training/artifacts/<type>/ at target_versioned_dir via a relative
+        symlink, replacing whatever is currently there.
+
+        Relative (not absolute) so the link resolves the same whether read from
+        the host (/home/.../training/artifacts/...) or a container
+        (/workspace/training/artifacts/...) — both see target_versioned_dir as a
+        sibling in the same directory.
+        """
+        active_dir = _ARTIFACTS_DIR / _ACTIVE_DIRS[model_type]
+        if active_dir.is_symlink() or active_dir.is_file():
+            active_dir.unlink()
+        elif active_dir.is_dir():
+            # Legacy physical directory from before symlink-based promotion —
+            # safe to remove, its content is byte-identical to some versioned_dir.
+            shutil.rmtree(active_dir)
+        active_dir.symlink_to(target_versioned_dir.name)
+
     def save_and_promote(
         self,
         model_type: str,
@@ -178,8 +196,9 @@ class VersionManager:
         metrics: dict,
         data_version: str | None = None,
     ) -> str:
-        """Copy source_dir to a versioned directory, compare with previous best,
-        and update the active symlink-equivalent (replace active dir contents).
+        """Move source_dir (disposable training output) into a versioned
+        directory, compare with the previous best, and point the active
+        symlink at whichever version wins. Never stores the same model twice.
 
         Returns the new version string.
         """
@@ -193,7 +212,7 @@ class VersionManager:
         versioned_dir = _ARTIFACTS_DIR / f"{_ACTIVE_DIRS[model_type]}_{version}"
         if versioned_dir.exists():
             shutil.rmtree(versioned_dir)
-        shutil.copytree(source_dir, versioned_dir)
+        shutil.move(str(source_dir), str(versioned_dir))
 
         primary_key = _METRIC_KEYS.get(model_type, "macro_f1")
         # Prefer the honest gold-set score when the new model reports it: gold is
@@ -214,6 +233,22 @@ class VersionManager:
         active_ver = section.get("active")
         if active_ver and active_ver in section["versions"] and active_ver != version:
             prev_metrics = section["versions"][active_ver].get("metrics", {})
+            prev_dir = Path(section["versions"][active_ver]["versioned_dir"])
+            # Compound gold gate as a promotion criterion: never replace a model
+            # that PASSES the honest gold gate with one that FAILS it, even if the
+            # failing model's macro_f1 is nominally higher (e.g. a prohibited model
+            # that trades away TNR). If no active model passes, fall through to the
+            # score comparison so the system always keeps its best available model.
+            new_passed = bool(metrics.get("gold_passed", True))
+            prev_passed = bool(prev_metrics.get("gold_passed", True))
+            if prev_passed and not new_passed:
+                print(
+                    f"  [version] {model_type}@{version} FAILS gold gate while "
+                    f"{model_type}@{active_ver} passes → keeping {active_ver}"
+                )
+                self._point_active(model_type, prev_dir)
+                self._save(registry)
+                return version
             # If the previous version predates gold gating, fall back to the
             # primary key for a fair like-for-like comparison.
             if metric_key == "gold_macro_f1" and "gold_macro_f1" not in prev_metrics:
@@ -226,20 +261,18 @@ class VersionManager:
                     f"> {model_type}@{active_ver} {metric_key}={prev_score:.4f} → PROMOTED"
                 )
                 section["active"] = version
+                self._point_active(model_type, versioned_dir)
             else:
                 print(
                     f"  [version] {model_type}@{version} {metric_key}={new_score:.4f} "
                     f"<= {model_type}@{active_ver} {metric_key}={prev_score:.4f} → keeping {active_ver}"
                 )
-                # Restore best model to active dir
-                best_dir = Path(section["versions"][active_ver]["versioned_dir"])
-                if best_dir.is_dir():
-                    shutil.rmtree(source_dir)
-                    shutil.copytree(best_dir, source_dir)
+                self._point_active(model_type, prev_dir)
         else:
             # First version — always promote
             section["active"] = version
             print(f"  [version] {model_type}@{version} {metric_key}={new_score:.4f} → ACTIVE (first version)")
+            self._point_active(model_type, versioned_dir)
 
         self._save(registry)
         return version

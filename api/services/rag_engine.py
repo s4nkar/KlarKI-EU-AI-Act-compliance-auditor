@@ -36,6 +36,19 @@ _DOMAIN_TO_ARTICLE: dict[ArticleDomain, int] = {
     ArticleDomain.SECURITY:                15,
 }
 
+# Fixed article-topic queries used to rank domain chunks before RAG retrieval.
+# Bilingual so they work with multilingual-e5-small on both EN and DE documents.
+# Embeddings are cached by EmbeddingService — cost is paid once per server lifetime.
+ARTICLE_RAG_QUERIES: dict[int, str] = {
+    9:  "risk management system requirements high-risk AI Risikomanagementsystem Anforderungen",
+    10: "training data governance quality management AI dataset Datenverwaltung Qualität",
+    11: "technical documentation AI system design architecture Technische Dokumentation",
+    12: "record keeping logging automated decisions audit trail Aufzeichnungspflichten",
+    13: "transparency information disclosure AI system users Transparenzpflicht Nutzer",
+    14: "human oversight monitoring control intervention Menschliche Aufsicht Kontrolle",
+    15: "accuracy robustness cybersecurity resilience AI Cybersicherheit Genauigkeit",
+}
+
 # Collections queried for regulatory passages
 _COLLECTIONS = ("eu_ai_act", "compliance_checklist")
 
@@ -263,6 +276,52 @@ def _rerank(query: str, candidates: list[dict], top_k: int) -> list[dict]:
     return [doc for doc, _ in ranked[:top_k]]
 
 
+# ── Query-chunk selection ─────────────────────────────────────────────────────
+
+async def select_query_chunks(
+    domain_chunks: list[DocumentChunk],
+    article_num: int,
+    embeddings: EmbeddingService,
+    n: int = 3,
+) -> list[DocumentChunk]:
+    """Return the top-n most relevant chunks for a given article using semantic similarity.
+
+    Embeds a fixed article-topic query (ARTICLE_RAG_QUERIES) and scores each domain
+    chunk by cosine similarity (dot product of already-normalised e5-small vectors).
+    Falls back to document order if embedding fails.
+
+    Shared by the production pipeline (audit.py) and the offline eval scripts so
+    both exercise identical RAG chunk-selection behaviour.
+    """
+    if len(domain_chunks) <= n:
+        return domain_chunks
+
+    query = ARTICLE_RAG_QUERIES.get(article_num)
+    if query is None:
+        return domain_chunks[:n]
+
+    try:
+        import numpy as np
+
+        texts = [query] + [c.text for c in domain_chunks]
+        vectors = await embeddings.embed(texts)
+        q_vec = np.array(vectors[0])
+        scores = [float(np.dot(q_vec, np.array(v))) for v in vectors[1:]]
+        ranked = sorted(zip(scores, domain_chunks), key=lambda x: x[0], reverse=True)
+        selected = [c for _, c in ranked[:n]]
+        logger.debug(
+            "chunk_relevance_ranked",
+            article=article_num,
+            total=len(domain_chunks),
+            selected=n,
+            top_score=round(scores[0], 3) if scores else 0,
+        )
+        return selected
+    except Exception as exc:
+        logger.warning("chunk_relevance_ranking_failed", article=article_num, error=str(exc))
+        return domain_chunks[:n]
+
+
 # ── Main retrieval function ──────────────────────────────────────────────────
 
 async def retrieve_requirements(
@@ -312,12 +371,16 @@ async def retrieve_requirements(
             )
             return []
 
-    # Build metadata where-filter: article_num + optional regulation
+    # Build metadata where-filter: article_num + optional regulation.
+    # ChromaDB requires multi-condition where-filters to use an explicit
+    # boolean operator — a flat {"article_num": ..., "regulation": ...} dict
+    # is rejected ("Expected where to have exactly one operator").
     where_filter: dict | None = None
     if article_num is not None:
-        where_filter = {"article_num": article_num}
         if regulation:
-            where_filter["regulation"] = regulation
+            where_filter = {"$and": [{"article_num": article_num}, {"regulation": regulation}]}
+        else:
+            where_filter = {"article_num": article_num}
     elif regulation:
         where_filter = {"regulation": regulation}
 

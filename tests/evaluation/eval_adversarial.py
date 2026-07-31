@@ -24,7 +24,7 @@ import time
 from pathlib import Path
 
 REPO_ROOT   = Path(__file__).resolve().parent.parent.parent
-ADV_PATH    = Path(__file__).parent / "datasets" / "adversarial_queries.jsonl"
+ADV_PATH    = Path(__file__).parent / "gold" / "adversarial_queries.jsonl"
 MODEL_PATH  = next(
     (p for p in [REPO_ROOT / "training" / "artifacts" / "bert_classifier", Path("/training/artifacts/bert_classifier")] if p.exists()),
     Path("/training/artifacts/bert_classifier"),

@@ -8,7 +8,9 @@
 #   pip install torch
 
 torch>=2.1.0
-transformers>=4.40.0,<6.0.0
+transformers==4.44.2             # pinned: newer transformers breaks sentence-transformers==3.0.1's
+                                  # CrossEncoder/model .to(cuda) with "Cannot copy out of meta
+                                  # tensor" (also broke ml_classifiers loading)
 datasets>=2.18.0
 scikit-learn>=1.4.0
 evaluate>=0.4.0

@@ -48,6 +48,7 @@ Environment (defaults match .env.example):
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -105,10 +106,26 @@ def _vm_snapshot_data(data_type: str, path: Path) -> str | None:
     return None
 
 
+def _prune_checkpoints(model_dir: Path) -> None:
+    """Delete HuggingFace Trainer's intermediate checkpoint-*/ subdirectories.
+
+    Trainer keeps these for resuming/load_best_model_at_end during training,
+    but by the time we get here the final weights are already written at
+    model_dir's top level (trainer.save_model()). Leaving the checkpoints
+    behind doubles their cost again once save_and_promote copies model_dir
+    into a versioned archive (e.g. actor_classifier/ + actor_classifier_v1/
+    each carrying every intermediate checkpoint alongside the final model).
+    """
+    for ckpt in model_dir.glob("checkpoint-*"):
+        if ckpt.is_dir():
+            shutil.rmtree(ckpt, ignore_errors=True)
+
+
 def _vm_save_model(model_type: str, model_dir: Path, metrics_path: Path, data_type: str | None = None) -> None:
     """Save versioned model copy and promote if best (no-op if VM unavailable)."""
     if _VM and model_dir.is_dir():
         try:
+            _prune_checkpoints(model_dir)
             metrics: dict = {}
             if metrics_path.exists():
                 with open(metrics_path, encoding="utf-8") as f:
@@ -399,19 +416,24 @@ def stage_train_bert(args: argparse.Namespace) -> bool:
             print(_c(YELLOW, "  --  artifacts/bert_classifier/ already exists -- skipping BERT training."))
             print(_c(DIM, "      Run with --retrain (data-change-aware) or --force-retrain."))
             return True
+    # Train into a disposable candidate dir, never the active path — bert_dir
+    # may already be a symlink to the current best version, and writing
+    # straight through it would clobber that version before we've compared
+    # the new one against it. save_and_promote() moves the winner into place.
+    candidate_dir = ROOT / "training" / "artifacts" / "bert_classifier_candidate"
+    if candidate_dir.exists():
+        shutil.rmtree(candidate_dir)
     cmd = [
         sys.executable,
         str(ROOT / "training" / "scripts" / "train_classifier.py"),
         "--data",       str(ROOT / "training" / "data" / "clause_labels.jsonl"),
-        "--output",     str(ROOT / "training" / "artifacts" / "bert_classifier"),
+        "--output",     str(candidate_dir),
         "--epochs",     str(args.bert_epochs),
         "--batch-size", str(args.bert_batch),
     ]
     ok = run(cmd, args.dry_run) == 0
     if ok:
-        _vm_save_model("bert", ROOT / "training" / "artifacts" / "bert_classifier",
-                       ROOT / "training" / "artifacts" / "bert_classifier" / "metrics.json",
-                       data_type="bert")
+        _vm_save_model("bert", candidate_dir, candidate_dir / "metrics.json", data_type="bert")
     return ok
 
 
@@ -467,20 +489,24 @@ def stage_train_ner(args: argparse.Namespace) -> bool:
             print(_c(YELLOW, "  --  artifacts/spacy_ner_model/model-final already exists -- skipping NER training."))
             print(_c(DIM, "      Run with --retrain (data-change-aware) or --force-retrain."))
             return True
+    # Train into a disposable candidate dir, never the active path — see the
+    # matching comment in stage_train_bert for why (active dir may be a
+    # symlink to the current best version).
+    candidate_dir = ROOT / "training" / "artifacts" / "spacy_ner_model_candidate"
+    if candidate_dir.exists():
+        shutil.rmtree(candidate_dir)
     cmd = [
         sys.executable,
         str(ROOT / "training" / "scripts" / "train_ner.py"),
         "--data",       str(ROOT / "training" / "data" / "ner_annotations.jsonl"),
-        "--output",     str(ROOT / "training" / "artifacts" / "spacy_ner_model"),
+        "--output",     str(candidate_dir),
         "--epochs",     str(args.ner_epochs),
         "--batch-size", str(args.ner_batch),
         "--patience",   str(args.ner_patience),
     ]
     ok = run(cmd, args.dry_run) == 0
     if ok:
-        _vm_save_model("ner", ROOT / "training" / "artifacts" / "spacy_ner_model",
-                       ROOT / "training" / "artifacts" / "spacy_ner_model" / "metrics.json",
-                       data_type="ner")
+        _vm_save_model("ner", candidate_dir, candidate_dir / "metrics.json", data_type="ner")
     return ok
 
 
@@ -582,18 +608,25 @@ def stage_train_specialist(args: argparse.Namespace) -> bool:
                 print(_c(YELLOW, f"  --  {classifier_type}_classifier already trained -- skipping."))
                 continue
 
+        # Train into a disposable candidate dir, never the active path — see the
+        # matching comment in stage_train_bert for why (active dir may be a
+        # symlink to the current best version).
+        candidate_dir = artifacts_dir / f"{classifier_type}_classifier_candidate"
+        if candidate_dir.exists():
+            shutil.rmtree(candidate_dir)
         cmd = [
             sys.executable,
             str(script),
             "--type", classifier_type,
             "--epochs", str(args.bert_epochs),
             "--batch-size", str(args.bert_batch),
+            "--output", str(candidate_dir),
         ]
         if run(cmd, args.dry_run) != 0:
             print(_c(RED, f"     WARNING: {classifier_type} classifier training failed, continuing"))
             all_ok = False
         else:
-            _vm_save_model(classifier_type, model_dir, model_dir / "metrics.json",
+            _vm_save_model(classifier_type, candidate_dir, candidate_dir / "metrics.json",
                            data_type=classifier_type)
 
     if not args.dry_run and all(
@@ -782,24 +815,35 @@ def main() -> None:
     if args.skip_phase5:
         skip_set.update(s[0] for s in STAGES if s[2])  # phase5_only=True
 
+    # When local-datagen-V2 is the authoritative data source (_SKIP_DATAGEN),
+    # retrain/force-retrain must NOT run the Ollama generate-* stages: they would
+    # overwrite the deterministic v2 datasets in training/data/ with LLM-noisy
+    # data, silently changing label semantics between runs (a prime source of
+    # model variance). Instead, retrain on the committed v2 data. Pass
+    # --gen-overwrite to explicitly opt back into Ollama regeneration.
+    if args.gen_overwrite or not _SKIP_DATAGEN:
+        _retrain_ids = [
+            "generate-data", "train-bert",
+            "generate-specialist-data", "train-specialist",
+            "generate-ner-data", "train-ner",
+            "export-bert", "export-e5",
+        ]
+        _retrain_gen_overwrite = True
+    else:
+        _retrain_ids = [
+            "train-bert", "train-specialist", "train-ner",
+            "export-bert", "export-e5",
+        ]
+        _retrain_gen_overwrite = False
+
     if args.force_retrain:
-        # force-retrain: regenerate data unconditionally + always train new version
-        args.gen_overwrite = True
-        run_ids = [
-            "generate-data", "train-bert",
-            "generate-specialist-data", "train-specialist",
-            "generate-ner-data", "train-ner",
-            "export-bert", "export-e5",
-        ]
+        # force-retrain: always train a new version (per-stage force flag handles it)
+        args.gen_overwrite = _retrain_gen_overwrite
+        run_ids = _retrain_ids
     elif args.retrain:
-        # retrain: regenerate data, then train only if data content actually changed
-        args.gen_overwrite = True
-        run_ids = [
-            "generate-data", "train-bert",
-            "generate-specialist-data", "train-specialist",
-            "generate-ner-data", "train-ner",
-            "export-bert", "export-e5",
-        ]
+        # retrain: train only if data content actually changed (per-stage gate)
+        args.gen_overwrite = _retrain_gen_overwrite
+        run_ids = _retrain_ids
     elif args.only_stages:
         run_ids = list(args.only_stages)
     else:

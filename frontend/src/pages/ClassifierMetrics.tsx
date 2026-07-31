@@ -46,6 +46,8 @@ interface SpecialistMetric {
   classifier_type: string
   macro_f1: number
   per_class: PerClassMetric[]
+  confusion_matrix?: number[][]
+  labels?: string[]
   train_size: number
   val_size: number
   base_model: string
@@ -119,8 +121,8 @@ interface EvalResult {
   balanced_accuracy?: number
   by_outcome?: {
     prohibited?: { n_examples: number; n_correct: number; precision: number; recall: number; f1: number }
-    high_risk?:  { n_examples: number; n_correct: number; precision: number; recall: number; f1: number }
-    minimal?:    { n_examples: number; n_correct: number }
+    high_risk?: { n_examples: number; n_correct: number; precision: number; recall: number; f1: number }
+    minimal?: { n_examples: number; n_correct: number }
   }
   mode?: string
   n_samples?: number
@@ -137,19 +139,68 @@ interface EvalResult {
   n_prohibited?: number
   n_not_prohibited?: number
   by_type?: Record<string, { recall: number; tp: number; fp: number; tn: number; fn: number }>
+  // Misclassified-example breakdowns (risk, prohibited, evidence_mapper)
+  errors?: Array<{
+    text: string
+    true?: string
+    pred?: string
+    confidence?: number
+    note?: string
+    term?: string
+    outcome?: string
+  }>
+  // Evidence mapper per-obligation-term breakdown
+  per_term?: Record<string, {
+    support: number
+    tpr: number
+    tnr: number
+    tp: number
+    fp: number
+    tn: number
+    fn: number
+  }>
+  // Adversarial per-concept paraphrase-robustness breakdown
+  by_concept?: Record<string, {
+    total: number
+    correct: number
+    failures: Array<{ text: string; expected: string; predicted: string }>
+  }>
+  // RAG per-query retrieval breakdown
+  per_query?: Array<{
+    query: string
+    expected_articles: number[]
+    'hit@1': number
+    'hit@3': number
+    'hit@5': number
+    first_hit_rank: number | null
+    top3_articles: number[]
+  }>
+  // Hallucination per-article breakdown
+  article_results?: Record<string, {
+    gaps: number
+    recommendations: number
+    passages: number
+    chunk_count: number
+    violations: string[]
+    gaps_checked_for_entailment?: number
+    gaps_entailed?: number
+  }>
+  entailment_rate?: number | null
+  nli_model_available?: boolean
 }
 
 type EvalResultsMap = Record<string, EvalResult>
 
 export default function ClassifierMetrics() {
-  const [data, setData]                   = useState<ClassifierMetricsData | null>(null)
-  const [nerData, setNerData]             = useState<NerMetricsData | null>(null)
-  const [specialistData, setSpecialist]   = useState<SpecialistMetricsData>({})
-  const [versionsData, setVersions]       = useState<VersionsData | null>(null)
-  const [evalData, setEvalData]           = useState<EvalResultsMap | null>(null)
-  const [loading, setLoading]             = useState(true)
-  const [error, setError]                 = useState<string | null>(null)
-  const [fromStatic, setFromStatic]       = useState(false)
+  const [data, setData] = useState<ClassifierMetricsData | null>(null)
+  const [nerData, setNerData] = useState<NerMetricsData | null>(null)
+  const [specialistData, setSpecialist] = useState<SpecialistMetricsData>({})
+  const [versionsData, setVersions] = useState<VersionsData | null>(null)
+  const [evalData, setEvalData] = useState<EvalResultsMap | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [fromStatic, setFromStatic] = useState(false)
+  const [modelTab, setModelTab] = useState<'all' | 'bert' | 'ner' | 'actor' | 'risk' | 'prohibited'>('all')
 
   useEffect(() => {
     Promise.allSettled([
@@ -203,19 +254,19 @@ export default function ClassifierMetrics() {
       <Layout>
         <div className="max-w-xl mx-auto py-20">
           <div className="card p-10 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <div className="w-14 h-14 rounded-2xl bg-surface-raised flex items-center justify-center mx-auto mb-4">
               <svg className="w-7 h-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
             </div>
-            <h2 className="text-lg font-bold text-slate-800 mb-2">Metrics Not Available</h2>
+            <h2 className="text-lg font-bold text-slate-100 mb-2">Metrics Not Available</h2>
             <p className="text-sm text-slate-500 mb-4">{error ?? 'Metrics not found.'}</p>
-            <div className="bg-slate-50 rounded-xl p-4 text-left mb-6">
+            <div className="bg-surface rounded-xl p-4 text-left mb-6">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">To generate metrics, run:</p>
-              <code className="block text-xs text-slate-700 font-mono leading-relaxed">
-                ./run.sh setup<br/>
-                <span className="text-slate-400"># or individually:</span><br/>
+              <code className="block text-xs text-slate-300 font-mono leading-relaxed">
+                ./run.sh setup<br />
+                <span className="text-slate-400"># or individually:</span><br />
                 python training/train_classifier.py
               </code>
             </div>
@@ -226,38 +277,177 @@ export default function ClassifierMetrics() {
     )
   }
 
-  const f1Theme = data.macro_f1 >= 0.85
-    ? { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-black', bar: '#10b981', label: 'Above 85% target' }
-    : data.macro_f1 >= 0.70
-      ? { text: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-black',  bar: '#f59e0b', label: 'Below 85% target' }
-      : { text: 'text-red-600',    bg: 'bg-red-50',    border: 'border-black',    bar: '#ef4444', label: 'Needs retraining' }
-
-  const maxCellValue = Math.max(...data.confusion_matrix.flatMap(r => r))
-
   return (
     <Layout>
       {/* Page header */}
-      <div className="mb-7">
+      <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Model Metrics</h1>
+          <h1 className="text-3xl font-extrabold text-white tracking-tight">Model Metrics</h1>
           {fromStatic && (
-            <span className="badge bg-amber-100 text-amber-700 border-2 border-black">
+            <span className="badge bg-amber-500/10 text-amber-300">
               Static snapshot · Start the API for live data
             </span>
           )}
         </div>
         <p className="text-slate-500 text-sm">
-          BERT classifier evaluation on the held-out validation set ({data.val_size} examples).
-          Base model:{' '}
-          <code className="text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-md font-mono">
-            {data.base_model}
-          </code>
+          Held-out validation metrics, per-class evaluation tables, and confusion matrices across all five model classifiers.
         </p>
       </div>
 
-      {/* ── Hero stats ──────────────────────────────────────────────────────── */}
+      {/* Model navigation tabs */}
+      <div className="flex flex-wrap items-center gap-2 mb-8 border-b border-line pb-4">
+        {[
+          { id: 'all', label: 'All Models Overview' },
+          { id: 'bert', label: 'BERT Domain Classifier' },
+          { id: 'ner', label: 'spaCy NER' },
+          { id: 'actor', label: 'Actor Classifier (Art. 3)' },
+          { id: 'risk', label: 'Risk Classifier (Art. 6)' },
+          { id: 'prohibited', label: 'Prohibited Classifier (Art. 5)' },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setModelTab(tab.id as any)}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors ${modelTab === tab.id
+                ? 'bg-brand-500 text-white shadow-sm'
+                : 'bg-surface-raised text-slate-400 hover:text-slate-200 hover:bg-surface-hover'
+              }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 1. BERT Classifier */}
+      {(modelTab === 'all' || modelTab === 'bert') && (
+        <ClassificationModelSection
+          title="BERT Domain Classifier"
+          subtitle={`EU AI Act 8-domain article classifier evaluation on held-out validation set (${data.val_size} examples).`}
+          data={data}
+          targetF1={0.85}
+          trainCmd="python training/train_classifier.py"
+        />
+      )}
+
+      {/* 2. spaCy NER Model */}
+      {(modelTab === 'all' || modelTab === 'ner') && nerData && (
+        <NerMetricsSection data={nerData} />
+      )}
+
+      {/* 3. Actor Specialist Classifier */}
+      {(modelTab === 'all' || modelTab === 'actor') && (
+        <ClassificationModelSection
+          title="Actor Classifier (Article 3)"
+          subtitle="4-class role detection: Provider / Deployer / Importer / Distributor."
+          data={specialistData.actor ?? null}
+          targetF1={0.90}
+          trainCmd="python training/scripts/train_specialist_classifiers.py --type actor"
+        />
+      )}
+
+      {/* 4. Risk Specialist Classifier */}
+      {(modelTab === 'all' || modelTab === 'risk') && (
+        <ClassificationModelSection
+          title="Risk Classifier (Article 6 + Annex III)"
+          subtitle="High-risk vs Not high-risk binary classifier gate."
+          data={specialistData.risk ?? null}
+          targetF1={0.93}
+          trainCmd="python training/scripts/train_specialist_classifiers.py --type risk"
+        />
+      )}
+
+      {/* 5. Prohibited Specialist Classifier */}
+      {(modelTab === 'all' || modelTab === 'prohibited') && (
+        <ClassificationModelSection
+          title="Prohibited Classifier (Article 5)"
+          subtitle="Article 5 prohibited practice binary classifier gate."
+          data={specialistData.prohibited ?? null}
+          targetF1={0.95}
+          trainCmd="python training/scripts/train_specialist_classifiers.py --type prohibited"
+        />
+      )}
+
+      {/* Model version registry */}
+      {versionsData && <VersionRegistrySection data={versionsData} />}
+
+      {/* Evaluation suite results */}
+      <EvaluationSection data={evalData} />
+    </Layout>
+  )
+}
+
+// ── Sub-components ──────────────────────────────────────────────────────────
+
+interface ClassificationModelSectionProps {
+  title: string
+  subtitle: string
+  data: {
+    macro_f1: number
+    per_class: PerClassMetric[]
+    confusion_matrix?: number[][]
+    labels?: string[]
+    val_size: number
+    train_size: number
+    base_model?: string
+  } | null
+  targetF1?: number
+  trainCmd?: string
+}
+
+function ClassificationModelSection({
+  title,
+  subtitle,
+  data,
+  targetF1 = 0.85,
+  trainCmd,
+}: ClassificationModelSectionProps) {
+  if (!data) {
+    return (
+      <div className="border-t border-line pt-8 mb-7">
+        <h2 className="text-2xl font-extrabold text-white tracking-tight mb-1">{title}</h2>
+        <p className="text-sm text-slate-500 mb-4">{subtitle}</p>
+        <div className="card p-6 text-center">
+          <p className="text-sm font-semibold text-slate-300 mb-1">Model Not Yet Trained</p>
+          <p className="text-xs text-slate-500 mb-3">Run setup or training script to generate model metrics.</p>
+          {trainCmd && (
+            <code className="text-xs bg-surface-raised text-brand-300 px-3 py-1.5 rounded font-mono inline-block">
+              {trainCmd}
+            </code>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const f1Theme = data.macro_f1 >= targetF1
+    ? { text: 'text-emerald-400', bg: 'bg-emerald-500/[0.06]', border: 'border-emerald-500/20', bar: '#34d399', label: `Above ${(targetF1 * 100).toFixed(0)}% target` }
+    : data.macro_f1 >= 0.70
+      ? { text: 'text-amber-400', bg: 'bg-amber-500/[0.06]', border: 'border-amber-500/20', bar: '#fbbf24', label: `Below ${(targetF1 * 100).toFixed(0)}% target` }
+      : { text: 'text-red-400', bg: 'bg-red-500/[0.06]', border: 'border-red-500/20', bar: '#f87171', label: 'Needs retraining' }
+
+  const labels = data.labels || data.per_class.map(c => c.label)
+  const maxCellValue = data.confusion_matrix && data.confusion_matrix.length > 0
+    ? Math.max(...data.confusion_matrix.flatMap(r => r), 1)
+    : 1
+
+  return (
+    <div className="border-t border-line pt-8 mb-7">
+      <div className="mb-6">
+        <h2 className="text-2xl font-extrabold text-white tracking-tight mb-1">{title}</h2>
+        <p className="text-sm text-slate-500">
+          {subtitle}
+          {data.base_model && (
+            <>
+              {' · '}Base model:{' '}
+              <code className="text-xs bg-surface-raised text-slate-300 px-1.5 py-0.5 rounded-md font-mono">
+                {data.base_model}
+              </code>
+            </>
+          )}
+        </p>
+      </div>
+
+      {/* Hero stats */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-7">
-        {/* Macro F1 hero */}
         <div className={`sm:col-span-1 card p-6 flex flex-col items-center justify-center text-center border-2 ${f1Theme.border} ${f1Theme.bg}`}>
           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Macro F1</p>
           <p className={`text-5xl font-extrabold tabular-nums ${f1Theme.text}`}>
@@ -266,12 +456,11 @@ export default function ClassifierMetrics() {
           <p className={`text-xs mt-2 font-medium ${f1Theme.text} opacity-75`}>{f1Theme.label}</p>
         </div>
 
-        {/* Other stats */}
         <div className="sm:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <MetaCard
             label="Classes"
-            value={data.labels.length}
-            sub="EU AI Act article domains"
+            value={labels.length}
+            sub="Target output categories"
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>}
           />
           <MetaCard
@@ -283,18 +472,18 @@ export default function ClassifierMetrics() {
           <MetaCard
             label="Validation Examples"
             value={data.val_size.toLocaleString()}
-            sub="15% held-out split"
+            sub="Held-out split"
             icon={<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>}
           />
         </div>
       </div>
 
-      {/* ── Per-class metrics ────────────────────────────────────────────────── */}
-      <h2 className="section-label">Per-Class Performance</h2>
+      {/* Per-class metrics table */}
+      <h3 className="section-label">Per-Class Performance</h3>
       <div className="card overflow-hidden mb-7">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-black bg-slate-50/80">
+            <tr className="border-b border-line bg-surface-raised/80">
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Class</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Precision</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Recall</th>
@@ -303,24 +492,24 @@ export default function ClassifierMetrics() {
               <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-44">F1 Score</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-line">
             {data.per_class.map((cls, i) => {
-              const theme = cls.f1 >= 0.85
-                ? { text: 'text-emerald-600', bar: '#10b981' }
+              const theme = cls.f1 >= targetF1
+                ? { text: 'text-emerald-400', bar: '#10b981' }
                 : cls.f1 >= 0.70
-                  ? { text: 'text-amber-600', bar: '#f59e0b' }
-                  : { text: 'text-red-600', bar: '#ef4444' }
+                  ? { text: 'text-amber-400', bar: '#f59e0b' }
+                  : { text: 'text-red-400', bar: '#ef4444' }
               return (
-                <tr key={i} className="hover:bg-slate-50/70 transition-colors">
+                <tr key={i} className="hover:bg-surface-raised/70 transition-colors">
                   <td className="px-5 py-3.5">
-                    <span className="font-semibold text-slate-800 capitalize">
+                    <span className="font-semibold text-slate-100 capitalize">
                       {cls.label.replace(/_/g, ' ')}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 text-center text-slate-600 tabular-nums">
+                  <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums">
                     {(cls.precision * 100).toFixed(1)}%
                   </td>
-                  <td className="px-4 py-3.5 text-center text-slate-600 tabular-nums">
+                  <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums">
                     {(cls.recall * 100).toFixed(1)}%
                   </td>
                   <td className={`px-4 py-3.5 text-center font-bold tabular-nums ${theme.text}`}>
@@ -329,7 +518,7 @@ export default function ClassifierMetrics() {
                   <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums">{cls.support}</td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="flex-1 h-2 bg-surface-raised rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-500"
                           style={{ width: `${cls.f1 * 100}%`, backgroundColor: theme.bar }}
@@ -344,90 +533,80 @@ export default function ClassifierMetrics() {
         </table>
       </div>
 
-      {/* ── Confusion matrix ─────────────────────────────────────────────────── */}
-      <h2 className="section-label">Confusion Matrix</h2>
-      <div className="card p-5 overflow-x-auto mb-7">
-        <p className="text-xs text-slate-400 mb-4">
-          Rows = actual class · Columns = predicted class ·
-          <span className="text-emerald-600 font-medium"> Green = correct</span>
-          {' · '}
-          <span className="text-red-500 font-medium">Red = misclassified</span>
-        </p>
-        <table className="text-xs border-separate border-spacing-0.5">
-          <thead>
-            <tr>
-              <th className="w-36 pr-3 text-right text-slate-400 font-normal pb-2 text-[11px]">
-                Actual ↓ / Predicted →
-              </th>
-              {data.labels.map(l => (
-                <th key={l} className="w-12 text-center pb-2 font-semibold text-slate-500 text-[10px] leading-tight">
-                  {l.replace(/_/g, ' ').split(' ').map((w, i) => <div key={i}>{w}</div>)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.confusion_matrix.map((row, ri) => (
-              <tr key={ri}>
-                <td className="pr-3 text-right font-semibold text-slate-600 py-0.5 text-[11px] whitespace-nowrap">
-                  {data.labels[ri].replace(/_/g, ' ')}
-                </td>
-                {row.map((val, ci) => {
-                  const intensity = maxCellValue > 0 ? val / maxCellValue : 0
-                  const isDiag = ri === ci
-                  const bg = isDiag
-                    ? `rgba(16, 185, 129, ${0.12 + intensity * 0.75})`
-                    : intensity > 0
-                      ? `rgba(239, 68, 68, ${0.08 + intensity * 0.55})`
-                      : 'transparent'
-                  return (
-                    <td
-                      key={ci}
-                      className="w-12 h-9 text-center font-bold rounded-lg"
-                      style={{
-                        backgroundColor: bg,
-                        color: isDiag
-                          ? intensity > 0.5 ? '#065f46' : '#047857'
-                          : intensity > 0.3 ? '#991b1b' : val > 0 ? '#7f1d1d' : '#94a3b8',
-                      }}
-                    >
-                      {val > 0 ? val : <span className="text-slate-200">·</span>}
+      {/* Confusion matrix */}
+      {data.confusion_matrix && data.confusion_matrix.length > 0 && (
+        <>
+          <h3 className="section-label">Confusion Matrix</h3>
+          <div className="card p-5 overflow-x-auto mb-7">
+            <p className="text-xs text-slate-400 mb-4">
+              Rows = actual class · Columns = predicted class ·
+              <span className="text-emerald-400 font-medium"> Green = correct</span>
+              {' · '}
+              <span className="text-red-400 font-medium">Red = misclassified</span>
+            </p>
+            <table className="text-xs border-separate border-spacing-0.5">
+              <thead>
+                <tr>
+                  <th className="w-36 pr-3 text-right text-slate-400 font-normal pb-2 text-[11px]">
+                    Actual ↓ / Predicted →
+                  </th>
+                  {labels.map(l => (
+                    <th key={l} className="w-16 text-center pb-2 font-semibold text-slate-500 text-[10px] leading-tight">
+                      {l.replace(/_/g, ' ').split(' ').map((w, i) => <div key={i}>{w}</div>)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.confusion_matrix.map((row, ri) => (
+                  <tr key={ri}>
+                    <td className="pr-3 text-right font-semibold text-slate-400 py-0.5 text-[11px] whitespace-nowrap">
+                      {labels[ri]?.replace(/_/g, ' ')}
                     </td>
-                  )
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* NER metrics section */}
-      {nerData && <NerMetricsSection data={nerData} />}
-
-      {/* Phase 3 specialist classifiers */}
-      <SpecialistSection data={specialistData} />
-
-      {/* Model version registry */}
-      {versionsData && <VersionRegistrySection data={versionsData} />}
-
-      {/* Evaluation suite results */}
-      <EvaluationSection data={evalData} />
-    </Layout>
+                    {row.map((val, ci) => {
+                      const intensity = maxCellValue > 0 ? val / maxCellValue : 0
+                      const isDiag = ri === ci
+                      const bg = isDiag
+                        ? `rgba(52, 211, 153, ${0.08 + intensity * 0.32})`
+                        : intensity > 0
+                          ? `rgba(248, 113, 113, ${0.06 + intensity * 0.32})`
+                          : 'transparent'
+                      return (
+                        <td
+                          key={ci}
+                          className="w-16 h-9 text-center font-bold rounded-lg"
+                          style={{
+                            backgroundColor: bg,
+                            color: isDiag
+                              ? '#6ee7b7'
+                              : intensity > 0.3 ? '#fca5a5' : val > 0 ? '#fca5a5' : '#64748b',
+                          }}
+                        >
+                          {val > 0 ? val : <span className="text-slate-700">·</span>}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
   )
 }
-
-// ── Sub-components ──────────────────────────────────────────────────────────
 
 function MetaCard({ label, value, sub, icon }: { label: string; value: string | number; sub: string; icon: React.ReactNode }) {
   return (
     <div className="card p-5">
       <div className="flex items-center gap-2.5 mb-3">
-        <div className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-brand-600">
+        <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center text-brand-400">
           {icon}
         </div>
       </div>
       <p className="stat-value">{value}</p>
-      <p className="text-xs font-semibold text-slate-700 mt-0.5">{label}</p>
+      <p className="text-xs font-semibold text-slate-300 mt-0.5">{label}</p>
       <p className="text-xs text-slate-400 mt-0.5">{sub}</p>
     </div>
   )
@@ -445,16 +624,22 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
       (r.per_class && Object.keys(r.per_class).length > 0) ||
       (r.per_label && Object.keys(r.per_label).length > 0) ||
       r.by_outcome ||
-      (r.checks && Object.keys(r.checks).length > 0)
+      (r.checks && Object.keys(r.checks).length > 0) ||
+      (r.by_type && Object.keys(r.by_type).length > 0) ||
+      (r.per_term && Object.keys(r.per_term).length > 0) ||
+      (r.by_concept && Object.keys(r.by_concept).length > 0) ||
+      (r.per_query && r.per_query.length > 0) ||
+      (r.article_results && Object.keys(r.article_results).length > 0) ||
+      (r.errors && r.errors.length > 0)
     )
   }
 
   if (!data) {
     return (
-      <div className="border-t border-black pt-8 mb-10">
-        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Evaluation Suite</h1>
+      <div className="border-t border-line pt-8 mb-10">
+        <h1 className="text-2xl font-extrabold text-white tracking-tight mb-1">Evaluation Suite</h1>
         <p className="text-sm text-slate-500 mb-4">
-          Run <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded-md font-mono text-slate-700">./run.sh test</code> to execute the evaluation suite and populate this section.
+          Run <code className="text-xs bg-surface-raised px-1.5 py-0.5 rounded-md font-mono text-slate-300">./run.sh test</code> to execute the evaluation suite and populate this section.
         </p>
         <div className="card p-6 text-center text-slate-400 text-sm">No evaluation results yet.</div>
       </div>
@@ -462,50 +647,52 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
   }
 
   const EVAL_META: Record<string, { label: string; desc: string }> = {
-    classifier:      { label: 'Gold Dataset',        desc: 'BERT on 80 hand-labeled examples' },
-    ner:             { label: 'NER Gold Eval',        desc: '8-label entity recognition — 31 gold sentences' },
-    rag:             { label: 'RAG Retrieval',        desc: 'Recall@K against ChromaDB' },
-    pipeline:        { label: 'End-to-End',           desc: 'Full pipeline on synthetic doc' },
-    hallucination:   { label: 'Hallucination',        desc: 'Citation & grounding checks' },
-    adversarial:     { label: 'Adversarial',          desc: '30 paraphrase robustness tests' },
-    consistency:     { label: 'Consistency',          desc: 'Determinism across repeated runs' },
-    actor:           { label: 'Actor Classifier',     desc: 'Pattern accuracy on 31 gold documents' },
-    applicability:   { label: 'Applicability Gate',   desc: 'Art.5/6/Annex III decision accuracy on 28 examples' },
-    evidence_mapper: { label: 'Evidence Mapper',      desc: 'Synonym hit-rate on 24 gold evidence chunks' },
-    risk:            { label: 'Risk Classifier (ML)', desc: 'High-risk vs not-high-risk on 40 policy-doc examples' },
-    prohibited:      { label: 'Prohibited Classifier (ML)', desc: 'Art.5 prohibited vs lawful on 40 policy-doc examples' },
+    classifier: { label: 'Gold Dataset', desc: 'BERT on 80 hand-labeled examples' },
+    ner: { label: 'NER Gold Eval', desc: '8-label entity recognition — 31 gold sentences' },
+    actor: { label: 'Actor Classifier', desc: 'Pattern accuracy on 31 gold documents' },
+    risk: { label: 'Risk Classifier (ML)', desc: 'High-risk vs not-high-risk on 40 policy-doc examples' },
+    prohibited: { label: 'Prohibited Classifier (ML)', desc: 'Art.5 prohibited vs lawful on 40 policy-doc examples' },
+    rag: { label: 'RAG Retrieval', desc: 'Recall@K against ChromaDB' },
+    pipeline: { label: 'End-to-End', desc: 'Full pipeline on synthetic doc' },
+    hallucination: { label: 'Hallucination', desc: 'Citation & grounding checks' },
+    adversarial: { label: 'Adversarial', desc: '30 paraphrase robustness tests' },
+    consistency: { label: 'Consistency', desc: 'Determinism across repeated runs' },
+    applicability: { label: 'Applicability Gate', desc: 'Art.5/6/Annex III decision accuracy on 28 examples' },
+    evidence_mapper: { label: 'Evidence Mapper', desc: 'Synonym hit-rate on 24 gold evidence chunks' },
   }
 
   const statusStyle = (s: string) =>
-    s === 'pass' ? 'bg-emerald-50 text-emerald-700 border-black'
-    : s === 'warn' ? 'bg-amber-50 text-amber-700 border-black'
-    : s === 'skip' ? 'bg-slate-100 text-slate-500 border-black'
-    : 'bg-red-50 text-red-700 border-black'
+    s === 'pass' ? 'bg-emerald-500/10 text-emerald-400'
+      : s === 'warn' ? 'bg-amber-500/10 text-amber-400'
+        : s === 'skip' ? 'bg-surface-raised text-slate-500'
+          : 'bg-red-500/10 text-red-400'
 
   const statusDot = (s: string) =>
-    s === 'pass' ? '#10b981' : s === 'warn' ? '#f59e0b' : s === 'skip' ? '#94a3b8' : '#ef4444'
+    s === 'pass' ? '#34d399' : s === 'warn' ? '#fbbf24' : s === 'skip' ? '#64748b' : '#f87171'
 
   function keyMetric(key: string, r: EvalResult): string {
-    if (key === 'classifier')      return r.macro_f1 != null ? `Macro F1 ${(r.macro_f1 * 100).toFixed(1)}%` : '—'
-    if (key === 'ner')             return r.overall_f1 != null ? `Overall F1 ${(r.overall_f1 * 100).toFixed(1)}%  ·  ${r.n_gold ?? '—'} gold samples` : '—'
-    if (key === 'rag')             return r['recall@3'] != null ? `Recall@3 ${(r['recall@3'] * 100).toFixed(1)}%  ·  MRR ${r.mrr?.toFixed(3) ?? '—'}` : '—'
-    if (key === 'adversarial')     return r.adversarial_accuracy != null ? `Accuracy ${(r.adversarial_accuracy * 100).toFixed(1)}%` : '—'
-    if (key === 'consistency')     return r.bert?.consistency_rate != null ? `BERT ${(r.bert.consistency_rate * 100).toFixed(0)}%  ·  LLM ${r.ollama?.consistency_rate != null ? (r.ollama.consistency_rate * 100).toFixed(0) + '%' : '—'}` : '—'
-    if (key === 'hallucination')   return r.citation_rate != null ? `Citation rate ${(r.citation_rate * 100).toFixed(1)}%` : '—'
-    if (key === 'pipeline')        return r.checks_passed != null ? `${r.checks_passed}/${r.checks_total} checks passed` : '—'
-    if (key === 'actor')           return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  F1 ${r.macro_f1 != null ? (r.macro_f1 * 100).toFixed(1) + '%' : '—'}` : '—'
-    if (key === 'applicability')   return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Prohibited recall ${r.by_outcome?.prohibited?.recall != null ? (r.by_outcome.prohibited.recall * 100).toFixed(0) + '%' : '—'}` : '—'
+    if (key === 'classifier') return r.macro_f1 != null ? `Macro F1 ${(r.macro_f1 * 100).toFixed(1)}%` : '—'
+    if (key === 'ner') return r.overall_f1 != null ? `Overall F1 ${(r.overall_f1 * 100).toFixed(1)}%  ·  ${r.n_gold ?? '—'} gold samples` : '—'
+    if (key === 'rag') return r['recall@3'] != null ? `Recall@3 ${(r['recall@3'] * 100).toFixed(1)}%  ·  MRR ${r.mrr?.toFixed(3) ?? '—'}` : '—'
+    if (key === 'adversarial') return r.adversarial_accuracy != null ? `Accuracy ${(r.adversarial_accuracy * 100).toFixed(1)}%` : '—'
+    if (key === 'consistency') return r.bert?.consistency_rate != null ? `BERT ${(r.bert.consistency_rate * 100).toFixed(0)}%  ·  LLM ${r.ollama?.consistency_rate != null ? (r.ollama.consistency_rate * 100).toFixed(0) + '%' : '—'}` : '—'
+    if (key === 'hallucination') return r.citation_rate != null
+      ? `Citation rate ${(r.citation_rate * 100).toFixed(1)}%${r.entailment_rate != null ? `  ·  Entailment ${(r.entailment_rate * 100).toFixed(1)}%` : ''}`
+      : '—'
+    if (key === 'pipeline') return r.checks_passed != null ? `${r.checks_passed}/${r.checks_total} checks passed` : '—'
+    if (key === 'actor') return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  F1 ${r.macro_f1 != null ? (r.macro_f1 * 100).toFixed(1) + '%' : '—'}` : '—'
+    if (key === 'applicability') return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Prohibited recall ${r.by_outcome?.prohibited?.recall != null ? (r.by_outcome.prohibited.recall * 100).toFixed(0) + '%' : '—'}` : '—'
     if (key === 'evidence_mapper') return r.tpr != null ? `TPR ${(r.tpr * 100).toFixed(1)}%  ·  TNR ${r.tnr != null ? (r.tnr * 100).toFixed(1) + '%' : '—'}` : '—'
-    if (key === 'risk')            return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Recall ${r.recall != null ? (r.recall * 100).toFixed(1) + '%' : '—'}` : '—'
-    if (key === 'prohibited')      return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Recall ${r.recall != null ? (r.recall * 100).toFixed(1) + '%' : '—'}` : '—'
+    if (key === 'risk') return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Recall ${r.recall != null ? (r.recall * 100).toFixed(1) + '%' : '—'}` : '—'
+    if (key === 'prohibited') return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Recall ${r.recall != null ? (r.recall * 100).toFixed(1) + '%' : '—'}` : '—'
     return '—'
   }
 
   return (
-    <div className="border-t border-black pt-8 mb-10">
-      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Evaluation Suite</h1>
+    <div className="border-t border-line pt-8 mb-10">
+      <h1 className="text-2xl font-extrabold text-white tracking-tight mb-1">Evaluation Suite</h1>
       <p className="text-sm text-slate-500 mb-6">
-        Results from the last <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded-md font-mono text-slate-700">./run.sh test</code> run.
+        Results from the last <code className="text-xs bg-surface-raised px-1.5 py-0.5 rounded-md font-mono text-slate-300">./run.sh test</code> run.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {Object.entries(EVAL_META).map(([key, meta]) => {
@@ -524,7 +711,7 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
                   <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{meta.label}</p>
                   <p className="text-xs text-slate-400 mt-0.5">{meta.desc}</p>
                 </div>
-                <span className={`badge border-2 ${statusStyle(r.status)}`}>
+                <span className={`badge ${statusStyle(r.status)}`}>
                   <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: statusDot(r.status) }} />
                   {r.status}
                 </span>
@@ -532,74 +719,80 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
               {r.status === 'skip'
                 ? <p className="text-xs text-slate-400 italic">{r.reason ?? 'Skipped'}</p>
                 : <div>
-                    <p className="text-sm font-semibold text-slate-700 tabular-nums">{keyMetric(key, r)}</p>
-                    {key === 'ner' && r.weak_labels && Object.keys(r.weak_labels).length > 0 && (
-                      <p className="text-xs text-amber-600 mt-1">
-                        Weak: {Object.keys(r.weak_labels).join(', ')}
-                      </p>
-                    )}
-                    {key === 'actor' && r.n_samples != null && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        {r.n_samples} gold docs · {r.mode === 'with_ml' ? 'pattern + ML' : 'pattern only'}
-                      </p>
-                    )}
-                    {key === 'applicability' && r.by_outcome && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        High-risk recall{' '}
-                        {r.by_outcome.high_risk?.recall != null
-                          ? `${(r.by_outcome.high_risk.recall * 100).toFixed(0)}%`
-                          : '—'}
-                        {' · '}
-                        {r.n_samples} examples
-                      </p>
-                    )}
-                    {key === 'evidence_mapper' && r.balanced_accuracy != null && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        Balanced acc. {(r.balanced_accuracy * 100).toFixed(1)}%
-                        {r.n_errors != null && r.n_errors > 0 && (
-                          <span className="text-amber-600"> · {r.n_errors} misses</span>
-                        )}
-                      </p>
-                    )}
-                    {key === 'risk' && r.tnr != null && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        Specificity {(r.tnr * 100).toFixed(1)}%
-                        {' · '}
-                        {r.n_samples ?? '—'} gold docs
-                        {r.f1 != null && <span> · F1 {(r.f1 * 100).toFixed(1)}%</span>}
-                      </p>
-                    )}
-                    {key === 'prohibited' && r.tnr != null && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        Specificity {(r.tnr * 100).toFixed(1)}%
-                        {' · '}
-                        {r.n_samples ?? '—'} gold docs
-                        {r.f1 != null && <span> · F1 {(r.f1 * 100).toFixed(1)}%</span>}
-                      </p>
-                    )}
-                    {hasDetails(r) && (
-                      <button
-                        onClick={() => toggle(key)}
-                        className="mt-3 flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 font-medium"
+                  <p className="text-sm font-semibold text-slate-300 tabular-nums">{keyMetric(key, r)}</p>
+                  {key === 'ner' && r.weak_labels && Object.keys(r.weak_labels).length > 0 && (
+                    <p className="text-xs text-amber-400 mt-1">
+                      Weak: {Object.keys(r.weak_labels).join(', ')}
+                    </p>
+                  )}
+                  {key === 'actor' && r.n_samples != null && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      {r.n_samples} gold docs · {r.mode === 'with_ml' ? 'pattern + ML' : 'pattern only'}
+                    </p>
+                  )}
+                  {key === 'applicability' && r.by_outcome && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      High-risk recall{' '}
+                      {r.by_outcome.high_risk?.recall != null
+                        ? `${(r.by_outcome.high_risk.recall * 100).toFixed(0)}%`
+                        : '—'}
+                      {' · '}
+                      {r.n_samples} examples
+                    </p>
+                  )}
+                  {key === 'evidence_mapper' && r.balanced_accuracy != null && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Balanced acc. {(r.balanced_accuracy * 100).toFixed(1)}%
+                      {r.n_errors != null && r.n_errors > 0 && (
+                        <span className="text-amber-400"> · {r.n_errors} misses</span>
+                      )}
+                    </p>
+                  )}
+                  {key === 'risk' && r.tnr != null && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Specificity {(r.tnr * 100).toFixed(1)}%
+                      {' · '}
+                      {r.n_samples ?? '—'} gold docs
+                      {r.f1 != null && <span> · F1 {(r.f1 * 100).toFixed(1)}%</span>}
+                    </p>
+                  )}
+                  {key === 'prohibited' && r.tnr != null && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      Specificity {(r.tnr * 100).toFixed(1)}%
+                      {' · '}
+                      {r.n_samples ?? '—'} gold docs
+                      {r.f1 != null && <span> · F1 {(r.f1 * 100).toFixed(1)}%</span>}
+                    </p>
+                  )}
+                  {hasDetails(r) && (
+                    <button
+                      onClick={() => toggle(key)}
+                      className="mt-3 flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 font-medium"
+                    >
+                      <svg
+                        className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded[key] ? 'rotate-180' : ''}`}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
                       >
-                        <svg
-                          className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded[key] ? 'rotate-180' : ''}`}
-                          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                        {expanded[key] ? 'Hide' : 'Show'} breakdown
-                      </button>
-                    )}
-                    {expanded[key] && hasDetails(r) && (
-                      <div className="mt-3 pt-3 border-t border-black">
-                        {r.per_class && <EvalPerClassDetail data={r.per_class} />}
-                        {r.per_label && <EvalPerLabelDetail data={r.per_label} />}
-                        {r.by_outcome && <EvalByOutcomeDetail data={r.by_outcome} />}
-                        {r.checks && <EvalChecksDetail data={r.checks} articleScores={r.article_scores} />}
-                      </div>
-                    )}
-                  </div>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                      {expanded[key] ? 'Hide' : 'Show'} breakdown
+                    </button>
+                  )}
+                  {expanded[key] && hasDetails(r) && (
+                    <div className="mt-3 pt-3 border-t border-line">
+                      {r.per_class && <EvalPerClassDetail data={r.per_class} />}
+                      {r.per_label && <EvalPerLabelDetail data={r.per_label} />}
+                      {r.by_outcome && <EvalByOutcomeDetail data={r.by_outcome} />}
+                      {r.checks && <EvalChecksDetail data={r.checks} articleScores={r.article_scores} />}
+                      {r.by_type && <EvalByTypeDetail data={r.by_type} />}
+                      {r.per_term && <EvalPerTermDetail data={r.per_term} />}
+                      {r.by_concept && <EvalByConceptDetail data={r.by_concept} />}
+                      {r.per_query && <EvalPerQueryDetail data={r.per_query} />}
+                      {r.article_results && <EvalArticleResultsDetail data={r.article_results} />}
+                      {r.errors && r.errors.length > 0 && <EvalErrorsDetail data={r.errors} />}
+                    </div>
+                  )}
+                </div>
               }
             </div>
           )
@@ -609,112 +802,20 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
   )
 }
 
-const SPECIALIST_META: Record<string, { label: string; desc: string; purpose: string }> = {
-  actor:      { label: 'Actor Classifier',      desc: 'Article 3 role detection', purpose: 'Provider / Deployer / Importer / Distributor' },
-  risk:       { label: 'Risk Classifier',       desc: 'Article 6 + Annex III gate', purpose: 'High-risk vs Not high-risk' },
-  prohibited: { label: 'Prohibited Classifier', desc: 'Article 5 prohibition gate', purpose: 'Prohibited vs Not prohibited' },
-}
 
-function SpecialistSection({ data }: { data: SpecialistMetricsData }) {
-  const allKeys = Object.keys(SPECIALIST_META)
-  const anyTrained = allKeys.some(k => k in data)
-
-  return (
-    <div className="border-t border-black pt-8 mb-7">
-      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">
-        Phase 3 Specialist Classifiers
-      </h1>
-      <p className="text-sm text-slate-500 mb-6">
-        Lightweight BERT classifiers for deterministic legal decision-making — no LLM calls.
-        {!anyTrained && (
-          <span className="ml-2 text-amber-600">
-            Not yet trained. Run{' '}
-            <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded-md font-mono text-slate-700">
-              ./run.sh setup
-            </code>{' '}
-            to train them.
-          </span>
-        )}
-      </p>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-7">
-        {allKeys.map(key => {
-          const meta = SPECIALIST_META[key]
-          const m = data[key]
-          if (!m) return (
-            <div key={key} className="card p-6 opacity-60 flex flex-col gap-2">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{meta.label}</p>
-              <p className="text-xs text-slate-400">{meta.desc}</p>
-              <p className="text-xs text-slate-400 italic mt-1">{meta.purpose}</p>
-              <div className="mt-4 text-sm text-slate-400">Not yet trained</div>
-            </div>
-          )
-
-          const theme = m.macro_f1 >= 0.85
-            ? { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-black', bar: '#10b981' }
-            : m.macro_f1 >= 0.70
-              ? { text: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-black',  bar: '#f59e0b' }
-              : { text: 'text-red-600',    bg: 'bg-red-50',    border: 'border-black',    bar: '#ef4444' }
-
-          return (
-            <div key={key} className={`card p-6 border-2 ${theme.border} ${theme.bg}`}>
-              <div className="mb-4">
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{meta.label}</p>
-                <p className="text-xs text-slate-500 mt-0.5">{meta.desc}</p>
-                <p className="text-xs text-slate-400 mt-0.5 italic">{meta.purpose}</p>
-              </div>
-
-              <div className="flex items-baseline gap-2 mb-4">
-                <span className={`text-4xl font-extrabold tabular-nums ${theme.text}`}>
-                  {(m.macro_f1 * 100).toFixed(1)}%
-                </span>
-                <span className="text-xs text-slate-400 font-medium">Macro F1</span>
-              </div>
-
-              <div className="text-xs text-slate-400 mb-4">
-                {m.train_size.toLocaleString()} train · {m.val_size} val ·{' '}
-                {m.per_class.length} classes
-              </div>
-
-              <div className="space-y-2">
-                {m.per_class.map((cls, i) => {
-                  const barColor = cls.f1 >= 0.85 ? '#10b981' : cls.f1 >= 0.70 ? '#f59e0b' : '#ef4444'
-                  return (
-                    <div key={i}>
-                      <div className="flex justify-between text-xs mb-0.5">
-                        <span className="text-slate-600 font-medium capitalize">{cls.label.replace(/_/g, ' ')}</span>
-                        <span className="text-slate-500 tabular-nums">{(cls.f1 * 100).toFixed(1)}%</span>
-                      </div>
-                      <div className="h-1.5 bg-white/60 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{ width: `${cls.f1 * 100}%`, backgroundColor: barColor }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 
 function VersionRegistrySection({ data }: { data: VersionsData }) {
   const MODEL_LABELS: Record<string, string> = {
-    bert:       'BERT Domain Classifier',
-    ner:        'spaCy NER',
-    actor:      'Actor Classifier',
-    risk:       'Risk Classifier',
+    bert: 'BERT Domain Classifier',
+    ner: 'spaCy NER',
+    actor: 'Actor Classifier',
+    risk: 'Risk Classifier',
     prohibited: 'Prohibited Classifier',
   }
 
   const modelEntries = Object.entries(data.models)
-  const dataEntries  = Object.entries(data.data)
+  const dataEntries = Object.entries(data.data)
 
   if (modelEntries.length === 0) return null
 
@@ -724,8 +825,8 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
   }
 
   return (
-    <div className="border-t border-black pt-8 mb-7">
-      <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">Model Version Registry</h1>
+    <div className="border-t border-line pt-8 mb-7">
+      <h1 className="text-2xl font-extrabold text-white tracking-tight mb-1">Model Version Registry</h1>
       <p className="text-sm text-slate-500 mb-6">
         Active model versions, training history, and data-version traceability across all five classifiers.
       </p>
@@ -735,7 +836,7 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
       <div className="card overflow-hidden mb-6">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-black bg-slate-50/80">
+            <tr className="border-b border-line bg-surface-raised/80">
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Model</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Active Ver.</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Score</th>
@@ -744,34 +845,34 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Versions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-line">
             {modelEntries.map(([key, info]) => {
               const active = info.versions.find(v => v.is_active)
               const scoreVal = active?.score ?? null
               const scoreTheme = scoreVal == null ? 'text-slate-400'
-                : scoreVal >= 0.85 ? 'text-emerald-600 font-bold'
-                : scoreVal >= 0.70 ? 'text-amber-600 font-bold'
-                : 'text-red-600 font-bold'
+                : scoreVal >= 0.85 ? 'text-emerald-400 font-bold'
+                  : scoreVal >= 0.70 ? 'text-amber-400 font-bold'
+                    : 'text-red-400 font-bold'
               return (
-                <tr key={key} className="hover:bg-slate-50/70 transition-colors">
+                <tr key={key} className="hover:bg-surface-raised/70 transition-colors">
                   <td className="px-5 py-3.5">
-                    <span className="font-semibold text-slate-800">{MODEL_LABELS[key] ?? key}</span>
+                    <span className="font-semibold text-slate-100">{MODEL_LABELS[key] ?? key}</span>
                   </td>
                   <td className="px-4 py-3.5 text-center">
                     {info.active
-                      ? <span className="badge bg-brand-50 text-brand-700 border-2 border-black">{info.active}</span>
+                      ? <span className="badge bg-brand-500/10 text-brand-300">{info.active}</span>
                       : <span className="text-slate-400 text-xs italic">untrained</span>}
                   </td>
                   <td className={`px-4 py-3.5 text-center tabular-nums ${scoreTheme}`}>
                     {scoreVal != null ? `${(scoreVal * 100).toFixed(1)}%` : '—'}
                   </td>
                   <td className="px-4 py-3.5 text-center">
-                    <code className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
+                    <code className="text-xs bg-surface-raised text-slate-400 px-1.5 py-0.5 rounded font-mono">
                       {info.metric_key}
                     </code>
                   </td>
                   <td className="px-4 py-3.5 text-center text-slate-500 text-xs">
-                    {active?.data_version ?? <span className="text-slate-300">—</span>}
+                    {active?.data_version ?? <span className="text-slate-600">—</span>}
                   </td>
                   <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums">
                     {info.versions.length}
@@ -798,13 +899,13 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
                 {[...info.versions].reverse().map(v => {
                   const scoreStr = v.score != null ? `${(v.score * 100).toFixed(1)}%` : '—'
                   return (
-                    <div key={v.version} className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${v.is_active ? 'bg-brand-50 border-2 border-black' : 'bg-slate-50'}`}>
+                    <div key={v.version} className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs ${v.is_active ? 'bg-brand-500/10' : 'bg-surface'}`}>
                       <div className="flex items-center gap-2">
-                        <span className={`font-bold ${v.is_active ? 'text-brand-700' : 'text-slate-500'}`}>
+                        <span className={`font-bold ${v.is_active ? 'text-brand-300' : 'text-slate-500'}`}>
                           {v.version}
                         </span>
                         {v.is_active && (
-                          <span className="badge bg-brand-100 text-brand-700 text-[10px] py-0 px-1.5">active</span>
+                          <span className="badge bg-brand-500/10 text-brand-300 text-[10px] py-0 px-1.5">active</span>
                         )}
                       </div>
                       <div className="text-right text-slate-500">
@@ -827,27 +928,27 @@ function VersionRegistrySection({ data }: { data: VersionsData }) {
           <div className="card overflow-hidden mb-2">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-black bg-slate-50/80">
+                <tr className="border-b border-line bg-surface-raised/80">
                   <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Dataset</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Active Ver.</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Records</th>
                   <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Snapshots</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
+              <tbody className="divide-y divide-line">
                 {dataEntries.map(([key, info]) => {
                   const active = info.versions.find(v => v.is_active)
                   return (
-                    <tr key={key} className="hover:bg-slate-50/70 transition-colors">
+                    <tr key={key} className="hover:bg-surface-raised/70 transition-colors">
                       <td className="px-5 py-3.5">
-                        <span className="font-semibold text-slate-800 capitalize">{key.replace(/_/g, ' ')} labels</span>
+                        <span className="font-semibold text-slate-100 capitalize">{key.replace(/_/g, ' ')} labels</span>
                       </td>
                       <td className="px-4 py-3.5 text-center">
                         {info.active
-                          ? <span className="badge bg-slate-100 text-slate-600 border-2 border-black">{info.active}</span>
+                          ? <span className="badge bg-surface-raised text-slate-400">{info.active}</span>
                           : <span className="text-slate-400 text-xs italic">none</span>}
                       </td>
-                      <td className="px-4 py-3.5 text-center text-slate-600 tabular-nums">
+                      <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums">
                         {active?.record_count?.toLocaleString() ?? '—'}
                       </td>
                       <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums">
@@ -874,7 +975,7 @@ function EvalPerClassDetail({ data }: {
   return (
     <table className="w-full text-xs">
       <thead>
-        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-black">
+        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-line">
           <th className="pb-1.5">Class</th>
           <th className="pb-1.5 text-center">P</th>
           <th className="pb-1.5 text-center">R</th>
@@ -884,10 +985,10 @@ function EvalPerClassDetail({ data }: {
       </thead>
       <tbody>
         {entries.map(([cls, m]) => {
-          const color = m.f1 >= 0.85 ? 'text-emerald-600' : m.f1 >= 0.70 ? 'text-amber-600' : 'text-red-600'
+          const color = m.f1 >= 0.85 ? 'text-emerald-400' : m.f1 >= 0.70 ? 'text-amber-400' : 'text-red-400'
           return (
-            <tr key={cls} className="border-b border-black last:border-0">
-              <td className="py-1 text-slate-600 capitalize font-medium">{cls.replace(/_/g, ' ')}</td>
+            <tr key={cls} className="border-b border-line last:border-0">
+              <td className="py-1 text-slate-400 capitalize font-medium">{cls.replace(/_/g, ' ')}</td>
               <td className="py-1 text-center text-slate-500 tabular-nums">{(m.precision * 100).toFixed(0)}%</td>
               <td className="py-1 text-center text-slate-500 tabular-nums">{(m.recall * 100).toFixed(0)}%</td>
               <td className={`py-1 text-center font-bold tabular-nums ${color}`}>{(m.f1 * 100).toFixed(1)}%</td>
@@ -906,7 +1007,7 @@ function EvalPerLabelDetail({ data }: {
   return (
     <table className="w-full text-xs">
       <thead>
-        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-black">
+        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-line">
           <th className="pb-1.5">Label</th>
           <th className="pb-1.5 text-center">F1</th>
           <th className="pb-1.5 text-center">TP</th>
@@ -916,16 +1017,16 @@ function EvalPerLabelDetail({ data }: {
       </thead>
       <tbody>
         {Object.entries(data).map(([lbl, m]) => {
-          const color = m.f1 >= 0.80 ? 'text-emerald-600' : m.f1 >= 0.60 ? 'text-amber-600' : 'text-red-600'
+          const color = m.f1 >= 0.80 ? 'text-emerald-400' : m.f1 >= 0.60 ? 'text-amber-400' : 'text-red-400'
           return (
-            <tr key={lbl} className="border-b border-black last:border-0">
+            <tr key={lbl} className="border-b border-line last:border-0">
               <td className="py-1">
-                <code className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">{lbl}</code>
+                <code className="text-[10px] bg-surface-raised text-slate-400 px-1.5 py-0.5 rounded font-mono">{lbl}</code>
               </td>
               <td className={`py-1 text-center font-bold tabular-nums ${color}`}>{(m.f1 * 100).toFixed(1)}%</td>
-              <td className="py-1 text-center text-emerald-600 tabular-nums">{m.tp}</td>
+              <td className="py-1 text-center text-emerald-400 tabular-nums">{m.tp}</td>
               <td className="py-1 text-center text-red-500 tabular-nums">{m.fp}</td>
-              <td className="py-1 text-center text-amber-600 tabular-nums">{m.fn}</td>
+              <td className="py-1 text-center text-amber-400 tabular-nums">{m.fn}</td>
             </tr>
           )
         })}
@@ -939,7 +1040,7 @@ function EvalByOutcomeDetail({ data }: { data: NonNullable<EvalResult['by_outcom
     <div className="space-y-1.5">
       {data.prohibited && (
         <div className="flex justify-between items-baseline text-xs">
-          <span className="text-slate-600 font-medium">Prohibited</span>
+          <span className="text-slate-400 font-medium">Prohibited</span>
           <span className="text-slate-500 tabular-nums">
             Recall {(data.prohibited.recall * 100).toFixed(0)}%
             {' · '}F1 {(data.prohibited.f1 * 100).toFixed(0)}%
@@ -949,7 +1050,7 @@ function EvalByOutcomeDetail({ data }: { data: NonNullable<EvalResult['by_outcom
       )}
       {data.high_risk && (
         <div className="flex justify-between items-baseline text-xs">
-          <span className="text-slate-600 font-medium">High-risk</span>
+          <span className="text-slate-400 font-medium">High-risk</span>
           <span className="text-slate-500 tabular-nums">
             Recall {(data.high_risk.recall * 100).toFixed(0)}%
             {' · '}F1 {(data.high_risk.f1 * 100).toFixed(0)}%
@@ -959,12 +1060,231 @@ function EvalByOutcomeDetail({ data }: { data: NonNullable<EvalResult['by_outcom
       )}
       {data.minimal && (
         <div className="flex justify-between items-baseline text-xs">
-          <span className="text-slate-600 font-medium">Minimal</span>
+          <span className="text-slate-400 font-medium">Minimal</span>
           <span className="text-slate-500 tabular-nums">
             {data.minimal.n_correct}/{data.minimal.n_examples} correct
           </span>
         </div>
       )}
+    </div>
+  )
+}
+
+function EvalByTypeDetail({ data }: {
+  data: Record<string, { recall: number; tp: number; fp: number; tn: number; fn: number }>
+}) {
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-line">
+          <th className="pb-1.5">Type</th>
+          <th className="pb-1.5 text-center">Recall</th>
+          <th className="pb-1.5 text-center">TP</th>
+          <th className="pb-1.5 text-center">FP</th>
+          <th className="pb-1.5 text-center">TN</th>
+          <th className="pb-1.5 text-center">FN</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Object.entries(data).map(([type, m]) => {
+          const color = m.recall >= 0.80 ? 'text-emerald-400' : m.recall >= 0.60 ? 'text-amber-400' : 'text-red-400'
+          return (
+            <tr key={type} className="border-b border-line last:border-0">
+              <td className="py-1 text-slate-400 capitalize font-medium">{type.replace(/_/g, ' ')}</td>
+              <td className={`py-1 text-center font-bold tabular-nums ${color}`}>{(m.recall * 100).toFixed(0)}%</td>
+              <td className="py-1 text-center text-emerald-400 tabular-nums">{m.tp}</td>
+              <td className="py-1 text-center text-red-500 tabular-nums">{m.fp}</td>
+              <td className="py-1 text-center text-slate-400 tabular-nums">{m.tn}</td>
+              <td className="py-1 text-center text-amber-400 tabular-nums">{m.fn}</td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
+function EvalPerTermDetail({ data }: {
+  data: Record<string, { support: number; tpr: number; tnr: number; tp: number; fp: number; tn: number; fn: number }>
+}) {
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide border-b border-line">
+          <th className="pb-1.5">Term</th>
+          <th className="pb-1.5 text-center">N</th>
+          <th className="pb-1.5 text-center">TPR</th>
+          <th className="pb-1.5 text-center">TNR</th>
+          <th className="pb-1.5 text-center">FP</th>
+          <th className="pb-1.5 text-center">FN</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Object.entries(data).map(([term, m]) => {
+          const color = m.tpr >= 0.80 ? 'text-emerald-400' : m.tpr >= 0.60 ? 'text-amber-400' : 'text-red-400'
+          return (
+            <tr key={term} className="border-b border-line last:border-0">
+              <td className="py-1 text-slate-400 capitalize font-medium">{term.replace(/_/g, ' ')}</td>
+              <td className="py-1 text-center text-slate-500 tabular-nums">{m.support}</td>
+              <td className={`py-1 text-center font-bold tabular-nums ${color}`}>{(m.tpr * 100).toFixed(0)}%</td>
+              <td className="py-1 text-center text-slate-400 tabular-nums">{(m.tnr * 100).toFixed(0)}%</td>
+              <td className="py-1 text-center text-red-500 tabular-nums">{m.fp}</td>
+              <td className="py-1 text-center text-amber-400 tabular-nums">{m.fn}</td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
+function EvalByConceptDetail({ data }: {
+  data: Record<string, { total: number; correct: number; failures: Array<{ text: string; expected: string; predicted: string }> }>
+}) {
+  return (
+    <div className="space-y-2">
+      {Object.entries(data).map(([concept, info]) => {
+        const allCorrect = info.correct === info.total
+        return (
+          <div key={concept}>
+            <div className="flex justify-between items-baseline text-xs">
+              <span className="text-slate-400 font-medium capitalize">{concept.replace(/_/g, ' ')}</span>
+              <span className={`tabular-nums font-semibold ${allCorrect ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {info.correct}/{info.total}
+              </span>
+            </div>
+            {info.failures.length > 0 && (
+              <div className="mt-1 pl-3 border-l-2 border-red-500/30 space-y-0.5">
+                {info.failures.map((f, i) => (
+                  <p key={i} className="text-[11px] text-slate-500 truncate">
+                    <span className="text-red-400">{f.expected} → {f.predicted}</span>{'  '}
+                    "{f.text}"
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function EvalPerQueryDetail({ data }: {
+  data: Array<{
+    query: string
+    expected_articles: number[]
+    'hit@1': number
+    'hit@3': number
+    'hit@5': number
+    first_hit_rank: number | null
+    top3_articles: number[]
+  }>
+}) {
+  const misses = data.filter(q => !q['hit@3'])
+  const shown = misses.length > 0 ? misses : data
+  const label = misses.length > 0 ? `Recall@3 misses (${misses.length}/${data.length})` : `All queries (${data.length})`
+  return (
+    <div>
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">{label}</p>
+      <div className="space-y-1.5">
+        {shown.slice(0, 15).map((q, i) => (
+          <div key={i} className="text-xs">
+            <div className="flex justify-between items-baseline gap-2">
+              <span className="text-slate-400 truncate">"{q.query}"</span>
+              <span className={q['hit@3'] ? 'text-emerald-400' : 'text-red-400'}>
+                {q['hit@3'] ? '✓ hit@3' : '✗ miss'}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              expected Art. {q.expected_articles.join(', ')} · retrieved Art. {q.top3_articles.join(', ') || '—'}
+            </p>
+          </div>
+        ))}
+        {shown.length > 15 && (
+          <p className="text-[11px] text-slate-500">… and {shown.length - 15} more</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function EvalArticleResultsDetail({ data }: {
+  data: Record<string, {
+    gaps: number
+    recommendations: number
+    passages: number
+    chunk_count: number
+    violations: string[]
+    gaps_checked_for_entailment?: number
+    gaps_entailed?: number
+  }>
+}) {
+  return (
+    <div className="space-y-1.5">
+      {Object.entries(data).map(([art, info]) => (
+        <div key={art} className="text-xs">
+          <div className="flex justify-between items-baseline">
+            <span className="text-slate-400 font-medium">Article {art}</span>
+            <span className={info.violations.length === 0 ? 'text-emerald-400' : 'text-red-400'}>
+              {info.passages} passages · {info.gaps} gaps
+              {info.gaps_checked_for_entailment ? (
+                <> · entailed {info.gaps_entailed}/{info.gaps_checked_for_entailment}</>
+              ) : null}
+            </span>
+          </div>
+          {info.violations.length > 0 && (
+            <div className="mt-0.5 pl-3 border-l-2 border-red-500/30 space-y-0.5">
+              {info.violations.slice(0, 3).map((v, i) => (
+                <p key={i} className="text-[11px] text-slate-500 truncate">{v}</p>
+              ))}
+              {info.violations.length > 3 && (
+                <p className="text-[11px] text-slate-500">… and {info.violations.length - 3} more</p>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function EvalErrorsDetail({ data }: {
+  data: Array<{
+    text: string
+    true?: string
+    pred?: string
+    confidence?: number
+    note?: string
+    term?: string
+    outcome?: string
+  }>
+}) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
+        Misclassified examples ({data.length})
+      </p>
+      <div className="space-y-1.5">
+        {data.slice(0, 15).map((e, i) => (
+          <div key={i} className="text-xs">
+            <div className="flex items-baseline gap-2">
+              {e.term ? (
+                <span className="text-red-400 font-medium capitalize">{e.term.replace(/_/g, ' ')} · {e.outcome?.replace(/_/g, ' ')}</span>
+              ) : (
+                <span className="text-red-400 font-medium">{e.true} → {e.pred}</span>
+              )}
+              {e.confidence != null && (
+                <span className="text-slate-500 tabular-nums">conf {(e.confidence * 100).toFixed(0)}%</span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 truncate">"{e.text}"{e.note ? `  — ${e.note}` : ''}</p>
+          </div>
+        ))}
+        {data.length > 15 && (
+          <p className="text-[11px] text-slate-500">… and {data.length - 15} more</p>
+        )}
+      </div>
     </div>
   )
 }
@@ -979,18 +1299,18 @@ function EvalChecksDetail({ data, articleScores }: {
         {Object.entries(data).map(([check, passed]) => (
           <div key={check} className="flex items-center gap-1 text-xs">
             <span className={passed ? 'text-emerald-500' : 'text-red-500'}>{passed ? '✓' : '✗'}</span>
-            <span className={`${passed ? 'text-slate-600' : 'text-red-600'} truncate`}>
+            <span className={`${passed ? 'text-slate-400' : 'text-red-400'} truncate`}>
               {check.replace(/_/g, ' ')}
             </span>
           </div>
         ))}
       </div>
       {articleScores && Object.keys(articleScores).length > 0 && (
-        <div className="mt-2 pt-2 border-t border-black">
+        <div className="mt-2 pt-2 border-t border-line">
           <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Article Scores</p>
           <div className="flex gap-3 flex-wrap">
             {Object.entries(articleScores).map(([art, score]) => {
-              const color = score >= 75 ? 'text-emerald-600' : score >= 50 ? 'text-amber-600' : 'text-red-600'
+              const color = score >= 75 ? 'text-emerald-400' : score >= 50 ? 'text-amber-400' : 'text-red-400'
               return (
                 <div key={art} className="text-center">
                   <div className={`text-sm font-bold tabular-nums ${color}`}>{score}%</div>
@@ -1007,19 +1327,19 @@ function EvalChecksDetail({ data, articleScores }: {
 
 function NerMetricsSection({ data }: { data: NerMetricsData }) {
   const theme = data.overall_f1 >= 0.80
-    ? { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-black', label: 'Above 80% target' }
+    ? { text: 'text-emerald-400', bg: 'bg-emerald-500/[0.06]', border: 'border-emerald-500/20', label: 'Above 80% target' }
     : data.overall_f1 >= 0.60
-      ? { text: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-black',  label: 'Below 80% target' }
-      : { text: 'text-red-600',    bg: 'bg-red-50',    border: 'border-black',    label: 'Needs retraining' }
+      ? { text: 'text-amber-400', bg: 'bg-amber-500/[0.06]', border: 'border-amber-500/20', label: 'Below 80% target' }
+      : { text: 'text-red-400', bg: 'bg-red-500/[0.06]', border: 'border-red-500/20', label: 'Needs retraining' }
 
   return (
     <>
-      <div className="border-t border-black pt-8 mb-7">
-        <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight mb-1">NER Model Metrics</h1>
+      <div className="border-t border-line pt-8 mb-7">
+        <h1 className="text-2xl font-extrabold text-white tracking-tight mb-1">NER Model Metrics</h1>
         <p className="text-sm text-slate-500">
           spaCy entity recogniser on the held-out dev set ({data.val_size} sentences).
           Train: {data.train_size} · Final loss:{' '}
-          <code className="text-xs bg-slate-100 px-1.5 py-0.5 rounded-md font-mono text-slate-700">
+          <code className="text-xs bg-surface-raised px-1.5 py-0.5 rounded-md font-mono text-slate-300">
             {data.final_loss.toFixed(4)}
           </code>
         </p>
@@ -1045,7 +1365,7 @@ function NerMetricsSection({ data }: { data: NerMetricsData }) {
       <div className="card overflow-hidden mb-10">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-black bg-slate-50/80">
+            <tr className="border-b border-line bg-surface-raised/80">
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Entity Type</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Precision</th>
               <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide text-center">Recall</th>
@@ -1053,25 +1373,25 @@ function NerMetricsSection({ data }: { data: NerMetricsData }) {
               <th className="px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-44">F1 Score</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50">
+          <tbody className="divide-y divide-line">
             {data.per_label.map((row, i) => {
               const t = row.f1 >= 0.80
-                ? { text: 'text-emerald-600', bar: '#10b981' }
+                ? { text: 'text-emerald-400', bar: '#10b981' }
                 : row.f1 >= 0.60
-                  ? { text: 'text-amber-600', bar: '#f59e0b' }
-                  : { text: 'text-red-600', bar: '#ef4444' }
+                  ? { text: 'text-amber-400', bar: '#f59e0b' }
+                  : { text: 'text-red-400', bar: '#ef4444' }
               return (
-                <tr key={i} className="hover:bg-slate-50/70 transition-colors">
+                <tr key={i} className="hover:bg-surface-raised/70 transition-colors">
                   <td className="px-5 py-3.5">
-                    <code className="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded-md font-mono font-semibold">
+                    <code className="text-xs bg-surface-raised text-slate-300 px-2 py-1 rounded-md font-mono font-semibold">
                       {row.label}
                     </code>
                   </td>
-                  <td className="px-4 py-3.5 text-center text-slate-600 tabular-nums">{(row.precision * 100).toFixed(1)}%</td>
-                  <td className="px-4 py-3.5 text-center text-slate-600 tabular-nums">{(row.recall * 100).toFixed(1)}%</td>
+                  <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums">{(row.precision * 100).toFixed(1)}%</td>
+                  <td className="px-4 py-3.5 text-center text-slate-400 tabular-nums">{(row.recall * 100).toFixed(1)}%</td>
                   <td className={`px-4 py-3.5 text-center font-bold tabular-nums ${t.text}`}>{(row.f1 * 100).toFixed(1)}%</td>
                   <td className="px-5 py-3.5">
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-2 bg-surface-raised rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{ width: `${row.f1 * 100}%`, backgroundColor: t.bar }}

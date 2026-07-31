@@ -53,9 +53,17 @@ _sed_inplace() {
   fi
 }
 
-# Returns 0 if an NVIDIA GPU is reachable via nvidia-smi, 1 otherwise.
+# Returns 0 only if Docker can actually run GPU containers, 1 otherwise.
+# A host GPU (nvidia-smi) is necessary but NOT sufficient: Docker also needs the
+# NVIDIA Container Toolkit runtime. Checking only nvidia-smi made ./run.sh apply
+# the GPU compose overlay on machines without the toolkit, so container start
+# failed with "could not select device driver nvidia" instead of falling back to
+# CPU. Set KLARKI_FORCE_CPU=1 to force CPU mode even when the GPU is usable.
 _has_nvidia_gpu() {
-  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1
+  [ "${KLARKI_FORCE_CPU:-0}" = "1" ] && return 1
+  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi >/dev/null 2>&1 || return 1
+  # Docker must expose the nvidia runtime (installed by nvidia-container-toolkit).
+  docker info --format '{{.Runtimes}}' 2>/dev/null | grep -qi nvidia
 }
 
 # Build the shared torch layer (docker/torch-base.Dockerfile) that api/Dockerfile,

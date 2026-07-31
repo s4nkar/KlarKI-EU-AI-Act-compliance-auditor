@@ -61,12 +61,12 @@ export default function Upload() {
         {/* Page header */}
         <div className="mb-8 text-center">
           <div className="flex items-center justify-center gap-2 mb-3">
-            <span className="badge bg-brand-100 text-brand-700 border-2 border-black">Step 2 of 2</span>
+            <span className="badge bg-brand-500/10 text-brand-400">Step 2 of 2</span>
           </div>
-          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h1 className="text-3xl font-bold text-white tracking-tight">
             Upload Documentation
           </h1>
-          <p className="mt-2 text-slate-500 max-w-lg mx-auto leading-relaxed">
+          <p className="mt-2 text-slate-400 max-w-lg mx-auto leading-relaxed">
             Upload your AI system documentation to analyse compliance against EU AI Act Articles 9–15 and GDPR.
           </p>
         </div>
@@ -75,15 +75,15 @@ export default function Upload() {
         {wizardTier ? (
           <WizardTierBanner tier={wizardTier} />
         ) : (
-          <div className="mb-5 flex items-center gap-3 p-4 bg-amber-50 border-2 border-black rounded-xl text-sm">
-            <svg className="w-4 h-4 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="mb-5 flex items-center gap-3 p-4 bg-amber-500/[0.06] border border-amber-500/20 rounded-xl text-sm">
+            <svg className="w-4 h-4 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
-            <span className="text-amber-700 flex-1">
+            <span className="text-amber-300/90 flex-1">
               No risk tier selected. Complete the Annex III wizard first for a more accurate audit.
             </span>
-            <Link to="/" className="shrink-0 text-sm font-semibold text-amber-800 hover:text-amber-900 underline">
+            <Link to="/" className="shrink-0 text-sm font-semibold text-amber-300 hover:text-amber-200 underline">
               Go to Step 1 →
             </Link>
           </div>
@@ -93,31 +93,31 @@ export default function Upload() {
           /* Running state */
           <div className="card p-10 text-center">
             <div className="mb-8">
-              <div className="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-brand-600 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-16 h-16 rounded-2xl bg-brand-500/10 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-brand-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                     d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
-              <h2 className="text-lg font-bold text-slate-800 mb-1">Analysing your document</h2>
-              <p className="text-sm text-slate-400">This typically takes 2–5 minutes depending on length.</p>
+              <h2 className="text-lg font-semibold text-slate-100 mb-1">Analysing your document</h2>
+              <p className="text-sm text-slate-500">This typically takes 2–5 minutes depending on length.</p>
             </div>
             <LoadingSpinner status={status!} />
           </div>
         ) : (
           /* Input form */
-          <div className="card shadow-card">
+          <div className="card">
             {/* Mode tabs */}
-            <div className="p-5 border-b border-black">
-              <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+            <div className="p-5 border-b border-line">
+              <div className="flex gap-1 bg-surface-raised rounded-xl p-1 w-fit">
                 {(['file', 'text'] as InputMode[]).map(m => (
                   <button
                     key={m}
                     onClick={() => setMode(m)}
                     className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-150 ${
                       mode === m
-                        ? 'bg-white text-brand-700 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700'
+                        ? 'bg-surface-hover text-white shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
                     {m === 'file' ? (
@@ -150,7 +150,7 @@ export default function Upload() {
               )}
 
               {error && (
-                <div className="mt-4 flex items-start gap-2.5 p-3.5 bg-red-50 border-2 border-black rounded-xl text-sm text-red-700">
+                <div className="mt-4 flex items-start gap-2.5 p-3.5 bg-red-500/[0.06] border border-red-500/20 rounded-xl text-sm text-red-300">
                   <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -160,8 +160,8 @@ export default function Upload() {
               )}
             </div>
 
-            <div className="px-5 pb-5 flex items-center justify-between gap-4 border-t border-black pt-4">
-              <p className="text-xs text-slate-400 flex items-center gap-1.5">
+            <div className="px-5 pb-5 flex items-center justify-between gap-4 border-t border-line pt-4">
+              <p className="text-xs text-slate-500 flex items-center gap-1.5">
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                     d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -190,14 +190,14 @@ function WizardTierBanner({ tier }: { tier: RiskTier }) {
   const { label, className } = riskTierLabel(tier)
 
   return (
-    <div className="mb-5 flex items-center gap-3 p-4 bg-slate-50 border-2 border-black rounded-xl text-sm">
-      <svg className="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div className="mb-5 flex items-center gap-3 p-4 bg-surface border border-line rounded-xl text-sm">
+      <svg className="w-4 h-4 text-slate-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
           d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
       </svg>
-      <span className="text-slate-600">Risk tier from Step 1:</span>
+      <span className="text-slate-400">Risk tier from Step 1:</span>
       <span className={`badge ${className}`}>{label}</span>
-      <span className="text-slate-400 text-xs ml-auto">Recorded alongside your audit results</span>
+      <span className="text-slate-500 text-xs ml-auto">Recorded alongside your audit results</span>
     </div>
   )
 }

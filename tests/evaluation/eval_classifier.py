@@ -1,9 +1,9 @@
 """
 Evaluation 1 — Gold Dataset Classification.
 
-Loads the 80-example hand-labeled gold dataset and runs the trained BERT
-model directly (no API required).  Produces accuracy, macro F1, and
-per-class precision/recall/F1.
+Loads the hand-labeled gold dataset (datasets/gold_classifier.jsonl) and runs
+the trained BERT model directly (no API required).  Produces accuracy, macro F1,
+and per-class precision/recall/F1.
 
 Usage:
     python tests/evaluation/eval_classifier.py
@@ -20,7 +20,7 @@ from pathlib import Path
 
 # ── paths ──────────────────────────────────────────────────────────────────
 REPO_ROOT   = Path(__file__).resolve().parent.parent.parent
-GOLD_PATH   = Path(__file__).parent / "datasets" / "gold_classifier.jsonl"
+GOLD_PATH   = Path(__file__).parent / "gold" / "gold_classifier.jsonl"
 MODEL_PATH  = next(
     (p for p in [REPO_ROOT / "training" / "artifacts" / "bert_classifier", Path("/training/artifacts/bert_classifier")] if p.exists()),
     Path("/training/artifacts/bert_classifier"),
@@ -91,7 +91,10 @@ def run(verbose: bool = False) -> dict:
         batch  = texts[i : i + batch_size]
         inputs = tokenizer(
             batch, padding=True, truncation=True,
-            max_length=512, return_tensors="pt",
+            # Must match the training max_length (train_classifier.py --max-length,
+            # default 256). Evaluating at a different length silently changes the
+            # truncation point vs training. Keep these two in lockstep.
+            max_length=256, return_tensors="pt",
         )
         with torch.no_grad():
             logits = model(**inputs).logits

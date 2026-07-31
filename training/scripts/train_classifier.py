@@ -218,7 +218,11 @@ def main() -> None:
     parser.add_argument("--epochs", type=int, default=12,
                         help="Max epochs — early stopping triggers before this (default: 12)")
     parser.add_argument("--batch-size", type=int, default=16,
-                        help="Per-device batch size (effective batch = 2x via grad accumulation)")
+                        help="Per-device micro-batch (effective batch is held at 32 via "
+                             "adaptive gradient accumulation)")
+    parser.add_argument("--grad-checkpointing", action="store_true",
+                        help="Trade compute for memory (exact same results, ~20%% slower). "
+                             "Auto-enabled on GPUs with <6GB VRAM to avoid CUDA OOM.")
     parser.add_argument("--lr", type=float, default=2e-5,
                         help="Peak learning rate with cosine decay (default: 2e-5)")
     parser.add_argument("--max-length", type=int, default=256,
@@ -231,6 +235,14 @@ def main() -> None:
     print(f"Loading data from {args.data}")
     records = load_jsonl(args.data)
     print(f"  Loaded {len(records)} examples across {len(LABELS)} classes")
+
+    # Surface which generator(s) produced this data — there are currently 3
+    # (scripts/, local-datagen, local-datagen-V2) and silently training on an
+    # unexpected one has caused real confusion before.
+    from collections import Counter
+    gen_counts = Counter(r.get("generator", "unknown") for r in records)
+    colour = _AMBER if len(gen_counts) > 1 or "unknown" in gen_counts else _GREEN
+    print(_c(colour, f"  Generator provenance: {dict(gen_counts)}"))
 
     train_data, val_data = split_dataset(records, seed=args.seed)
     print(f"  Train: {len(train_data)}, Val: {len(val_data)}")
@@ -266,13 +278,33 @@ def main() -> None:
     print(f"  Using device: {device}")
     model = model.to(device)
 
+    # Fit modest GPUs (e.g. 4GB laptop cards) without changing training dynamics:
+    # shrink the micro-batch and turn on gradient checkpointing when VRAM is tight.
+    grad_checkpointing = args.grad_checkpointing
+    if torch.cuda.is_available():
+        vram_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+        if vram_gb < 6.0:
+            if args.batch_size > 8:
+                print(_c(_AMBER, f"  [vram] GPU has {vram_gb:.1f} GB — reducing micro-batch "
+                                 f"{args.batch_size}->8 and enabling gradient checkpointing."))
+                args.batch_size = 8
+            grad_checkpointing = True
+
+    # Hold the effective batch at ~32 regardless of micro-batch size, so smaller
+    # micro-batches (for memory) don't change the optimisation trajectory.
+    _EFFECTIVE_BATCH = 32
+    grad_accum = max(1, _EFFECTIVE_BATCH // args.batch_size)
+    print(_c(_DIM, f"  Micro-batch={args.batch_size}, grad-accum={grad_accum} "
+                   f"(effective batch={args.batch_size * grad_accum}), "
+                   f"grad-checkpointing={grad_checkpointing}"))
+
     training_args = TrainingArguments(
         output_dir=args.output,
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
-        # Gradient accumulation: effective batch = batch_size * 2 (e.g. 32 with bs=16)
-        gradient_accumulation_steps=2,
+        gradient_accumulation_steps=grad_accum,
+        gradient_checkpointing=grad_checkpointing,
         learning_rate=args.lr,
         weight_decay=0.01,
         # Cosine schedule with 6% warmup — smoother decay than linear, better for ~10 epochs
@@ -429,6 +461,7 @@ def main() -> None:
         metrics_payload["gold_macro_f1"] = gold["macro_f1"]
         metrics_payload["gold_accuracy"] = gold["accuracy"]
         metrics_payload["gold_n"] = gold["n"]
+        metrics_payload["gold_passed"] = bool(gold["passed"])
         colour = _GREEN if gold["passed"] else _RED
         verdict = "PASS" if gold["passed"] else "FAIL"
         gold_f1_str = _c(colour, f"{gold['macro_f1']:.4f}")
@@ -436,8 +469,8 @@ def main() -> None:
         print(f"\nGold-set macro F1    : {gold_f1_str}  "
               f"(threshold {gold['threshold']:.2f}, n={gold['n']})  [{verdict_str}]")
         if not gold["passed"]:
-            print(_c(_RED, "  [!!] Below gold threshold — model will NOT be promoted "
-                           "(synthetic val is misleadingly high; fix training data)."))
+            print(_c(_RED, "  [!!] Fails gold gate — will NOT be promoted over a passing "
+                           "version (synthetic val is misleadingly high; fix training data)."))
 
     metrics_path = output_path / "metrics.json"
     with open(metrics_path, "w", encoding="utf-8") as f:

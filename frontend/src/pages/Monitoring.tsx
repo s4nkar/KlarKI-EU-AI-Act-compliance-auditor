@@ -56,9 +56,9 @@ interface MonitoringData {
 // ── Palette ───────────────────────────────────────────────────────────────────
 
 const COLORS = {
-  success: '#16a34a', failed: '#dc2626', active: '#2563eb',
-  nodes: ['#3b82f6', '#8b5cf6', '#f59e0b'],
-  stages: '#6366f1',
+  success: '#34d399', failed: '#f87171', active: '#60a5fa',
+  nodes: ['#60a5fa', '#a78bfa', '#fbbf24'],
+  stages: '#7c6ef5',
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
@@ -70,16 +70,16 @@ function formatUptime(s: number) {
 }
 
 function StatusDot({ ok }: { ok: boolean }) {
-  return <span className={`inline-block w-2.5 h-2.5 rounded-full mr-2 ${ok ? 'bg-green-500' : 'bg-red-500'}`} />
+  return <span className={`inline-block w-2.5 h-2.5 rounded-full mr-2 ${ok ? 'bg-emerald-500' : 'bg-red-500'}`} />
 }
 
 function StatCard({ label, value, sub, accent }: {
   label: string; value: string | number; sub?: string; accent?: string
 }) {
   return (
-    <div className={`bg-white border-2 rounded-lg p-4 ${accent ?? 'border-black'}`}>
-      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{label}</div>
-      <div className="text-2xl font-bold text-slate-800">{value}</div>
+    <div className={`bg-surface border rounded-lg p-4 ${accent ?? 'border-line'}`}>
+      <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{label}</div>
+      <div className="text-2xl font-bold text-white">{value}</div>
       {sub && <div className="text-xs text-slate-500 mt-1">{sub}</div>}
     </div>
   )
@@ -87,18 +87,30 @@ function StatCard({ label, value, sub, accent }: {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 mt-8 border-l-4 border-black pl-3">
+    <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 mt-8 border-l-4 border-brand-500/40 pl-3">
       {children}
     </h2>
   )
 }
+
+// Shared dark-mode styling for Recharts primitives (grid, axes, tooltip).
+const CHART_GRID_COLOR = 'rgba(255,255,255,0.08)'
+const CHART_TICK = { fontSize: 11, fill: '#8b8b9a' }
+const CHART_TOOLTIP_STYLE = {
+  background: '#17171f',
+  border: '1px solid rgba(255,255,255,0.1)',
+  borderRadius: 8,
+  color: '#e2e2ea',
+  fontSize: 12,
+}
+const CHART_LEGEND_STYLE = { fontSize: 12, color: '#8b8b9a' }
 
 // ── Charts ────────────────────────────────────────────────────────────────────
 
 function PipelineDonut({ pipeline }: { pipeline: PipelineStats }) {
   if (pipeline.total === 0) {
     return (
-      <div className="flex items-center justify-center h-44 text-slate-400 text-sm">
+      <div className="flex items-center justify-center h-44 text-slate-500 text-sm">
         No audits yet
       </div>
     )
@@ -122,13 +134,14 @@ function PipelineDonut({ pipeline }: { pipeline: PipelineStats }) {
           outerRadius={75}
           paddingAngle={3}
           dataKey="value"
+          stroke="#121218"
         >
           {pieData.map((_, idx) => (
             <Cell key={idx} fill={donutColors[idx % donutColors.length]} />
           ))}
         </Pie>
-        <Tooltip />
-        <Legend iconType="circle" iconSize={8} />
+        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+        <Legend iconType="circle" iconSize={8} wrapperStyle={CHART_LEGEND_STYLE} />
       </PieChart>
     </ResponsiveContainer>
   )
@@ -142,17 +155,17 @@ function StageTimingChart({ stages }: { stages: Record<string, StageStat> }) {
   }))
 
   if (data.length === 0) {
-    return <div className="flex items-center justify-center h-44 text-slate-400 text-sm">No stage data yet</div>
+    return <div className="flex items-center justify-center h-44 text-slate-500 text-sm">No stage data yet</div>
   }
 
   return (
     <ResponsiveContainer width="100%" height={200}>
       <BarChart data={data} layout="vertical" margin={{ left: 16, right: 24, top: 4, bottom: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-        <XAxis type="number" unit="s" tick={{ fontSize: 11 }} />
-        <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80} />
-        <Tooltip formatter={(v) => [`${v}s`]} />
-        <Legend iconType="square" iconSize={10} />
+        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={CHART_GRID_COLOR} />
+        <XAxis type="number" unit="s" tick={CHART_TICK} />
+        <YAxis type="category" dataKey="name" tick={CHART_TICK} width={80} />
+        <Tooltip formatter={(v) => [`${v}s`]} contentStyle={CHART_TOOLTIP_STYLE} />
+        <Legend iconType="square" iconSize={10} wrapperStyle={CHART_LEGEND_STYLE} />
         <Bar dataKey="avg" name="Avg" fill={COLORS.stages} radius={[0, 4, 4, 0]} />
         <Bar dataKey="p95" name="p95" fill="#a5b4fc" radius={[0, 4, 4, 0]} />
       </BarChart>
@@ -170,16 +183,16 @@ function GraphNodeChart({ nodes }: { nodes: Record<string, GraphNodeStat> }) {
   }))
 
   if (data.length === 0) {
-    return <div className="flex items-center justify-center h-44 text-slate-400 text-sm">No LangGraph data yet</div>
+    return <div className="flex items-center justify-center h-44 text-slate-500 text-sm">No LangGraph data yet</div>
   }
 
   return (
     <ResponsiveContainer width="100%" height={200}>
       <BarChart data={data} margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-        <YAxis unit="s" tick={{ fontSize: 11 }} />
-        <Tooltip formatter={(v) => [`${v}s`]} />
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
+        <XAxis dataKey="name" tick={{ ...CHART_TICK, fontSize: 12 }} />
+        <YAxis unit="s" tick={CHART_TICK} />
+        <Tooltip formatter={(v) => [`${v}s`]} contentStyle={CHART_TOOLTIP_STYLE} />
         <Bar dataKey="avg_s" name="Avg latency" radius={[4, 4, 0, 0]}>
           {data.map((d, idx) => <Cell key={idx} fill={d.color} />)}
         </Bar>
@@ -197,11 +210,11 @@ function ChromaBarChart({ collections }: { collections: Record<string, number | 
   return (
     <ResponsiveContainer width="100%" height={160}>
       <BarChart data={data} margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-        <YAxis tick={{ fontSize: 11 }} />
-        <Tooltip />
-        <Bar dataKey="docs" name="Documents" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={CHART_GRID_COLOR} />
+        <XAxis dataKey="name" tick={CHART_TICK} />
+        <YAxis tick={CHART_TICK} />
+        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+        <Bar dataKey="docs" name="Documents" fill="#818cf8" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   )
@@ -209,17 +222,17 @@ function ChromaBarChart({ collections }: { collections: Record<string, number | 
 
 function MemoryBar({ used, total }: { used: number; total: number }) {
   const pct = total > 0 ? Math.round((used / total) * 100) : 0
-  const color = pct > 85 ? 'bg-red-500' : pct > 65 ? 'bg-amber-500' : 'bg-green-500'
+  const color = pct > 85 ? 'bg-red-500' : pct > 65 ? 'bg-amber-500' : 'bg-emerald-500'
   return (
     <div>
       <div className="flex justify-between text-xs text-slate-500 mb-1">
         <span>{used.toLocaleString()} MB used</span>
         <span>{pct}%</span>
       </div>
-      <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+      <div className="w-full h-3 bg-surface-hover rounded-full overflow-hidden">
         <div className={`h-3 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
       </div>
-      <div className="text-xs text-slate-400 mt-1">{total.toLocaleString()} MB total</div>
+      <div className="text-xs text-slate-500 mt-1">{total.toLocaleString()} MB total</div>
     </div>
   )
 }
@@ -256,20 +269,20 @@ export default function Monitoring() {
     <Layout>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Monitoring</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h1 className="text-2xl font-bold text-white">Monitoring</h1>
+          <p className="text-sm text-slate-400 mt-0.5">
             Live observability · auto-refreshes every 10s
             {data && <> · uptime <strong>{formatUptime(data.uptime_s)}</strong></>}
           </p>
         </div>
         <div className="flex items-center gap-3">
           {lastRefresh && (
-            <span className="text-xs text-slate-400">Updated {lastRefresh.toLocaleTimeString()}</span>
+            <span className="text-xs text-slate-500">Updated {lastRefresh.toLocaleTimeString()}</span>
           )}
           <button
             onClick={fetchData}
             disabled={refreshing}
-            className="text-sm px-4 py-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium disabled:opacity-50"
+            className="text-sm px-4 py-2 rounded-lg bg-brand-500/10 text-brand-300 hover:bg-brand-500/15 font-medium disabled:opacity-50"
           >
             {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
@@ -277,13 +290,13 @@ export default function Monitoring() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border-2 border-black text-red-700 rounded-lg px-4 py-3 text-sm mb-6">
+        <div className="bg-red-500/[0.06] border border-red-500/20 text-red-300 rounded-lg px-4 py-3 text-sm mb-6">
           {error}
         </div>
       )}
 
       {!data && !error && (
-        <div className="text-slate-400 text-sm">Loading…</div>
+        <div className="text-slate-500 text-sm">Loading…</div>
       )}
 
       {data && (
@@ -292,12 +305,12 @@ export default function Monitoring() {
           <SectionTitle>Service Health</SectionTitle>
           <div className="grid grid-cols-3 gap-3 mb-2">
             {(Object.entries(data.services) as [string, boolean][]).map(([name, ok]) => (
-              <div key={name} className={`border-2 rounded-lg px-4 py-3 flex items-center ${
-                ok ? 'bg-green-50 border-green-200' : 'bg-red-50 border-black'
+              <div key={name} className={`border rounded-lg px-4 py-3 flex items-center ${
+                ok ? 'bg-emerald-500/[0.06] border-emerald-500/20' : 'bg-red-500/[0.06] border-red-500/20'
               }`}>
                 <StatusDot ok={ok} />
-                <span className="font-medium text-sm capitalize">{name}</span>
-                <span className={`ml-auto text-xs font-bold ${ok ? 'text-green-600' : 'text-red-600'}`}>
+                <span className="font-medium text-sm capitalize text-slate-200">{name}</span>
+                <span className={`ml-auto text-xs font-bold ${ok ? 'text-emerald-400' : 'text-red-400'}`}>
                   {ok ? 'UP' : 'DOWN'}
                 </span>
               </div>
@@ -313,18 +326,18 @@ export default function Monitoring() {
               <StatCard
                 label="Successful"
                 value={data.pipeline.successful}
-                accent="border-green-200"
+                accent="border-emerald-500/20"
               />
               <StatCard
                 label="Failed"
                 value={data.pipeline.failed}
-                accent={data.pipeline.failed > 0 ? 'border-black' : 'border-black'}
+                accent={data.pipeline.failed > 0 ? 'border-red-500/20' : 'border-line'}
               />
               <StatCard label="Active Now" value={data.pipeline.active} sub="in progress" />
               <StatCard
                 label="Success Rate"
                 value={`${data.pipeline.success_rate}%`}
-                accent={data.pipeline.success_rate >= 90 ? 'border-green-200' : 'border-black'}
+                accent={data.pipeline.success_rate >= 90 ? 'border-emerald-500/20' : 'border-line'}
               />
               <StatCard
                 label="Avg Duration"
@@ -333,8 +346,8 @@ export default function Monitoring() {
               />
             </div>
             {/* Donut */}
-            <div className="bg-white border-2 border-black rounded-lg p-4">
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+            <div className="bg-surface border border-line rounded-lg p-4">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
                 Audit Outcomes
               </div>
               <PipelineDonut pipeline={data.pipeline} />
@@ -344,15 +357,15 @@ export default function Monitoring() {
           {/* ── Stage Timing ──────────────────────────────────────── */}
           <SectionTitle>Pipeline Stage Timing</SectionTitle>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-white border-2 border-black rounded-lg p-4">
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+            <div className="bg-surface border border-line rounded-lg p-4">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
                 Avg vs p95 (seconds)
               </div>
               <StageTimingChart stages={data.stages} />
             </div>
-            <div className="bg-white border-2 border-black rounded-lg overflow-hidden">
+            <div className="bg-surface border border-line rounded-lg overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-black">
+                <thead className="bg-surface-raised border-b border-line">
                   <tr>
                     {['Stage', 'Runs', 'Avg', 'p95', 'Max'].map(h => (
                       <th key={h} className="text-left px-4 py-2 text-xs font-semibold text-slate-500 uppercase">{h}</th>
@@ -361,15 +374,15 @@ export default function Monitoring() {
                 </thead>
                 <tbody>
                   {Object.keys(data.stages).length === 0 ? (
-                    <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400 text-sm">No data yet</td></tr>
+                    <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500 text-sm">No data yet</td></tr>
                   ) : (
                     Object.entries(data.stages).map(([stage, s], i) => (
-                      <tr key={stage} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                        <td className="px-4 py-2 font-medium text-slate-700 capitalize">{stage}</td>
-                        <td className="px-4 py-2 text-slate-600">{s.count}</td>
-                        <td className="px-4 py-2 text-slate-600">{s.avg_s}s</td>
-                        <td className="px-4 py-2 text-slate-600">{s.p95_s}s</td>
-                        <td className="px-4 py-2 text-slate-600">{s.max_s}s</td>
+                      <tr key={stage} className={i % 2 === 0 ? 'bg-surface' : 'bg-surface-raised'}>
+                        <td className="px-4 py-2 font-medium text-slate-200 capitalize">{stage}</td>
+                        <td className="px-4 py-2 text-slate-400">{s.count}</td>
+                        <td className="px-4 py-2 text-slate-400">{s.avg_s}s</td>
+                        <td className="px-4 py-2 text-slate-400">{s.p95_s}s</td>
+                        <td className="px-4 py-2 text-slate-400">{s.max_s}s</td>
                       </tr>
                     ))
                   )}
@@ -381,33 +394,33 @@ export default function Monitoring() {
           {/* ── LangGraph Nodes ───────────────────────────────────── */}
           <SectionTitle>LangGraph Agent Nodes</SectionTitle>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-white border-2 border-black rounded-lg p-4">
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+            <div className="bg-surface border border-line rounded-lg p-4">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
                 Avg Latency per Node (seconds)
               </div>
               <GraphNodeChart nodes={data.graph_nodes} />
             </div>
             <div className="grid grid-cols-1 gap-3">
               {Object.keys(data.graph_nodes).length === 0 ? (
-                <div className="bg-white border-2 border-black rounded-lg p-6 text-center text-slate-400 text-sm">
+                <div className="bg-surface border border-line rounded-lg p-6 text-center text-slate-500 text-sm">
                   No LangGraph data yet — run an audit first
                 </div>
               ) : (
                 Object.entries(data.graph_nodes).map(([node, ns], idx) => (
-                  <div key={node} className="bg-white border-2 border-black rounded-lg p-4 flex items-center gap-4">
+                  <div key={node} className="bg-surface border border-line rounded-lg p-4 flex items-center gap-4">
                     <div
                       className="w-3 h-10 rounded-full flex-shrink-0"
                       style={{ background: COLORS.nodes[idx % COLORS.nodes.length] }}
                     />
                     <div className="flex-1">
-                      <div className="text-sm font-semibold text-slate-700 capitalize">
+                      <div className="text-sm font-semibold text-slate-200 capitalize">
                         {node.replace('_agent', '')} Agent
                       </div>
                       <div className="text-xs text-slate-500 mt-0.5">
                         {ns.invocations} calls · {ns.avg_duration_s}s avg · {ns.total_duration_s}s total
                       </div>
                     </div>
-                    <div className={`text-sm font-bold ${ns.errors > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    <div className={`text-sm font-bold ${ns.errors > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                       {ns.errors > 0 ? `${ns.errors} err` : '✓ clean'}
                     </div>
                   </div>
@@ -419,19 +432,19 @@ export default function Monitoring() {
           {/* ── ChromaDB ──────────────────────────────────────────── */}
           <SectionTitle>ChromaDB Collections</SectionTitle>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-white border-2 border-black rounded-lg p-4">
-              <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+            <div className="bg-surface border border-line rounded-lg p-4">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">
                 Document count per collection
               </div>
               <ChromaBarChart collections={data.chromadb.collections} />
             </div>
             <div className="grid grid-cols-3 gap-3 content-start">
               {Object.entries(data.chromadb.collections).map(([col, count]) => (
-                <div key={col} className="bg-white border-2 border-black rounded-lg p-4">
-                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                <div key={col} className="bg-surface border border-line rounded-lg p-4">
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
                     {col.replace(/_/g, ' ')}
                   </div>
-                  <div className="text-2xl font-bold text-slate-800">
+                  <div className="text-2xl font-bold text-white">
                     {count !== null ? count.toLocaleString() : '—'}
                   </div>
                   <div className="text-xs text-slate-500">docs</div>
@@ -440,77 +453,54 @@ export default function Monitoring() {
             </div>
           </div>
 
-          {/* ── Model Registry ────────────────────────────────────── */}
-          <SectionTitle>Model Registry</SectionTitle>
-          <div className="bg-white border-2 border-black rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-black">
-                <tr>
-                  {['Model', 'Version', 'Score', 'Metric', 'Data Ver', 'Trained At', 'On Disk'].map(h => (
-                    <th key={h} className="text-left px-4 py-2 text-xs font-semibold text-slate-500 uppercase">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.models.map((m, i) => (
-                  <tr key={`${m.model_type}-${m.version ?? 'none'}`}
-                      className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                    <td className="px-4 py-2 font-medium text-slate-700">{m.model_type}</td>
-                    <td className="px-4 py-2">
+          {/* ── Runtime Model Deployment Health ───────────────────────────── */}
+          <SectionTitle>Runtime Model Deployment Health</SectionTitle>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-2">
+            {data.models.map(m => {
+              const modelLabels: Record<string, string> = {
+                bert: 'BERT Domain Classifier',
+                ner: 'spaCy NER Model',
+                actor: 'Actor Classifier (Art. 3)',
+                risk: 'Risk Classifier (Art. 6)',
+                prohibited: 'Prohibited Classifier (Art. 5)',
+              }
+              const label = modelLabels[m.model_type] ?? m.model_type
+              return (
+                <div key={m.model_type} className="bg-surface border border-line rounded-lg p-4 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-semibold text-slate-100 text-sm">{label}</span>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                        m.on_disk ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                      }`}>
+                        {m.on_disk ? '● Active' : '○ Missing'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-400 mb-3">
+                      <span>Active Version:</span>
                       {m.version ? (
-                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                          m.is_active ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {m.version}{m.is_active ? ' ✓' : ''}
+                        <span className="px-1.5 py-0.5 rounded bg-brand-500/10 text-brand-300 font-mono font-semibold">
+                          {m.version}
                         </span>
                       ) : (
-                        <span className="text-slate-400 text-xs">not trained</span>
+                        <span className="text-slate-500 italic">untrained</span>
                       )}
-                    </td>
-                    <td className="px-4 py-2 font-mono text-slate-700">
-                      {m.score !== null ? m.score.toFixed(3) : '—'}
-                    </td>
-                    <td className="px-4 py-2 text-slate-500 text-xs">{m.metric_key}</td>
-                    <td className="px-4 py-2 text-slate-500 text-xs">{m.data_version ?? '—'}</td>
-                    <td className="px-4 py-2 text-slate-500 text-xs">
-                      {m.created_at ? m.created_at.replace('T', ' ') : '—'}
-                    </td>
-                    <td className="px-4 py-2">
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                        m.on_disk ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
-                      }`}>
-                        {m.on_disk ? 'present' : 'missing'}
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-line/60 flex items-center justify-between text-xs text-slate-400">
+                    <div>
+                      Score:{' '}
+                      <span className="font-bold text-slate-200 tabular-nums">
+                        {m.score !== null ? `${(m.score * 100).toFixed(1)}%` : '—'}
                       </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* ── Data Registry ─────────────────────────────────────── */}
-          <SectionTitle>Training Data Registry</SectionTitle>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {data.data.map(d => (
-              <div key={d.data_type} className="bg-white border-2 border-black rounded-lg p-4">
-                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
-                  {d.data_type}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono">
+                      {m.data_version ? `Data: ${m.data_version}` : ''}
+                    </div>
+                  </div>
                 </div>
-                <div className="text-xl font-bold text-slate-800">
-                  {d.current_records !== null ? d.current_records.toLocaleString() : '—'}
-                </div>
-                <div className="text-xs text-slate-500 mb-2">records</div>
-                <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${
-                  d.file_exists ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
-                }`}>
-                  {d.file_exists ? 'present' : 'missing'}
-                </span>
-                {d.active_version && (
-                  <span className="ml-1.5 text-xs text-slate-400">{d.active_version}</span>
-                )}
-                <div className="text-xs text-slate-400 mt-1">{d.total_versions} version(s)</div>
-              </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* ── System Resources ──────────────────────────────────── */}
@@ -518,28 +508,28 @@ export default function Monitoring() {
             <>
               <SectionTitle>System Resources</SectionTitle>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white border-2 border-black rounded-lg p-4">
-                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">CPU</div>
-                  <div className="text-3xl font-bold text-slate-800 mb-2">
+                <div className="bg-surface border border-line rounded-lg p-4">
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">CPU</div>
+                  <div className="text-3xl font-bold text-white mb-2">
                     {data.system.cpu_percent ?? '—'}%
                   </div>
-                  <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-surface-hover rounded-full overflow-hidden">
                     <div
                       className={`h-2 rounded-full ${
                         (data.system.cpu_percent ?? 0) > 80 ? 'bg-red-500'
                         : (data.system.cpu_percent ?? 0) > 50 ? 'bg-amber-500'
-                        : 'bg-green-500'
+                        : 'bg-emerald-500'
                       }`}
                       style={{ width: `${data.system.cpu_percent ?? 0}%` }}
                     />
                   </div>
                 </div>
-                <div className="bg-white border-2 border-black rounded-lg p-4">
-                  <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Memory</div>
+                <div className="bg-surface border border-line rounded-lg p-4">
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Memory</div>
                   {data.system.memory_used_mb != null && data.system.memory_total_mb != null ? (
                     <MemoryBar used={data.system.memory_used_mb} total={data.system.memory_total_mb} />
                   ) : (
-                    <div className="text-slate-400 text-sm">—</div>
+                    <div className="text-slate-500 text-sm">—</div>
                   )}
                 </div>
                 <StatCard label="Uptime" value={formatUptime(data.uptime_s)} />

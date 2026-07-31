@@ -130,18 +130,49 @@ def _audit_span_alignment(records: list[dict], nlp) -> dict:
     return {"requested": total_req, "dropped": total_drop, "rate": round(rate, 4)}
 
 
-def _eval_f1(nlp, records: list[dict]) -> tuple[float, dict]:
-    """Run NER on records and return (overall_f1, ents_per_type)."""
-    from spacy.scorer import Scorer
-    scorer = Scorer()
-    examples = []
-    for record in records:
-        ref_doc = nlp.make_doc(record["text"])
-        spans = [ref_doc.char_span(s, e, label=l) for s, e, l in _resolve_spans(record, nlp)]
-        ref_doc.ents = [sp for sp in spans if sp is not None]
-        examples.append(Example(nlp(record["text"]), ref_doc))
-    scores = scorer.score(examples)
-    return round(scores.get("ents_f", 0.0), 4), scores.get("ents_per_type", {})
+def _eval_overlap(nlp, records: list[dict]) -> tuple[float, float, float, dict]:
+    """Label-aware OVERLAP scorer — mirrors the CI gate in
+    tests/evaluation/eval_ner.py::_score so training selection AND the final
+    reported metrics use the same rule the gate asserts (a gold entity counts as
+    found if a same-label prediction overlaps it). Keep this in sync with that
+    file. Returns (overall_f1, overall_p, overall_r, per_label) where per_label
+    maps label -> {precision, recall, f1, tp, fp, fn}.
+    """
+    def _overlaps(a_s, a_e, b_s, b_e) -> bool:
+        return a_s < b_e and b_s < a_e
+
+    tp = {l: 0 for l in ENTITY_LABELS}
+    fp = {l: 0 for l in ENTITY_LABELS}
+    fn = {l: 0 for l in ENTITY_LABELS}
+
+    for rec in records:
+        doc = nlp(rec["text"])
+        pred = [(e.start_char, e.end_char, e.label_) for e in doc.ents]
+        gold = [(e["start"], e["end"], e["label"]) for e in rec["entities"]]
+        for gs, ge, gl in gold:
+            if any(pl == gl and _overlaps(gs, ge, ps, pe) for ps, pe, pl in pred):
+                tp[gl] = tp.get(gl, 0) + 1
+            else:
+                fn[gl] = fn.get(gl, 0) + 1
+        for ps, pe, pl in pred:
+            if not any(gl == pl and _overlaps(ps, pe, gs, ge) for gs, ge, gl in gold):
+                fp[pl] = fp.get(pl, 0) + 1
+
+    per_label: dict[str, dict] = {}
+    tot_tp = tot_fp = tot_fn = 0
+    for label in ENTITY_LABELS:
+        t, f_p, f_n = tp[label], fp[label], fn[label]
+        tot_tp += t; tot_fp += f_p; tot_fn += f_n
+        p = t / (t + f_p) if (t + f_p) else 0.0
+        r = t / (t + f_n) if (t + f_n) else 0.0
+        f1 = 2 * p * r / (p + r) if (p + r) else 0.0
+        per_label[label] = {"precision": round(p, 4), "recall": round(r, 4),
+                            "f1": round(f1, 4), "tp": t, "fp": f_p, "fn": f_n}
+
+    op = tot_tp / (tot_tp + tot_fp) if (tot_tp + tot_fp) else 0.0
+    orr = tot_tp / (tot_tp + tot_fn) if (tot_tp + tot_fn) else 0.0
+    of1 = 2 * op * orr / (op + orr) if (op + orr) else 0.0
+    return round(of1, 4), round(op, 4), round(orr, 4), per_label
 
 
 def load_annotations(path: str) -> list[dict]:
@@ -153,6 +184,29 @@ def load_annotations(path: str) -> list[dict]:
             if line:
                 records.append(json.loads(line))
     return records
+
+
+def _case_augment(records: list[dict], prob: float, rng: random.Random) -> tuple[list[dict], int]:
+    """Lowercase a random subset of records wholesale.
+
+    Entity offsets are unaffected — str.lower() is length-preserving for the
+    EN/DE alphabets used here. Guards against the model keying off surface
+    capitalization instead of the words themselves (e.g. it previously only
+    recognised some PROHIBITED_USE phrases when Title-Cased, never in their
+    equally-valid lowercase mid-sentence form — a training-data casing
+    artifact, not a real distinction). Applied to TRAIN only, at low
+    probability, so natural casing signals that matter (German nouns are
+    always capitalized; REGULATION acronyms like GDPR) stay dominant.
+    """
+    augmented = []
+    n = 0
+    for rec in records:
+        if rng.random() < prob:
+            augmented.append({**rec, "text": rec["text"].lower()})
+            n += 1
+        else:
+            augmented.append(rec)
+    return augmented, n
 
 
 def build_doc_bin(records: list[dict], nlp) -> DocBin:
@@ -188,9 +242,17 @@ def main() -> None:
                         help="Early stopping patience in epochs on dev F1 (default: 10)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--dropout", type=float, default=0.3)
+    parser.add_argument("--case-augment-prob", type=float, default=0.08,
+                        help="Fraction of TRAIN examples lowercased wholesale for case "
+                             "robustness (dev set untouched; default: 0.08; 0 disables)")
     args = parser.parse_args()
 
+    # Full determinism: spacy.util.fix_random_seed seeds Python random, NumPy and
+    # (if present) torch, so the split shuffle AND spaCy's tok2vec init + dropout
+    # are reproducible. Seeding only Python `random` left model init and dropout
+    # unseeded, causing run-to-run dev-F1 swings right at the eval gate.
     random.seed(args.seed)
+    spacy.util.fix_random_seed(args.seed)
 
     print(_c(BOLD, "\n  NER Training -- EU AI Act Entity Recognition"))
     print(_c(DIM, "  -" * 30))
@@ -217,6 +279,17 @@ def main() -> None:
     records = load_annotations(args.data)
     print(_c(DIM, f"  Loaded {len(records)} annotated sentences"))
 
+    # Surface which generator(s) produced this data — there are currently 3
+    # (scripts/generate_ner_data.py, local-datagen, local-datagen-V2) and
+    # silently training on an unexpected one has caused real confusion before.
+    from collections import Counter
+    gen_counts = Counter(r.get("generator", "unknown") for r in records)
+    if len(gen_counts) > 1 or "unknown" in gen_counts:
+        colour = AMBER
+    else:
+        colour = GREEN
+    print(_c(colour, f"  Generator provenance: {dict(gen_counts)}"))
+
     if not records:
         print(_c(RED, "  ERROR: No annotations found. Check your JSONL file."))
         return
@@ -231,6 +304,12 @@ def main() -> None:
     train_records = records[:cut]
     dev_records   = records[cut:]
     print(_c(DIM, f"  Train: {len(train_records)} / Dev: {len(dev_records)}"))
+
+    if args.case_augment_prob > 0:
+        train_records, n_aug = _case_augment(
+            train_records, args.case_augment_prob, random.Random(args.seed))
+        print(_c(DIM, f"  Case augmentation: lowercased {n_aug}/{len(train_records)} "
+                      f"train examples (p={args.case_augment_prob}) for case robustness"))
 
     # Save DocBin files
     output_path = Path(args.output)
@@ -275,8 +354,10 @@ def main() -> None:
 
             train_loss = losses.get("ner", 0.0)
 
-            # Per-epoch dev F1 — drives best-model saving and early stopping
-            dev_f1, _ = _eval_f1(nlp, dev_records)
+            # Per-epoch dev F1 — selection uses the OVERLAP metric (same rule as
+            # the eval-suite gate) so the promoted checkpoint maximises what it is
+            # gated on.
+            dev_f1, _, _, _ = _eval_overlap(nlp, dev_records)
             improved = dev_f1 > best_f1
 
             if improved:
@@ -340,37 +421,27 @@ def main() -> None:
     print(_c(DIM,   "  Copy to model_repository/spacy_ner/1/ for Triton deployment."))
 
     # -- Evaluation on dev set -------------------------------------------------
-    # Disable the same non-NER pipes as during training. After nlp.from_disk()
-    # the full de_core_news_lg pipeline is active; running it during eval causes
-    # the attributeruler/tagger to overwrite doc.ents, producing 0.000 for some labels.
-    print(_c(BOLD, "\n  Evaluating on dev set..."))
-    eval_other_pipes = [p for p in nlp.pipe_names if p not in {"ner", "tok2vec"}]
-    from spacy.scorer import Scorer
-    scorer = Scorer()
-    with nlp.disable_pipes(*eval_other_pipes):
-        examples_dev = [
-            Example(nlp(r["text"]),
-                    _make_example(r, nlp).reference)
-            for r in dev_records
-        ]
-    scores = scorer.score(examples_dev)
-    ents_per_type = scores.get("ents_per_type", {})
+    # Uses the label-aware OVERLAP scorer (same rule as tests/evaluation/eval_ner.py
+    # and as best-model selection above), so the reported overall_f1 — which
+    # version_manager uses to rank NER promotions — matches the CI gate exactly
+    # instead of the stricter span-exact number it used to report.
+    # After the final select_pipes(disable=...) above, non-NER pipes are already
+    # inactive, so nlp(text) won't let the tagger overwrite doc.ents.
+    print(_c(BOLD, "\n  Evaluating on dev set (label-aware overlap)..."))
+    overall_f1, overall_p, overall_r, per_label_map = _eval_overlap(nlp, dev_records)
 
     print(f"  {'Label':<20} {'P':>6} {'R':>6} {'F1':>6}")
     print("  " + "-" * 42)
     per_label = []
     for label in ENTITY_LABELS:
-        s = ents_per_type.get(label, {})
-        p  = round(s.get("p",  0.0), 4)
-        r  = round(s.get("r",  0.0), 4)
-        f1 = round(s.get("f",  0.0), 4)
+        s  = per_label_map.get(label, {})
+        p  = round(s.get("precision", 0.0), 4)
+        r  = round(s.get("recall",    0.0), 4)
+        f1 = round(s.get("f1",        0.0), 4)
         per_label.append({"label": label, "precision": p, "recall": r, "f1": f1})
         colour = GREEN if f1 >= 0.85 else AMBER if f1 >= 0.70 else RED
         print(_c(colour, f"  {label:<20} {p:>6.3f} {r:>6.3f} {f1:>6.3f}"))
 
-    overall_f1 = round(scores.get("ents_f", 0.0), 4)
-    overall_p  = round(scores.get("ents_p", 0.0), 4)
-    overall_r  = round(scores.get("ents_r", 0.0), 4)
     print("  " + "-" * 42)
     overall_colour = GREEN if overall_f1 >= 0.90 else AMBER if overall_f1 >= 0.75 else RED
     print(_c(overall_colour, f"  {'Overall':<20} {overall_p:>6.3f} {overall_r:>6.3f} {overall_f1:>6.3f}"))

@@ -3,16 +3,28 @@
 import type { AuditStatus } from '../types'
 
 const STAGES: { status: AuditStatus; label: string; desc: string }[] = [
-  { status: 'uploading',   label: 'Uploading',    desc: 'Sending your document to the pipeline' },
-  { status: 'parsing',     label: 'Parsing',      desc: 'Extracting text from the document'      },
-  { status: 'classifying', label: 'Classifying',  desc: 'Categorising content with BERT'         },
-  { status: 'analysing',   label: 'Analysing',    desc: 'Identifying compliance gaps via LLM'    },
-  { status: 'scoring',     label: 'Scoring',      desc: 'Computing article compliance scores'    },
-  { status: 'complete',    label: 'Complete',     desc: 'Audit finished successfully'            },
+  { status: 'uploading',           label: 'Uploading',           desc: 'Sending your document to the pipeline'            },
+  { status: 'parsing',             label: 'Parsing',             desc: 'Extracting text and splitting into propositions'  },
+  { status: 'extracting_entities', label: 'Extracting Entities', desc: 'Detecting legal and risk entities via NER'        },
+  { status: 'classifying_risk',    label: 'Assessing Risk',      desc: 'Determining actor role and Art. 5/6 applicability'},
+  { status: 'classifying_chunks',  label: 'Classifying Content', desc: 'Categorising each chunk by EU AI Act article'     },
+  { status: 'analysing',           label: 'Analysing',           desc: 'Running gap analysis per article (RAG + LLM)'     },
+  { status: 'mapping_evidence',    label: 'Mapping Evidence',    desc: 'Matching obligations to documentation evidence'   },
+  { status: 'scoring',             label: 'Scoring',             desc: 'Computing article compliance scores'              },
+  { status: 'complete',            label: 'Complete',            desc: 'Audit finished successfully'                      },
 ]
 
 const STATUS_ORDER: Record<AuditStatus, number> = {
-  uploading: 0, parsing: 1, classifying: 2, analysing: 3, scoring: 4, complete: 5, failed: 6,
+  uploading: 0,
+  parsing: 1,
+  extracting_entities: 2,
+  classifying_risk: 3,
+  classifying_chunks: 4,
+  analysing: 5,
+  mapping_evidence: 6,
+  scoring: 7,
+  complete: 8,
+  failed: 9,
 }
 
 export default function LoadingSpinner({ status }: { status: AuditStatus }) {
@@ -29,9 +41,9 @@ export default function LoadingSpinner({ status }: { status: AuditStatus }) {
             {/* Step dot */}
             <div className="relative shrink-0">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
-                done   ? 'bg-emerald-500 shadow-sm'
-                : active ? 'bg-brand-600 shadow-sm shadow-brand-200'
-                :          'bg-slate-100'
+                done   ? 'bg-emerald-500'
+                : active ? 'bg-gradient-brand shadow-glow'
+                :          'bg-surface-raised border border-line'
               }`}>
                 {done ? (
                   <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -43,13 +55,13 @@ export default function LoadingSpinner({ status }: { status: AuditStatus }) {
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                   </svg>
                 ) : (
-                  <span className="text-xs font-bold text-slate-400">{i + 1}</span>
+                  <span className="text-xs font-bold text-slate-500">{i + 1}</span>
                 )}
               </div>
               {/* Vertical connector */}
               {i < STAGES.length - 1 && (
                 <div className={`absolute top-8 left-1/2 -translate-x-1/2 w-0.5 h-2 transition-colors duration-300 ${
-                  done ? 'bg-emerald-300' : 'bg-slate-200'
+                  done ? 'bg-emerald-500/40' : 'bg-line'
                 }`} />
               )}
             </div>
@@ -57,14 +69,14 @@ export default function LoadingSpinner({ status }: { status: AuditStatus }) {
             {/* Label */}
             <div className="flex-1 min-w-0">
               <p className={`text-sm font-semibold transition-colors ${
-                done   ? 'text-emerald-600'
-                : active ? 'text-brand-700'
-                :          'text-slate-400'
+                done   ? 'text-emerald-400'
+                : active ? 'text-brand-300'
+                :          'text-slate-500'
               }`}>
                 {stage.label}
               </p>
               {active && (
-                <p className="text-xs text-slate-400 mt-0.5">{stage.desc}</p>
+                <p className="text-xs text-slate-500 mt-0.5">{stage.desc}</p>
               )}
             </div>
           </div>

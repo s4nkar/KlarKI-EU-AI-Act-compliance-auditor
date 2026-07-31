@@ -4,44 +4,43 @@
 
 @layer base {
   body {
-    @apply bg-cream text-slate-900 antialiased;
+    @apply bg-canvas text-slate-100 antialiased;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-image: radial-gradient(circle, rgb(0 0 0 / 0.07) 1px, transparent 1px);
-    background-size: 18px 18px;
+    background-image: radial-gradient(circle at 50% 0%, rgb(124 110 245 / 0.14), transparent 55%);
+    background-repeat: no-repeat;
   }
 
   * { box-sizing: border-box; }
 
   ::-webkit-scrollbar        { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track  { background: transparent; }
-  ::-webkit-scrollbar-thumb  { @apply bg-black; }
-  ::-webkit-scrollbar-thumb:hover { @apply bg-slate-700; }
+  ::-webkit-scrollbar-thumb  { @apply bg-surface-hover rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
 }
 
 @layer components {
   /* Cards */
   .card {
-    @apply bg-white border-2 border-black;
-    box-shadow: 4px 4px 0 0 #000;
+    @apply bg-surface border border-line rounded-xl shadow-card;
   }
   .card-hover {
-    @apply transition-transform duration-150;
+    @apply transition-all duration-200;
   }
   .card-hover:hover {
-    box-shadow: 6px 6px 0 0 #000;
-    transform: translate(-2px, -2px);
+    @apply border-line-strong shadow-card-hover;
+    transform: translateY(-1px);
   }
 
-  /* Buttons — plain CSS for state variants to avoid @apply limitations */
+  /* Buttons */
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-5 py-2.5 border-2 border-black text-black text-sm font-bold uppercase tracking-wide transition-all duration-100;
-    background-color: #ff6b52;
-    box-shadow: 3px 3px 0 0 #000;
+    @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-white text-sm font-semibold transition-all duration-150;
+    background: linear-gradient(135deg, #7c6ef5 0%, #6c5ce9 100%);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 0 0 1px rgb(255 255 255 / 0.08);
   }
-  .btn-primary:hover  { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 0 #000; }
-  .btn-primary:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 #000; }
+  .btn-primary:hover  { filter: brightness(1.08); box-shadow: 0 4px 16px -2px rgb(124 110 245 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.1); transform: translateY(-1px); }
+  .btn-primary:active { filter: brightness(0.96); transform: translateY(0); }
   .btn-primary:disabled {
     opacity: 0.4;
     cursor: not-allowed;
@@ -50,11 +49,10 @@
   }
 
   .btn-secondary {
-    @apply inline-flex items-center gap-2 px-5 py-2.5 border-2 border-black bg-white text-black text-sm font-bold uppercase tracking-wide transition-all duration-100;
-    box-shadow: 3px 3px 0 0 #000;
+    @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-line bg-surface-raised text-slate-200 text-sm font-semibold transition-all duration-150;
   }
-  .btn-secondary:hover  { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 0 #000; @apply bg-cream; }
-  .btn-secondary:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 0 #000; }
+  .btn-secondary:hover  { @apply border-line-strong bg-surface-hover text-white; transform: translateY(-1px); }
+  .btn-secondary:active { transform: translateY(0); }
   .btn-secondary:disabled {
     opacity: 0.4;
     cursor: not-allowed;
@@ -64,23 +62,23 @@
 
   /* Badges */
   .badge {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-1 border-2 border-black text-xs font-bold uppercase tracking-wide;
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
   }
 }
 
 @layer utilities {
   .text-gradient-brand {
-    background: linear-gradient(135deg, #ff6b52, #f2452f);
+    background: linear-gradient(135deg, #a78bfa, #7c6ef5);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
   .section-label {
-    @apply text-xs font-bold text-black uppercase tracking-widest mb-3;
+    @apply text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3;
   }
 
   .stat-value {
-    @apply text-2xl font-black text-slate-900 tabular-nums;
+    @apply text-2xl font-bold text-white tabular-nums;
   }
 }
