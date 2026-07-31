@@ -170,12 +170,45 @@ interface EvalResult {
   per_query?: Array<{
     query: string
     expected_articles: number[]
+    language?: string
+    'precision@3'?: number
+    'precision@5'?: number
+    'ndcg@5'?: number
     'hit@1': number
     'hit@3': number
     'hit@5': number
     first_hit_rank: number | null
     top3_articles: number[]
   }>
+  // RAG: precision/nDCG, language breakdown, negative-control queries
+  'precision@3'?: number
+  'precision@5'?: number
+  'ndcg@5'?: number
+  by_language?: Record<string, { n_queries: number; 'recall@3': number }>
+  negative_rejection_rate?: number | null
+  n_negative_queries?: number
+  negative_results?: Array<{ query: string; top_score: number | null; correctly_rejected: boolean }>
+  // Score calibration / prompt injection per-case breakdowns
+  calibration_rate?: number
+  resistance_rate?: number
+  n_cases?: number
+  n_in_band?: number
+  n_resisted?: number
+  case_results?: Array<{
+    case: string
+    article_num?: number
+    score: number
+    expected_min?: number
+    expected_max?: number
+    in_band?: boolean
+    n_gaps?: number
+    resisted?: boolean
+    reasoning?: string
+    domain_chunks?: number
+    passages?: number
+  }>
+  // Hallucination: cross-article templated-recommendation detection (Rule 6)
+  templated_recommendations?: Array<{ text: string; articles: number[] }>
   // Hallucination per-article breakdown
   article_results?: Record<string, {
     gaps: number
@@ -639,7 +672,11 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
       (r.by_concept && Object.keys(r.by_concept).length > 0) ||
       (r.per_query && r.per_query.length > 0) ||
       (r.article_results && Object.keys(r.article_results).length > 0) ||
-      (r.errors && r.errors.length > 0)
+      (r.errors && r.errors.length > 0) ||
+      (r.case_results && r.case_results.length > 0) ||
+      (r.negative_results && r.negative_results.length > 0) ||
+      (r.by_language && Object.keys(r.by_language).length > 0) ||
+      (r.templated_recommendations && r.templated_recommendations.length > 0)
     )
   }
 
@@ -668,6 +705,8 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
     consistency: { label: 'Consistency', desc: 'Determinism across repeated runs' },
     applicability: { label: 'Applicability Gate', desc: 'Art.5/6/Annex III decision accuracy on 28 examples' },
     evidence_mapper: { label: 'Evidence Mapper', desc: 'Synonym hit-rate on 24 gold evidence chunks' },
+    score_calibration: { label: 'Score Calibration', desc: 'Strong/weak documents scored against expected bands' },
+    prompt_injection: { label: 'Prompt Injection', desc: 'Resistance to embedded instruction-override attacks' },
   }
 
   const statusStyle = (s: string) =>
@@ -682,7 +721,9 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
   function keyMetric(key: string, r: EvalResult): string {
     if (key === 'classifier') return r.macro_f1 != null ? `Macro F1 ${(r.macro_f1 * 100).toFixed(1)}%` : '—'
     if (key === 'ner') return r.overall_f1 != null ? `Overall F1 ${(r.overall_f1 * 100).toFixed(1)}%  ·  ${r.n_gold ?? '—'} gold samples` : '—'
-    if (key === 'rag') return r['recall@3'] != null ? `Recall@3 ${(r['recall@3'] * 100).toFixed(1)}%  ·  MRR ${r.mrr?.toFixed(3) ?? '—'}` : '—'
+    if (key === 'rag') return r['recall@3'] != null
+      ? `Recall@3 ${(r['recall@3'] * 100).toFixed(1)}%  ·  Precision@3 ${r['precision@3'] != null ? (r['precision@3'] * 100).toFixed(1) + '%' : '—'}  ·  MRR ${r.mrr?.toFixed(3) ?? '—'}`
+      : '—'
     if (key === 'adversarial') return r.adversarial_accuracy != null ? `Accuracy ${(r.adversarial_accuracy * 100).toFixed(1)}%` : '—'
     if (key === 'consistency') return r.bert?.consistency_rate != null ? `BERT ${(r.bert.consistency_rate * 100).toFixed(0)}%  ·  LLM ${r.ollama?.consistency_rate != null ? (r.ollama.consistency_rate * 100).toFixed(0) + '%' : '—'}` : '—'
     if (key === 'hallucination') return r.citation_rate != null
@@ -694,6 +735,12 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
     if (key === 'evidence_mapper') return r.tpr != null ? `TPR ${(r.tpr * 100).toFixed(1)}%  ·  TNR ${r.tnr != null ? (r.tnr * 100).toFixed(1) + '%' : '—'}` : '—'
     if (key === 'risk') return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Recall ${r.recall != null ? (r.recall * 100).toFixed(1) + '%' : '—'}` : '—'
     if (key === 'prohibited') return r.accuracy != null ? `Accuracy ${(r.accuracy * 100).toFixed(1)}%  ·  Recall ${r.recall != null ? (r.recall * 100).toFixed(1) + '%' : '—'}` : '—'
+    if (key === 'score_calibration') return r.calibration_rate != null
+      ? `Calibration ${(r.calibration_rate * 100).toFixed(1)}%  ·  ${r.n_in_band ?? '—'}/${r.n_cases ?? '—'} in band`
+      : '—'
+    if (key === 'prompt_injection') return r.resistance_rate != null
+      ? `Resistance ${(r.resistance_rate * 100).toFixed(1)}%  ·  ${r.n_resisted ?? '—'}/${r.n_cases ?? '—'} resisted`
+      : '—'
     return '—'
   }
 
@@ -799,6 +846,10 @@ function EvaluationSection({ data }: { data: EvalResultsMap | null }) {
                       {r.per_query && <EvalPerQueryDetail data={r.per_query} />}
                       {r.article_results && <EvalArticleResultsDetail data={r.article_results} />}
                       {r.errors && r.errors.length > 0 && <EvalErrorsDetail data={r.errors} />}
+                      {r.by_language && <EvalByLanguageDetail data={r.by_language} />}
+                      {r.negative_results && r.negative_results.length > 0 && <EvalNegativeResultsDetail data={r.negative_results} />}
+                      {r.case_results && r.case_results.length > 0 && <EvalCaseResultsDetail data={r.case_results} />}
+                      {r.templated_recommendations && r.templated_recommendations.length > 0 && <EvalTemplatedRecsDetail data={r.templated_recommendations} />}
                     </div>
                   )}
                 </div>
@@ -1347,6 +1398,110 @@ function EvalErrorsDetail({ data }: {
         {data.length > 15 && (
           <p className="text-[11px] text-slate-500">… and {data.length - 15} more</p>
         )}
+      </div>
+    </div>
+  )
+}
+
+function EvalByLanguageDetail({ data }: {
+  data: Record<string, { n_queries: number; 'recall@3': number }>
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Recall@3 by language</p>
+      {Object.entries(data).map(([lang, info]) => {
+        const color = info['recall@3'] >= 0.80 ? 'text-emerald-400' : info['recall@3'] >= 0.60 ? 'text-amber-400' : 'text-red-400'
+        return (
+          <div key={lang} className="flex justify-between items-baseline text-xs">
+            <span className="text-slate-400 font-medium uppercase">{lang}</span>
+            <span className={`tabular-nums font-semibold ${color}`}>
+              {(info['recall@3'] * 100).toFixed(1)}%  <span className="text-slate-500 font-normal">({info.n_queries} queries)</span>
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function EvalNegativeResultsDetail({ data }: {
+  data: Array<{ query: string; top_score: number | null; correctly_rejected: boolean }>
+}) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">
+        Negative-control queries ({data.length})
+      </p>
+      <div className="space-y-1">
+        {data.map((n, i) => (
+          <div key={i} className="flex justify-between items-baseline text-xs gap-2">
+            <span className="text-slate-400 truncate">"{n.query}"</span>
+            <span className={n.correctly_rejected ? 'text-emerald-400' : 'text-red-400'}>
+              {n.correctly_rejected ? '✓' : '✗'} {n.top_score != null ? n.top_score.toFixed(2) : '—'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EvalCaseResultsDetail({ data }: {
+  data: Array<{
+    case: string
+    article_num?: number
+    score: number
+    expected_min?: number
+    expected_max?: number
+    in_band?: boolean
+    n_gaps?: number
+    resisted?: boolean
+    reasoning?: string
+  }>
+}) {
+  return (
+    <div className="space-y-1.5">
+      {data.map((c, i) => {
+        const ok = c.in_band ?? c.resisted ?? true
+        return (
+          <div key={i} className="text-xs">
+            <div className="flex justify-between items-baseline gap-2">
+              <span className="text-slate-300 font-medium">
+                {c.case}{c.article_num != null ? ` (Art. ${c.article_num})` : ''}
+              </span>
+              <span className={ok ? 'text-emerald-400' : 'text-red-400'}>
+                {ok ? '✓' : '✗'} score={c.score}
+                {c.expected_min != null && c.expected_max != null && (
+                  <span className="text-slate-500"> [{c.expected_min}, {c.expected_max}]</span>
+                )}
+                {c.n_gaps != null && <span className="text-slate-500"> · {c.n_gaps} gaps</span>}
+              </span>
+            </div>
+            {c.reasoning && (
+              <p className="text-[11px] text-slate-500 truncate">{c.reasoning}</p>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function EvalTemplatedRecsDetail({ data }: {
+  data: Array<{ text: string; articles: number[] }>
+}) {
+  return (
+    <div>
+      <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wide mb-1.5">
+        Templated recommendations ({data.length})
+      </p>
+      <div className="space-y-1">
+        {data.map((t, i) => (
+          <div key={i} className="text-xs pl-2 border-l-2 border-red-500/40">
+            <p className="text-slate-500 truncate">"{t.text}"</p>
+            <p className="text-[11px] text-slate-600">reused across Articles {t.articles.join(', ')}</p>
+          </div>
+        ))}
       </div>
     </div>
   )

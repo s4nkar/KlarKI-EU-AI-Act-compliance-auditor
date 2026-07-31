@@ -2,7 +2,7 @@
 Evaluation 4 — Hallucination / Citation Verification.
 
 Every compliance gap the system surfaces must be traceable to actual
-regulatory text.  This eval enforces four rules:
+regulatory text.  This eval enforces six rules:
 
   Rule 1 — Evidence linkage:
       Each ArticleScore must have ≥ 1 regulatory_passage retrieved.
@@ -34,6 +34,25 @@ regulatory text.  This eval enforces four rules:
       evidence_mapper.py's own proven pattern, checks topical relevance
       instead of asking the passage to logically prove the deficiency.
 
+  Rule 5 — Fabricated-specifics faithfulness:
+      Gap descriptions and recommendations sometimes cite a specific
+      Article number or a specific figure (a duration, a percentage) as
+      justification. Rule 4 only checks topical grounding — it would not
+      catch a gap that's topically about the right requirement but invents
+      a figure no retrieved passage or user chunk actually contains (e.g.
+      "Article 12 requires 36-month retention" when no source text says
+      36 months). This rule regex-extracts Article-number mentions and
+      numeric claims and verifies they appear verbatim in the source text
+      the LLM was given (retrieved passages + the user's own chunks).
+
+  Rule 6 — Recommendation specificity:
+      A recommendation identical (after normalisation) to another
+      recommendation issued for a *different* article in the same run is
+      flagged as likely generic/templated boilerplate — Rule 3's keyword
+      check can be satisfied by any recommendation containing a common
+      word like "system" or "data" without the recommendation actually
+      being specific to the gap it's attached to.
+
 Uses proposition_chunk_text (the production chunker) so the chunking
 strategy matches what the real pipeline produces. Uses select_query_chunks
 (the production RAG chunk-selection ranker) so retrieval quality matches
@@ -56,6 +75,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -67,6 +87,37 @@ sys.path.insert(0, str(_API_DIR))
 
 # Minimum NLI entailment score for a passage to count as supporting a gap description
 _NLI_ENTAILMENT_THRESHOLD = 0.5
+
+# Rule 5 patterns — Article-number mentions and numeric-with-unit claims
+_ARTICLE_MENTION_RE = re.compile(r"\bArticle\s+(\d{1,2})\b", re.IGNORECASE)
+_NUMERIC_CLAIM_RE = re.compile(r"\b(\d+)\s*(months?|years?|days?|weeks?|hours?|%|percent)\b", re.IGNORECASE)
+
+
+def _check_fabricated_specifics(current_article: int, text: str, source_text: str) -> list[str]:
+    """Flag Article-number mentions and numeric claims in `text` that don't
+    appear anywhere in `source_text` (the concatenated retrieved passages the
+    LLM was actually given). Citing the article currently being scored is
+    always fine; citing a different one, or a duration/percentage, must be
+    traceable to the source text or it's treated as a fabricated specific."""
+    issues: list[str] = []
+    source_lower = source_text.lower()
+
+    for m in _ARTICLE_MENTION_RE.finditer(text):
+        cited_article = int(m.group(1))
+        if cited_article == current_article:
+            continue
+        if f"article {cited_article}" not in source_lower:
+            issues.append(
+                f"cites 'Article {cited_article}' but no retrieved passage "
+                f"references Article {cited_article}"
+            )
+
+    for m in _NUMERIC_CLAIM_RE.finditer(text):
+        claim = m.group(0)
+        if claim.lower() not in source_lower:
+            issues.append(f"claims '{claim}' but no retrieved passage contains this figure")
+
+    return issues
 
 # Keywords that a grounded recommendation should contain
 REGULATORY_VOCAB = {
@@ -245,6 +296,19 @@ def _check_article_score(score, nli_model=None) -> tuple[list[str], dict, list[d
                 "passage_text": passage.text[:300],
             })
 
+    # Rule 5: fabricated-specifics faithfulness — Article-number mentions and
+    # numeric claims in gaps/recommendations must be traceable to a retrieved
+    # passage. Only meaningful when passages exist; skipped otherwise (Rule 1
+    # already flags the zero-passage case).
+    if score.regulatory_passages:
+        source_text = " ".join(p.text for p in score.regulatory_passages)
+        for i, gap in enumerate(score.gaps):
+            for issue in _check_fabricated_specifics(art, gap.description, source_text):
+                violations.append(f"Article {art} gap[{i}]: {issue}")
+        for i, rec in enumerate(score.recommendations):
+            for issue in _check_fabricated_specifics(art, rec, source_text):
+                violations.append(f"Article {art} rec[{i}]: {issue}")
+
     return violations, entailment_stats, gap_citations
 
 
@@ -312,6 +376,9 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
     article_results: dict[int, dict] = {}
     total_gaps_checked = 0
     total_gaps_entailed = 0
+    # Rule 6: recommendation text (normalised) -> set of article_nums it appeared in.
+    # Built across the whole run since templating only shows up cross-article.
+    recommendation_articles: dict[str, set[int]] = {}
 
     for art_num, domain in ARTICLE_DOMAINS.items():
         art_chunks = [c for c in classified if c.domain == domain]
@@ -355,6 +422,16 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
         total_gaps_checked  += ent_stats["checked"]
         total_gaps_entailed += ent_stats["entailed"]
 
+        # Skip the deterministic "no chunks classified" fallback path
+        # (gap_analyser.py returns a hardcoded, intentionally-identical
+        # recommendation for every such article — that's by design, not
+        # LLM templating, so it must not trip the duplicate-recommendation check.
+        if score.chunk_count > 0:
+            for rec in score.recommendations:
+                normalized = " ".join(rec.strip().lower().split())
+                if normalized:
+                    recommendation_articles.setdefault(normalized, set()).add(art_num)
+
         article_results[art_num] = {
             "gaps":            len(score.gaps),
             "recommendations": len(score.recommendations),
@@ -388,6 +465,20 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
         if total_gaps_checked > 0 else None
     )
 
+    # Rule 6: recommendation specificity — a recommendation reused verbatim
+    # across different articles is almost certainly generic boilerplate, not
+    # advice specific to the gap it's attached to.
+    templated_recommendations = [
+        {"text": text, "articles": sorted(arts)}
+        for text, arts in recommendation_articles.items()
+        if len(arts) > 1
+    ]
+    for tr in templated_recommendations:
+        all_violations.append(
+            f"Recommendation reused verbatim across Articles {tr['articles']}: "
+            f"'{tr['text'][:80]}'"
+        )
+
     if strict:
         status = "pass" if not all_violations else "fail"
     else:
@@ -401,6 +492,7 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
         "citation_rate":           round(citation_rate, 4),
         "entailment_rate":         entailment_rate,
         "nli_model_available":     nli_model is not None,
+        "templated_recommendations": templated_recommendations,
         "total_violations":        len(all_violations),
         "violations":              all_violations,
         "article_results":         article_results,
@@ -500,6 +592,29 @@ def test_citation_rate_above_90() -> None:
     assert r["citation_rate"] >= 0.90, (
         f"Citation rate {r['citation_rate']:.2%} below 90%. "
         "Some articles have no regulatory passages retrieved."
+    )
+
+
+def test_no_fabricated_specifics() -> None:
+    """pytest: gaps/recommendations must not cite figures absent from source text (Rule 5)."""
+    r = run(strict=False)
+    if r["status"] == "skip":
+        import pytest
+        pytest.skip(r.get("reason", ""))
+    fabricated = [v for v in r.get("violations", []) if "claims" in v or "no retrieved passage references" in v]
+    assert not fabricated, "Fabricated specifics detected:\n" + "\n".join(fabricated)
+
+
+def test_no_templated_recommendations() -> None:
+    """pytest: recommendations must not be reused verbatim across articles (Rule 6)."""
+    r = run(strict=False)
+    if r["status"] == "skip":
+        import pytest
+        pytest.skip(r.get("reason", ""))
+    templated = r.get("templated_recommendations", [])
+    assert not templated, (
+        "Templated/generic recommendations reused across articles:\n"
+        + "\n".join(f"  {t['text'][:80]!r} -> Articles {t['articles']}" for t in templated)
     )
 
 

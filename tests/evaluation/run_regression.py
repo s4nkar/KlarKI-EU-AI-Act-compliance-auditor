@@ -41,10 +41,16 @@ TRACKED_METRICS: dict[str, tuple[str, float]] = {
     "rag.recall@3":                 ("rag_retrieval.recall@3",        0.05),
     "rag.recall@5":                 ("rag_retrieval.recall@5",        0.05),
     "rag.mrr":                      ("rag_retrieval.mrr",             0.05),
+    "rag.precision@3":              ("rag_retrieval.precision@3",     0.05),
+    "rag.ndcg@5":                   ("rag_retrieval.ndcg@5",          0.05),
+    "rag.negative_rejection_rate":  ("rag_retrieval.negative_rejection_rate", 0.10),
     "adversarial.accuracy":         ("adversarial.adversarial_accuracy", 0.05),
     "bert_consistency":             ("consistency.bert.consistency_rate", 0.0),
     "hallucination.citation_rate":  ("hallucination.citation_rate",   0.05),
+    "hallucination.entailment_rate": ("hallucination.entailment_rate", 0.10),
     "pipeline.checks_passed_ratio": ("pipeline.checks_passed_ratio",  0.10),
+    "score_calibration.calibration_rate": ("score_calibration.calibration_rate", 0.10),
+    "prompt_injection.resistance_rate":   ("prompt_injection.resistance_rate",   0.0),
     # Phase 3 metrics
     "actor.accuracy":               ("actor.accuracy",                0.05),
     "actor.macro_f1":               ("actor.macro_f1",                0.05),
@@ -163,15 +169,20 @@ def _print_inline_summary(name: str, r: dict) -> None:
     """Print a one-line metric summary for a completed eval."""
     summaries = {
         "classifier":      lambda r: f"    macro_f1={r.get('macro_f1',0)*100:.1f}%  accuracy={r.get('accuracy',0)*100:.1f}%",
-        "rag":             lambda r: f"    recall@1={r.get('recall@1',0)*100:.1f}%  recall@3={r.get('recall@3',0)*100:.1f}%  MRR={r.get('mrr',0):.3f}",
+        "rag":             lambda r: f"    recall@1={r.get('recall@1',0)*100:.1f}%  recall@3={r.get('recall@3',0)*100:.1f}%  "
+                                     f"precision@3={r.get('precision@3',0)*100:.1f}%  nDCG@5={r.get('ndcg@5',0):.3f}  MRR={r.get('mrr',0):.3f}  "
+                                     f"neg_rejection={(r.get('negative_rejection_rate') or 0)*100:.1f}%",
         "adversarial":     lambda r: f"    adversarial_accuracy={r.get('adversarial_accuracy',0)*100:.1f}%",
-        "hallucination":   lambda r: f"    citation_rate={r.get('citation_rate',0)*100:.1f}%  violations={r.get('total_violations',0)}",
+        "hallucination":   lambda r: f"    citation_rate={r.get('citation_rate',0)*100:.1f}%  "
+                                     f"entailment_rate={(r.get('entailment_rate') or 0)*100:.1f}%  violations={r.get('total_violations',0)}",
         "pipeline":        lambda r: f"    overall_score={r.get('overall_score',0):.0f}  checks={r.get('checks_passed',0)}/{r.get('checks_total',0)}",
         "actor":           lambda r: f"    accuracy={r.get('accuracy',0)*100:.1f}%  macro_f1={r.get('macro_f1',0)*100:.1f}%",
         "applicability":   lambda r: f"    accuracy={r.get('accuracy',0)*100:.1f}%  prohibited_recall={r.get('by_outcome',{}).get('prohibited',{}).get('recall',0)*100:.1f}%",
         "evidence_mapper": lambda r: f"    tpr={r.get('tpr',0)*100:.1f}%  tnr={r.get('tnr',0)*100:.1f}%  balanced_acc={r.get('balanced_accuracy',0)*100:.1f}%",
         "risk":            lambda r: f"    accuracy={r.get('accuracy',0)*100:.1f}%  recall={r.get('recall',0)*100:.1f}%  tnr={r.get('tnr',0)*100:.1f}%",
         "prohibited":      lambda r: f"    accuracy={r.get('accuracy',0)*100:.1f}%  recall={r.get('recall',0)*100:.1f}%  tnr={r.get('tnr',0)*100:.1f}%",
+        "score_calibration": lambda r: f"    calibration_rate={r.get('calibration_rate',0)*100:.1f}%  ({r.get('n_in_band',0)}/{r.get('n_cases',0)} in band)",
+        "prompt_injection":  lambda r: f"    resistance_rate={r.get('resistance_rate',0)*100:.1f}%  ({r.get('n_resisted',0)}/{r.get('n_cases',0)} resisted)",
     }
     fn = summaries.get(name)
     if fn:
@@ -202,6 +213,8 @@ def main() -> int:
     from eval_evidence_mapper import run as run_evidence_mapper
     from eval_risk            import run as run_risk
     from eval_prohibited      import run as run_prohibited
+    from eval_score_calibration import run as run_score_calibration
+    from eval_prompt_injection  import run as run_prompt_injection
 
     print(_bold("\n═══════════════════════════════════════════════════"))
     print(_bold("  KlarKI Evaluation & Regression Suite"))
@@ -239,8 +252,10 @@ def main() -> int:
 
     # Evals that need live services (skipped in --offline mode)
     if args.offline:
-        print("  [OFFLINE] Skipping RAG, pipeline, hallucination, consistency evals")
-        for key in ("rag_retrieval", "pipeline", "hallucination", "consistency"):
+        print("  [OFFLINE] Skipping RAG, pipeline, hallucination, consistency, "
+              "score_calibration, prompt_injection evals")
+        for key in ("rag_retrieval", "pipeline", "hallucination", "consistency",
+                    "score_calibration", "prompt_injection"):
             all_results[key] = {"status": "skip", "reason": "--offline flag set"}
     else:
         all_results["rag_retrieval"] = _run_eval(
@@ -254,6 +269,12 @@ def main() -> int:
         )
         all_results["consistency"] = _run_eval(
             "consistency", lambda: run_consistency(n_runs=5, verbose=args.verbose), args.verbose,
+        )
+        all_results["score_calibration"] = _run_eval(
+            "score_calibration", lambda: run_score_calibration(verbose=args.verbose), args.verbose,
+        )
+        all_results["prompt_injection"] = _run_eval(
+            "prompt_injection", lambda: run_prompt_injection(verbose=args.verbose), args.verbose,
         )
 
     # ── collect metrics ────────────────────────────────────────────────────
