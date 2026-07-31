@@ -15,6 +15,7 @@ from langgraph.graph import StateGraph, START, END
 from models.schemas import ArticleDomain, DocumentChunk
 from services.ollama_client import OllamaClient
 from services.monitoring_stats import stats as _monitor
+from services.prompt_registry import load_prompt
 
 logger = structlog.get_logger()
 
@@ -52,16 +53,11 @@ async def legal_agent_node(state: AuditState) -> dict:
             for p in state["regulatory_passages"][:5]
         ) or "(no regulatory passages retrieved)"
 
-        prompt = f"""You are a Legal Expert Agent analyzing the EU AI Act.
-Extract a precise checklist of strict, actionable requirements from these regulatory passages for Article {state['article_num']}.
-Output a JSON array of strings, where each string is a single requirement.
-
-Passages:
-{reg_text}
-
-Output ONLY this JSON format:
-{{"requirements": ["...", "..."]}}
-"""
+        prompt = (
+            load_prompt("legal_agent")
+            .replace("{{ARTICLE_NUM}}", str(state["article_num"]))
+            .replace("{{REG_TEXT}}", reg_text)
+        )
         result = await state["ollama_client"].generate_json(prompt)
         reqs = result.get("requirements", [])
         if not isinstance(reqs, list):
@@ -92,20 +88,11 @@ async def technical_agent_node(state: AuditState) -> dict:
     user_text = "\n\n".join(c.text for c in ranked_chunks[:15]) or "(no relevant documentation found)"
     req_str = "\n".join(f"- {r}" for r in reqs)
     
-    prompt = f"""You are a Technical Audit Agent.
-Evaluate the following user documentation against this checklist of legal requirements.
-For each requirement, state whether evidence is found, partially found, or missing, and provide a brief quote or reason.
-Output a JSON object mapping each requirement to your finding.
-
-Requirements:
-{req_str}
-
-User Documentation:
-{user_text}
-
-Output ONLY this JSON format:
-{{"findings": {{"Requirement 1": "Found: XYZ", "Requirement 2": "Missing: Reason"}}}}
-"""
+    prompt = (
+        load_prompt("technical_agent")
+        .replace("{{REQ_STR}}", req_str)
+        .replace("{{USER_TEXT}}", user_text)
+    )
     try:
         result = await state["ollama_client"].generate_json(prompt)
         findings = result.get("findings", {})
@@ -135,29 +122,11 @@ async def synthesis_agent_node(state: AuditState) -> dict:
         lines = [f"[{req[:60]}]: {str(finding)[:200]}" for req, finding in findings.items()]
         findings_str = "\n".join(lines[:10])  # cap at 10 requirements
 
-    prompt = f"""You are a Synthesis Agent compiling a compliance report for Article {state['article_num']}.
-Based on the Technical Agent's findings below, generate a structured Gap Analysis JSON.
-
-Scoring guide:
-- 90-100: nearly all requirements met, no critical gaps
-- 70-89: most requirements met, some gaps
-- 50-69: partial compliance, significant gaps
-- 30-49: major gaps, limited evidence
-- 0-29: little to no compliance evidence
-
-Findings:
-{findings_str}
-
-Output ONLY valid JSON in exactly this format (replace placeholder comments with real values):
-{{
-  "score": <integer 0-100 based on scoring guide above>,
-  "reasoning": "<2-3 sentences explaining the score>",
-  "gaps": [
-    {{"title": "<short gap title>", "description": "<specific gap description>", "severity": "<critical|major|minor>"}}
-  ],
-  "recommendations": ["<specific action>"]
-}}
-"""
+    prompt = (
+        load_prompt("synthesis_agent")
+        .replace("{{ARTICLE_NUM}}", str(state["article_num"]))
+        .replace("{{FINDINGS_STR}}", findings_str)
+    )
     try:
         # keep_alive="0" unloads the model immediately after this call so the
         # NLI cross-encoder (loaded by evidence_mapper) has room in system RAM.

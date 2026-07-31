@@ -1,0 +1,45 @@
+{
+  "legal_agent": {
+    "active": "v1",
+    "versions": {
+      "v1": {
+        "created_at": "2026-07-31",
+        "note": "Original prompt. Not user-exposed (only processes RAG-retrieved regulatory passages), so no v2 hardening needed."
+      }
+    }
+  },
+  "technical_agent": {
+    "active": "v3",
+    "versions": {
+      "v1": {
+        "created_at": "2026-07-31",
+        "note": "Original prompt."
+      },
+      "v2": {
+        "created_at": "2026-07-31",
+        "note": "Hardened against prompt injection: frames User Documentation as untrusted data, requires concrete evidence over bare compliance/certification claims, instructs the model to ignore embedded instructions. Measured: 0%->75% prompt-injection resistance (eval_prompt_injection.py), still lost to the 'authority_appeal' case (outside counsel / legal dept / company policy certification claim)."
+      },
+      "v3": {
+        "created_at": "2026-07-31",
+        "note": "v2 + explicit callout of third-party/outside-counsel/legal-department/company-policy certification claims as exactly the pattern to reject, with reasoning for why."
+      }
+    }
+  },
+  "synthesis_agent": {
+    "active": "v3",
+    "versions": {
+      "v1": {
+        "created_at": "2026-07-31",
+        "note": "Original prompt."
+      },
+      "v2": {
+        "created_at": "2026-07-31",
+        "note": "Hardened defense-in-depth: instructs the model not to award high scores based on unverified compliance assertions in the technical agent's findings."
+      },
+      "v3": {
+        "created_at": "2026-07-31",
+        "note": "v2 + explicit callout of third-party/outside-counsel/legal-department/company-policy certification claims."
+      }
+    }
+  }
+}
