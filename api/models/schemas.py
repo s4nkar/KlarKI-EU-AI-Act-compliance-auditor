@@ -320,11 +320,39 @@ class ComplianceReport(BaseModel):
 
 # ── API envelope models ────────────────────────────────────────────────────────
 
+class AuditProgress(BaseModel):
+    """Fine-grained progress within the current pipeline stage.
+
+    Only the fields relevant to the current AuditStatus are populated —
+    e.g. files_done/files_total during PARSING, chunks_done/chunks_total
+    during CLASSIFYING_CHUNKS, articles_done/articles_total during ANALYSING.
+    Frontend keys off `status` to decide which to show.
+    """
+    files_done: int | None = None
+    files_total: int | None = None
+    chunks_done: int | None = None
+    chunks_total: int | None = None
+    articles_done: int | None = None
+    articles_total: int | None = None
+    estimated_seconds_remaining: int | None = Field(
+        default=None,
+        description=(
+            "ETA for the current stage (CLASSIFYING_CHUNKS or ANALYSING). "
+            "Starts as a rough estimate from a calibrated default rate the "
+            "moment the stage's total is known (e.g. chunk/article count), "
+            "then is replaced by a live figure computed from this run's own "
+            "actual observed average pace once at least one item completes — "
+            "not a static guess at that point."
+        ),
+    )
+
+
 class AuditResponse(BaseModel):
     """Response wrapper for audit endpoints — includes status and optional report."""
     audit_id: str
     status: AuditStatus
     report: ComplianceReport | None = None
+    progress: AuditProgress | None = None
 
 
 class APIResponse(BaseModel):

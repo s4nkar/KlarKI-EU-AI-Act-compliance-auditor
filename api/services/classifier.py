@@ -7,6 +7,8 @@ Both backends return the same list[DocumentChunk] with .domain populated,
 keeping the rest of the pipeline backend-agnostic.
 """
 
+from typing import Callable
+
 import structlog
 
 from config import settings
@@ -37,7 +39,11 @@ def _parse_label(raw: str) -> ArticleDomain:
     return _LABEL_MAP.get(cleaned, ArticleDomain.UNRELATED)
 
 
-async def _classify_ollama(chunks: list[DocumentChunk], ollama: OllamaClient) -> tuple[list[DocumentChunk], str]:
+async def _classify_ollama(
+    chunks: list[DocumentChunk],
+    ollama: OllamaClient,
+    on_progress: Callable[[int, int], None] | None = None,
+) -> tuple[list[DocumentChunk], str]:
     """Sequential few-shot classification via Ollama."""
     prompt_template = load_prompt("classifier")
     total = len(chunks)
@@ -51,13 +57,18 @@ async def _classify_ollama(chunks: list[DocumentChunk], ollama: OllamaClient) ->
             logger.warning("classify_chunk_failed", chunk_id=chunk.chunk_id, error=str(exc))
             chunk.domain = ArticleDomain.UNRELATED
 
+        if on_progress:
+            on_progress(i + 1, total)
         if (i + 1) % 10 == 0 or (i + 1) == total:
             logger.info("classify_progress", done=i + 1, total=total)
 
     return chunks, "ollama"
 
 
-async def _classify_triton(chunks: list[DocumentChunk]) -> tuple[list[DocumentChunk], str]:
+async def _classify_triton(
+    chunks: list[DocumentChunk],
+    on_progress: Callable[[int, int], None] | None = None,
+) -> tuple[list[DocumentChunk], str]:
     """Batched BERT classification via Triton gRPC."""
     from services.triton_client import TritonClient
 
@@ -75,7 +86,10 @@ async def _classify_triton(chunks: list[DocumentChunk]) -> tuple[list[DocumentCh
         batch = texts[i : i + batch_size]
         labels = await client.classify(batch)
         all_labels.extend(labels)
-        logger.info("classify_progress", done=min(i + batch_size, len(texts)), total=len(texts))
+        done = min(i + batch_size, len(texts))
+        if on_progress:
+            on_progress(done, len(texts))
+        logger.info("classify_progress", done=done, total=len(texts))
 
     for chunk, label in zip(chunks, all_labels):
         chunk.domain = _LABEL_MAP.get(label, ArticleDomain.UNRELATED)
@@ -86,6 +100,7 @@ async def _classify_triton(chunks: list[DocumentChunk]) -> tuple[list[DocumentCh
 async def classify_chunks(
     chunks: list[DocumentChunk],
     ollama: OllamaClient,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> tuple[list[DocumentChunk], str]:
     """Classify each chunk into an ArticleDomain.
 
@@ -95,6 +110,9 @@ async def classify_chunks(
     Args:
         chunks: DocumentChunks with text populated.
         ollama: OllamaClient — used only when USE_TRITON=false.
+        on_progress: Optional callback(done, total) invoked as classification
+            proceeds, so a caller (e.g. the audit pipeline) can surface live
+            progress/ETA without this module knowing anything about audits.
 
     Returns:
         Tuple of (chunks with .domain set, actual backend name used).
@@ -103,7 +121,7 @@ async def classify_chunks(
     if settings.use_triton:
         logger.info("classify_backend", backend="triton", chunks=len(chunks))
         try:
-            chunks, backend = await _classify_triton(chunks)
+            chunks, backend = await _classify_triton(chunks, on_progress)
         except Exception as exc:
             logger.warning(
                 "triton_unavailable_fallback",
@@ -111,11 +129,11 @@ async def classify_chunks(
                 fallback="ollama",
             )
             logger.info("classify_backend", backend="ollama_fallback", chunks=len(chunks))
-            chunks, backend = await _classify_ollama(chunks, ollama)
+            chunks, backend = await _classify_ollama(chunks, ollama, on_progress)
             backend = f"ollama_fallback/{settings.ollama_model}"
     else:
         logger.info("classify_backend", backend="ollama", chunks=len(chunks))
-        chunks, backend = await _classify_ollama(chunks, ollama)
+        chunks, backend = await _classify_ollama(chunks, ollama, on_progress)
 
     classified = sum(1 for c in chunks if c.domain != ArticleDomain.UNRELATED)
     logger.info("classify_done", total=len(chunks), classified=classified, backend=backend)

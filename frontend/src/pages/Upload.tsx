@@ -1,6 +1,6 @@
 // Upload page: drag-drop file or paste raw text → start audit → show progress → redirect to dashboard.
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import Layout from '../components/Layout'
 import FileDropzone from '../components/FileDropzone'
@@ -8,7 +8,7 @@ import TextPasteArea from '../components/TextPasteArea'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { startAudit, pollAudit } from '../hooks/useAudit'
 import { riskTierLabel } from '../utils/formatters'
-import type { AuditStatus, RiskTier } from '../types'
+import type { AuditProgress, AuditStatus, RiskTier } from '../types'
 
 type InputMode = 'file' | 'text'
 
@@ -26,22 +26,39 @@ export default function Upload() {
   const [rawText, setRawText] = useState('')
   const [running, setRunning] = useState(false)
   const [status, setStatus] = useState<AuditStatus | null>(null)
+  const [progress, setProgress] = useState<AuditProgress | null>(null)
+  const [elapsed, setElapsed] = useState(0)
   const [error, setError]   = useState<string | null>(null)
+  const startTimeRef = useRef<number | null>(null)
 
   const canSubmit = mode === 'file' ? files.length > 0 : rawText.trim().length > 0
+
+  // Elapsed-time ticker — ticks once a second while an audit is running.
+  useEffect(() => {
+    if (!running) return
+    startTimeRef.current = Date.now()
+    setElapsed(0)
+    const interval = setInterval(() => {
+      if (startTimeRef.current != null) {
+        setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000))
+      }
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [running])
 
   const handleSubmit = async () => {
     if (!canSubmit) return
     setRunning(true)
     setError(null)
     setStatus('uploading')
+    setProgress(null)
     try {
       const auditId = await startAudit(
         mode === 'file' ? files : [],
         mode === 'text' ? rawText : undefined,
         wizardTier ?? undefined,
       )
-      const audit = await pollAudit(auditId, s => setStatus(s))
+      const audit = await pollAudit(auditId, (s, p) => { setStatus(s); setProgress(p ?? null) })
       if (audit.status === 'failed') {
         setError('Audit failed. Please try again with a different document.')
         setRunning(false)
@@ -91,18 +108,13 @@ export default function Upload() {
 
         {running ? (
           /* Running state */
-          <div className="card p-10 text-center">
-            <div className="mb-8">
-              <div className="w-16 h-16 rounded-2xl bg-brand-500/10 flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-brand-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-semibold text-slate-100 mb-1">Analysing your document</h2>
-              <p className="text-sm text-slate-500">This typically takes 2–5 minutes depending on length.</p>
-            </div>
-            <LoadingSpinner status={status!} />
+          <div className="card p-10">
+            <LoadingSpinner
+              status={status!}
+              progress={progress}
+              elapsedSeconds={elapsed}
+              documentCount={files.length}
+            />
           </div>
         ) : (
           /* Input form */

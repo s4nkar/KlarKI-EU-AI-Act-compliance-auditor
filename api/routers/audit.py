@@ -20,6 +20,7 @@ from config import settings
 from models.schemas import (
     APIResponse,
     ArticleDomain,
+    AuditProgress,
     AuditResponse,
     AuditStatus,
     RiskTier,
@@ -172,7 +173,10 @@ async def get_audit_status(audit_id: str) -> APIResponse:
     audit = _audits.get(audit_id)
     if audit is None:
         raise HTTPException(status_code=404, detail=f"Audit '{audit_id}' not found.")
-    return APIResponse(status="success", data={"status": audit.status.value})
+    return APIResponse(status="success", data={
+        "status": audit.status.value,
+        "progress": audit.progress.model_dump() if audit.progress else None,
+    })
 
 
 async def _run_pipeline(
@@ -202,8 +206,35 @@ async def _run_pipeline(
                 audit_id=audit_id,
                 status=status,
                 report=_audits[audit_id].report,
+                progress=_audits[audit_id].progress,
             )
-    
+
+    def _set_progress(**fields) -> None:
+        """Update fine-grained progress within the current stage, without
+        touching status/report. Safe under asyncio's cooperative scheduling —
+        no true parallelism, so no lock needed even when called from multiple
+        concurrently-running process_article() coroutines."""
+        if audit_id in _audits:
+            current = _audits[audit_id]
+            _audits[audit_id] = AuditResponse(
+                audit_id=audit_id,
+                status=current.status,
+                report=current.report,
+                progress=AuditProgress(**fields),
+            )
+
+    # Mutable boxes so process_article's closure can update shared counters
+    # across concurrently-scheduled tasks (asyncio.gather runs them
+    # concurrently, but gap_analyser.py's _LLM_SEMAPHORE effectively
+    # serializes the actual LLM calls, so "N of 7 done" is real progress,
+    # not a fake animation). _llm_articles_done / _analysing_t0 feed a live
+    # ETA computed from this run's own observed per-article timing — not a
+    # static guess — since only articles with chunks AND applicability
+    # actually go through the slow LLM path; the rest finish instantly.
+    _articles_done = [0]
+    _llm_articles_done = [0]
+    _analysing_t0 = [0.0]
+
     async def process_article(
         article_num,
         domain,
@@ -214,6 +245,8 @@ async def _run_pipeline(
         applicable_articles,
     ):
         art_chunks = domain_chunks.get(domain, [])
+        is_applicable = not applicable_articles or article_num in applicable_articles
+        used_llm = bool(art_chunks) and is_applicable
         query_chunks = await select_query_chunks(art_chunks, article_num, embeddings)
 
         reg_passages = []
@@ -249,6 +282,22 @@ async def _run_pipeline(
             applicable_articles=applicable_articles,
         )
 
+        _articles_done[0] += 1
+
+        eta_seconds = None
+        if used_llm:
+            _llm_articles_done[0] += 1
+            elapsed_in_stage = _time.time() - _analysing_t0[0]
+            avg_per_llm_article = elapsed_in_stage / _llm_articles_done[0]
+            remaining_llm = max(0, _llm_articles_total - _llm_articles_done[0])
+            eta_seconds = round(avg_per_llm_article * remaining_llm)
+
+        _set_progress(
+            articles_done=_articles_done[0],
+            articles_total=len(ARTICLE_DOMAINS),
+            estimated_seconds_remaining=eta_seconds,
+        )
+
         return score
 
     try:
@@ -264,11 +313,12 @@ async def _run_pipeline(
         # misapplied to another's chunks. Only the resulting chunk lists are
         # pooled — everything from here on operates on a flat list[DocumentChunk].
         _set_status(AuditStatus.PARSING)
+        _set_progress(files_done=0, files_total=len(file_paths))
         _t0 = _time.time()
         raw_texts: list[str] = []
         chunks: list = []
         primary_language: str | None = None
-        for path, name in zip(file_paths, filenames):
+        for idx, (path, name) in enumerate(zip(file_paths, filenames)):
             file_raw_text = await parse_document(path, name)
             file_chunks = await proposition_chunk_text(file_raw_text, source_file=name)
             file_language = await detect_language(file_raw_text)
@@ -278,6 +328,7 @@ async def _run_pipeline(
             chunks.extend(file_chunks)
             if primary_language is None:
                 primary_language = file_language  # report-level language = first file's
+            _set_progress(files_done=idx + 1, files_total=len(file_paths))
         # Actor classification takes one text blob for pattern matching (not
         # chunking/heading-sensitive like the chunker), so concatenating raw
         # texts here is safe — this reasoning is specific to classify_actor,
@@ -311,8 +362,29 @@ async def _run_pipeline(
         )
 
         # ── Stage 4: chunk classification (BERT/Ollama) ───────────────────────
+        # Sequential Ollama classification is the biggest, previously-invisible
+        # wait for large real documents (~150 chunks observed taking 5+ minutes
+        # with zero progress shown). ETA starts as a rough guess from a
+        # calibrated default rate the instant we know the chunk count, then
+        # gets replaced by this run's own live-observed average after the
+        # first chunk completes — same "start rough, refine live" pattern as
+        # the ANALYSING stage below.
         _set_status(AuditStatus.CLASSIFYING_CHUNKS)
-        chunks, classifier_backend = await classify_chunks(chunks, ollama)
+        _classify_t0 = _time.time()
+        _DEFAULT_SEC_PER_CHUNK = 2.7  # calibrated from observed real-document runs
+        _set_progress(
+            chunks_done=0,
+            chunks_total=len(chunks),
+            estimated_seconds_remaining=round(len(chunks) * _DEFAULT_SEC_PER_CHUNK),
+        )
+
+        def _on_classify_progress(done: int, total: int) -> None:
+            elapsed_in_stage = _time.time() - _classify_t0
+            avg_per_chunk = elapsed_in_stage / done if done > 0 else _DEFAULT_SEC_PER_CHUNK
+            eta = round(avg_per_chunk * max(0, total - done))
+            _set_progress(chunks_done=done, chunks_total=total, estimated_seconds_remaining=eta)
+
+        chunks, classifier_backend = await classify_chunks(chunks, ollama, on_progress=_on_classify_progress)
 
         # ── Stage 5: NER domain correction ───────────────────────────────────
         # Now that chunk.domain is set, correct UNRELATED chunks that NER
@@ -334,6 +406,23 @@ async def _run_pipeline(
                 domain_chunks[chunk.domain].append(chunk)
 
         applicable_articles = applicability_result.applicable_articles
+
+        # Count articles that will actually need an LLM call (chunks present
+        # AND applicable) — the rest finish near-instantly via gap_analyser.py's
+        # own short-circuits, so only these drive real wait time. Used to turn
+        # per-article completion timing into a live "N seconds remaining" ETA.
+        _llm_articles_total = sum(
+            1
+            for article_num, domain in ARTICLE_DOMAINS.items()
+            if domain_chunks.get(domain) and (not applicable_articles or article_num in applicable_articles)
+        )
+        _analysing_t0[0] = _time.time()
+        _DEFAULT_SEC_PER_ARTICLE = 45  # calibrated from observed real gap-analysis runs
+        _set_progress(
+            articles_done=0,
+            articles_total=len(ARTICLE_DOMAINS),
+            estimated_seconds_remaining=round(_llm_articles_total * _DEFAULT_SEC_PER_ARTICLE),
+        )
 
         tasks = []
         for article_num, domain in ARTICLE_DOMAINS.items():
