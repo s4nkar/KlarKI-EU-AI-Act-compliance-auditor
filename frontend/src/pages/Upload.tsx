@@ -67,7 +67,7 @@ export default function Upload() {
             Upload Documentation
           </h1>
           <p className="mt-2 text-slate-400 max-w-lg mx-auto leading-relaxed">
-            Upload your AI system documentation to analyse compliance against EU AI Act Articles 9–15 and GDPR.
+            Upload one or more AI system documentation files to analyse compliance against EU AI Act Articles 9–15 and GDPR.
           </p>
         </div>
 

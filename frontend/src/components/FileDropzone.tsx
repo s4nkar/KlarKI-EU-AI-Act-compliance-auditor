@@ -10,6 +10,7 @@ const ACCEPTED_TYPES = {
   'text/markdown': ['.md'],
 }
 const MAX_SIZE_BYTES = 10 * 1024 * 1024
+const MAX_FILES = 5
 
 interface FileDropzoneProps {
   files: File[]
@@ -17,81 +18,105 @@ interface FileDropzoneProps {
 }
 
 export default function FileDropzone({ files, onChange }: FileDropzoneProps) {
-  const onDrop = useCallback((accepted: File[]) => onChange(accepted), [onChange])
+  const atLimit = files.length >= MAX_FILES
+
+  const onDrop = useCallback((accepted: File[]) => {
+    // Merge with existing selection, de-duplicate by name+size, cap at MAX_FILES.
+    const merged = [...files, ...accepted].filter(
+      (f, i, arr) => arr.findIndex(o => o.name === f.name && o.size === f.size) === i,
+    )
+    onChange(merged.slice(0, MAX_FILES))
+  }, [files, onChange])
+
+  const removeFile = (index: number) => {
+    onChange(files.filter((_, i) => i !== index))
+  }
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } = useDropzone({
     onDrop,
     accept: ACCEPTED_TYPES,
     maxSize: MAX_SIZE_BYTES,
-    multiple: false,
+    multiple: true,
+    disabled: atLimit,
   })
 
   const rejection = fileRejections[0]?.errors[0]
 
-  if (files.length > 0) {
-    return (
-      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-emerald-300 truncate">{files[0].name}</p>
-            <p className="text-xs text-emerald-500 mt-0.5">{(files[0].size / 1024).toFixed(0)} KB · Ready to upload</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => onChange([])}
-            className="w-7 h-7 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 flex items-center justify-center text-emerald-400 hover:text-emerald-300 transition-colors"
-            aria-label="Remove file"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div>
-      <div
-        {...getRootProps()}
-        className={`relative border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200 ${
-          isDragActive
-            ? 'border-brand-400/50 bg-brand-500/5 scale-[1.01]'
-            : 'border-line-strong hover:border-brand-400/40 hover:bg-surface'
-        }`}
-      >
-        <input {...getInputProps()} />
-        <div className="flex flex-col items-center gap-3">
-          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${
-            isDragActive ? 'bg-brand-500/15' : 'bg-surface-raised'
-          }`}>
-            <svg className={`w-7 h-7 transition-colors ${isDragActive ? 'text-brand-400' : 'text-slate-400'}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-          </div>
-          {isDragActive ? (
-            <p className="text-brand-400 font-semibold text-sm">Drop it here</p>
-          ) : (
-            <>
+      {files.length > 0 && (
+        <div className="space-y-2 mb-3">
+          {files.map((f, i) => (
+            <div key={`${f.name}-${f.size}`} className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-emerald-300 truncate">{f.name}</p>
+                  <p className="text-xs text-emerald-500 mt-0.5">{(f.size / 1024).toFixed(0)} KB · Ready to upload</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeFile(i)}
+                  className="w-7 h-7 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 flex items-center justify-center text-emerald-400 hover:text-emerald-300 transition-colors"
+                  aria-label={`Remove ${f.name}`}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!atLimit && (
+        <div
+          {...getRootProps()}
+          className={`relative border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200 ${
+            isDragActive
+              ? 'border-brand-400/50 bg-brand-500/5 scale-[1.01]'
+              : 'border-line-strong hover:border-brand-400/40 hover:bg-surface'
+          }`}
+        >
+          <input {...getInputProps()} />
+          <div className="flex flex-col items-center gap-3">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-colors ${
+              isDragActive ? 'bg-brand-500/15' : 'bg-surface-raised'
+            }`}>
+              <svg className={`w-7 h-7 transition-colors ${isDragActive ? 'text-brand-400' : 'text-slate-400'}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+            {isDragActive ? (
+              <p className="text-brand-400 font-semibold text-sm">Drop it here</p>
+            ) : (
               <div>
                 <p className="text-slate-300 font-semibold text-sm">
-                  Drag &amp; drop a file, or <span className="text-brand-400 hover:text-brand-300">browse</span>
+                  {files.length > 0 ? 'Drag & drop more, or ' : 'Drag & drop a file, or '}
+                  <span className="text-brand-400 hover:text-brand-300">browse</span>
                 </p>
-                <p className="text-slate-500 text-xs mt-1">PDF, DOCX, TXT, MD · max 10 MB</p>
+                <p className="text-slate-500 text-xs mt-1">
+                  PDF, DOCX, TXT, MD · max 10 MB each · up to {MAX_FILES} files
+                </p>
               </div>
-            </>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {atLimit && (
+        <p className="text-xs text-slate-500 text-center py-2">
+          Maximum of {MAX_FILES} files reached — remove one to add another.
+        </p>
+      )}
 
       {rejection && (
         <p className="mt-2 text-sm text-red-400 flex items-center gap-1.5">

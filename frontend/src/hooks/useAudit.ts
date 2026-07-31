@@ -15,7 +15,7 @@ export async function startAudit(
   const form = new FormData()
 
   if (files.length > 0) {
-    form.append('file', files[0])
+    files.forEach(f => form.append('files', f))
   } else if (rawText) {
     form.append('raw_text', rawText)
   } else {
