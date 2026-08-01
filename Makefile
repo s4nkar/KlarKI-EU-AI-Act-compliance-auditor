@@ -16,6 +16,9 @@ setup:
 up:
 	./run.sh up
 
+dev:
+	./run.sh dev
+
 triton:
 	./run.sh triton
 

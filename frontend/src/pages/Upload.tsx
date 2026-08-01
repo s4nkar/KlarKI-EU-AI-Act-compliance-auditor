@@ -100,7 +100,7 @@ export default function Upload() {
             <span className="text-amber-300/90 flex-1">
               No risk tier selected. Complete the Annex III wizard first for a more accurate audit.
             </span>
-            <Link to="/" className="shrink-0 text-sm font-semibold text-amber-300 hover:text-amber-200 underline">
+            <Link to="/wizard" className="shrink-0 text-sm font-semibold text-amber-300 hover:text-amber-200 underline">
               Go to Step 1 →
             </Link>
           </div>

@@ -10,8 +10,14 @@ services:
       - ./training:/training # mount training models for eval scripts
       - upload_data:/data/uploads
       - chroma_data:/data/chroma
+      # Dockerfile.dev skips the prod image's pre-download step, and the ./api
+      # bind mount above shadows anything baked into /app/.cache anyway — so
+      # dev needs its own persistent cache and network access on first boot.
+      - hf_cache_dev:/app/.cache/huggingface
     environment:
       - DEBUG=true
+      - HF_HUB_OFFLINE=0
+      - TRANSFORMERS_OFFLINE=0
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
   klarki-frontend:
@@ -26,3 +32,6 @@ services:
     environment:
       - VITE_API_URL=http://localhost:8000
     command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  hf_cache_dev:

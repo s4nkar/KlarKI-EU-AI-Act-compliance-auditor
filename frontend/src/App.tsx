@@ -1,6 +1,7 @@
-// Router setup — Wizard-first flow: Step 1 (/) → Step 2 (/upload) → Dashboard.
+// Router setup — Landing page (/) → Wizard (/wizard) → Upload (/upload) → Dashboard.
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import Home from './pages/Home'
 import Upload from './pages/Upload'
 import Dashboard from './pages/Dashboard'
 import ArticleDetail from './pages/ArticleDetail'
@@ -12,10 +13,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<RiskWizard />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/wizard" element={<RiskWizard />} />
         <Route path="/upload" element={<Upload />} />
-        {/* Legacy alias so existing /wizard links still work */}
-        <Route path="/wizard" element={<Navigate to="/" replace />} />
         <Route path="/audit/:auditId" element={<Dashboard />} />
         <Route path="/audit/:auditId/article/:articleNum" element={<ArticleDetail />} />
         <Route path="/metrics" element={<ClassifierMetrics />} />
