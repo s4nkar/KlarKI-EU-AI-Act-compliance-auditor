@@ -47,7 +47,11 @@
     "versions": {
       "v1": {
         "created_at": "2026-07-31",
-        "note": "Migrated from the old flat api/prompts/classify_chunk.txt file (pre-registry) with no content change, other than {chunk_text} -> {{CHUNK_TEXT}} to match the registry's double-brace placeholder convention. Few-shot domain-label classification prompt used by services/classifier.py when USE_TRITON=false."
+        "note": "Migrated from the old flat api/prompts/classify_chunk.txt file (pre-registry) with no content change, other than {chunk_text} -> {{CHUNK_TEXT}} to match the registry's double-brace placeholder convention. Single-chunk classification prompt, one Ollama call per chunk. Active again as of 2026-08-01 after v2 (batching) was tried and reverted — see v2's note. services/classifier.py now also passes num_predict=20 on this call to cut off phi3:mini's occasional rambling past the bare label."
+      },
+      "v2": {
+        "created_at": "2026-08-01",
+        "note": "ABANDONED — real-world regression, not used. Tried batching 5 numbered chunks into one call (one JSON response with 5 labels) to cut Ollama round-trips ~5x. Measured on a real 154-chunk bilingual (DE/EN) legal document: classification got ~3x SLOWER overall (7.9s/chunk vs the v1 baseline's 2.7s/chunk), not faster. Two root causes, both fundamental rather than fixable by tuning: (1) phi3:mini frequently returns a genuinely incomplete-but-valid-JSON label set for a 5-item batch (e.g. 3 of 5 keys present, confirmed NOT a token-budget/truncation artifact — num_predict=180/300/500 produced byte-identical output), so a meaningful fraction of chunks still needed an individual v1 fallback call stacked on top of the slow batch call itself; (2) the dominant per-call cost on this CPU deployment is prefill time for the chunk content, which batching does not reduce — only the fixed prompt preamble is saved by combining chunks into one call, and that's a small fraction of total prompt size once real chunk text (up to 800 chars each) dominates. Kept in this registry as a record so this approach isn't re-attempted without knowing why it failed. If classification speed needs to improve further, the two real levers are: Triton/BERT batched inference (USE_TRITON=true — a discriminative model, not generative, so this failure mode doesn't apply) or GPU acceleration for Ollama itself."
       }
     }
   }

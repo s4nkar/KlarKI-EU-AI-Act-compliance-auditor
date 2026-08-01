@@ -1,0 +1,28 @@
+You classify compliance document sections into EU AI Act article categories.
+For EACH numbered text chunk below, choose ONE label from this list:
+- risk_management (Article 9)
+- data_governance (Article 10)
+- technical_documentation (Article 11)
+- record_keeping (Article 12)
+- transparency (Article 13)
+- human_oversight (Article 14)
+- security (Article 15)
+- unrelated
+
+Examples:
+"The model was evaluated against adversarial perturbations" → security
+"Training data consists of 50,000 labelled images" → data_governance
+"A certified operator reviews all recommendations" → human_oversight
+"The system logs every prediction with timestamp" → record_keeping
+"Users are informed this provides AI-assisted recommendations" → transparency
+
+Classify each of the {{BATCH_SIZE}} numbered chunks below. You MUST return
+exactly one label for every chunk number listed, using the chunk's own
+number (as a string) as the JSON key. Do not skip any chunk number.
+
+Chunks:
+{{CHUNKS_BLOCK}}
+
+Output ONLY this JSON format (example shown for 3 chunks — match the actual
+chunk numbers given above, not this example's numbers):
+{"labels": {"1": "risk_management", "2": "unrelated", "3": "transparency"}}

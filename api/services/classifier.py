@@ -39,19 +39,43 @@ def _parse_label(raw: str) -> ArticleDomain:
     return _LABEL_MAP.get(cleaned, ArticleDomain.UNRELATED)
 
 
+# Bare label output ("technical_documentation" is the longest, ~5 tokens) —
+# capped generously to stop phi3:mini's occasional unsolicited rambling
+# (observed appending a "(Note: the provided text appears to be...)"
+# explanation after a correct label) without risking cutting off a real answer.
+_SINGLE_LABEL_NUM_PREDICT = 20
+
+
 async def _classify_ollama(
     chunks: list[DocumentChunk],
     ollama: OllamaClient,
     on_progress: Callable[[int, int], None] | None = None,
 ) -> tuple[list[DocumentChunk], str]:
-    """Sequential few-shot classification via Ollama."""
-    prompt_template = load_prompt("classifier")
+    """Sequential few-shot classification via Ollama, one chunk per call.
+
+    A batched variant (N chunks per call, one JSON response) was tried and
+    reverted — see prompts/registry.json's classifier.v2 entry for the full
+    writeup. Summary: on a real 154-chunk document, batching made total
+    classification time ~3x WORSE (7.9s/chunk vs 2.7s/chunk), not better.
+    Root causes: (1) phi3:mini frequently returns a genuinely incomplete
+    label set for a 5-item batch — not truncation, a complete-but-partial
+    JSON object — so a meaningful fraction of chunks still need an
+    individual fallback call stacked on top of the (already slow) batch
+    call; (2) the dominant cost is CPU prefill time for the chunk content
+    itself, which batching doesn't reduce — only the fixed preamble is
+    saved by combining calls, and that's a small fraction of total prompt
+    size once real chunk text (up to 800 chars each) is included.
+
+    The one improvement from that work worth keeping: num_predict, which
+    measurably helps here too by cutting off the same rambling tendency.
+    """
+    prompt_template = load_prompt("classifier", version="v1")
     total = len(chunks)
 
     for i, chunk in enumerate(chunks):
         prompt = prompt_template.replace("{{CHUNK_TEXT}}", chunk.text)
         try:
-            raw = await ollama.generate(prompt)
+            raw = await ollama.generate(prompt, num_predict=_SINGLE_LABEL_NUM_PREDICT)
             chunk.domain = _parse_label(raw)
         except Exception as exc:
             logger.warning("classify_chunk_failed", chunk_id=chunk.chunk_id, error=str(exc))
