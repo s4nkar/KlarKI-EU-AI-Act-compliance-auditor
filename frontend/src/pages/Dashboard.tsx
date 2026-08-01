@@ -51,7 +51,7 @@ export default function Dashboard() {
             </svg>
           </div>
           <p className="text-slate-400 mb-5">{error ?? 'Report not found.'}</p>
-          <Link to="/" className="btn-primary">← Start a new audit</Link>
+          <Link to="/wizard" className="btn-primary">← Start a new audit</Link>
         </div>
       </Layout>
     )

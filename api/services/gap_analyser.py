@@ -1,12 +1,12 @@
 """Gap analysis service — per-article LLM structured analysis.
 
-Concatenates user document chunks with retrieved regulatory passages,
-sends to Ollama with the gap_analysis.txt prompt, parses the JSON response
-into an ArticleScore with GapItems and recommendations.
+Concatenates user document chunks with retrieved regulatory passages and
+runs them through the legal -> technical -> synthesis LangGraph chain
+(services/agent_graph.py), parsing the result into an ArticleScore with
+GapItems and recommendations.
 """
 
 import asyncio
-from pathlib import Path
 
 import structlog
 
@@ -28,8 +28,6 @@ from models.schemas import (
 from services.ollama_client import OllamaClient
 
 logger = structlog.get_logger()
-
-_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "gap_analysis.txt"
 
 _DOMAIN_LABELS: dict[ArticleDomain, str] = {
     ArticleDomain.RISK_MANAGEMENT:          "Risk Management System",

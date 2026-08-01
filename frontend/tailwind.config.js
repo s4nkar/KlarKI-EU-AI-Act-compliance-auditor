@@ -5,7 +5,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'system-ui', 'sans-serif'],
+        sans: ['Geist Variable', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'system-ui', 'sans-serif'],
+        mono: ['Geist Mono Variable', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       colors: {
         // Indigo → violet accent. Compressed range vs. stock Tailwind indigo so

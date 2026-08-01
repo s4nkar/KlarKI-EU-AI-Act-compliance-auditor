@@ -1,7 +1,7 @@
 // Upload documents and poll audit status.
 
 import apiClient from '../api/client'
-import type { AuditResponse, AuditStatus } from '../types'
+import type { AuditProgress, AuditResponse, AuditStatus } from '../types'
 
 const TERMINAL_STATUSES: AuditStatus[] = ['complete', 'failed']
 const POLL_INTERVAL_MS = 2000
@@ -15,7 +15,7 @@ export async function startAudit(
   const form = new FormData()
 
   if (files.length > 0) {
-    form.append('file', files[0])
+    files.forEach(f => form.append('files', f))
   } else if (rawText) {
     form.append('raw_text', rawText)
   } else {
@@ -37,7 +37,7 @@ export async function startAudit(
 /** Poll audit status every 2 s until COMPLETE or FAILED. */
 export async function pollAudit(
   auditId: string,
-  onStatusChange?: (status: AuditStatus) => void,
+  onStatusChange?: (status: AuditStatus, progress?: AuditProgress | null) => void,
 ): Promise<AuditResponse> {
   return new Promise((resolve, reject) => {
     const tick = async () => {
@@ -46,7 +46,7 @@ export async function pollAudit(
           `/api/v1/audit/${auditId}`,
         )
         const audit = resp.data
-        onStatusChange?.(audit.status)
+        onStatusChange?.(audit.status, audit.progress)
 
         if (TERMINAL_STATUSES.includes(audit.status)) {
           resolve(audit)

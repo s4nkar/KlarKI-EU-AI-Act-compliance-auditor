@@ -134,10 +134,21 @@ export interface ComplianceReport {
   requires_human_review: boolean
 }
 
+export interface AuditProgress {
+  files_done?: number | null
+  files_total?: number | null
+  chunks_done?: number | null
+  chunks_total?: number | null
+  articles_done?: number | null
+  articles_total?: number | null
+  estimated_seconds_remaining?: number | null
+}
+
 export interface AuditResponse {
   audit_id: string
   status: AuditStatus
   report: ComplianceReport | null
+  progress?: AuditProgress | null
 }
 
 export interface APIResponse<T = Record<string, unknown>> {

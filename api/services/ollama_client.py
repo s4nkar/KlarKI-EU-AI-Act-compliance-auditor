@@ -37,12 +37,20 @@ class OllamaClient:
         self._host = host.rstrip("/")
         self._model = model
 
-    async def generate(self, prompt: str, system: str = "") -> str:
+    async def generate(self, prompt: str, system: str = "", num_predict: int | None = None) -> str:
         """Send a prompt and return the raw text response.
 
         Args:
             prompt: User prompt text.
             system: Optional system message.
+            num_predict: Optional cap on generated tokens. There is no default
+                cap — a small model like phi3:mini will sometimes ramble past
+                the answer it was asked for (e.g. appending an unsolicited
+                "(Note: ...)" explanation after a classification label), and
+                that risk compounds when one prompt asks for several answers
+                at once (batched classification). Pass a value sized to the
+                expected output when the caller knows the answer should be
+                short.
 
         Returns:
             Model response string.
@@ -50,11 +58,14 @@ class OllamaClient:
         Raises:
             httpx.HTTPError: On network or server errors.
         """
+        options = dict(_DETERMINISTIC_OPTIONS)
+        if num_predict is not None:
+            options["num_predict"] = num_predict
         payload: dict = {
             "model": self._model,
             "prompt": prompt,
             "stream": False,
-            "options": _DETERMINISTIC_OPTIONS,
+            "options": options,
         }
         if system:
             payload["system"] = system
@@ -65,10 +76,15 @@ class OllamaClient:
             data = resp.json()
             return data.get("response", "").strip()
 
-    async def generate_json(self, prompt: str, system: str = "", keep_alive: str = "5m") -> dict:
+    async def generate_json(
+        self,
+        prompt: str,
+        system: str = "",
+        keep_alive: str = "5m",
+        constrain_format: bool = True,
+        num_predict: int | None = None,
+    ) -> dict:
         """Send a prompt requesting JSON output, retry once on parse failure.
-
-        Uses Ollama's format='json' mode to constrain output.
 
         Args:
             prompt: User prompt text.
@@ -76,6 +92,20 @@ class OllamaClient:
             keep_alive: How long to keep model loaded after this call. Pass "0"
                 to unload immediately (useful before loading large CPU models
                 like the NLI cross-encoder).
+            constrain_format: When True (default), sets Ollama's format='json'
+                mode, which guarantees syntactically valid JSON via
+                grammar-constrained decoding — but that constraint has real
+                per-token cost: measured ~2x slower (13.5s vs 7.1s) than
+                free-form generation on an identical prompt during
+                classifier.py's batched-classification work. Pass False when
+                the prompt's own instructions/few-shot examples already
+                reliably elicit JSON (as in the batched classifier prompt) —
+                parsing below runs the same extract-and-retry logic either way,
+                so a malformed response is still caught, just not prevented
+                by the decoder.
+            num_predict: See generate()'s docstring — same rambling risk,
+                worse here since the caller usually expects a bounded JSON
+                shape it can size in advance.
 
         Returns:
             Parsed JSON dict from the model.
@@ -83,14 +113,18 @@ class OllamaClient:
         Raises:
             ValueError: If JSON cannot be parsed after retry.
         """
+        options = dict(_DETERMINISTIC_OPTIONS)
+        if num_predict is not None:
+            options["num_predict"] = num_predict
         payload: dict = {
             "model": self._model,
             "prompt": prompt,
             "stream": False,
-            "format": "json",
             "keep_alive": keep_alive,
-            "options": _DETERMINISTIC_OPTIONS,
+            "options": options,
         }
+        if constrain_format:
+            payload["format"] = "json"
         if system:
             payload["system"] = system
 

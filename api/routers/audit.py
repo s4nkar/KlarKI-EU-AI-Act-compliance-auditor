@@ -14,12 +14,13 @@ from typing import Annotated
 
 import aiofiles
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Request, UploadFile
 
 from config import settings
 from models.schemas import (
     APIResponse,
     ArticleDomain,
+    AuditProgress,
     AuditResponse,
     AuditStatus,
     RiskTier,
@@ -50,56 +51,70 @@ _audits: dict[str, AuditResponse] = {}
 async def upload_document(
     request: Request,
     background_tasks: BackgroundTasks,
-    file: UploadFile | None = None,
+    files: Annotated[list[UploadFile], File()] = [],
     raw_text: Annotated[str | None, Form()] = None,
     wizard_risk_tier: Annotated[str | None, Form()] = None,
 ) -> APIResponse:
-    """Accept a document file or raw text and start the compliance audit pipeline.
+    """Accept one or more document files, or raw text, and start the compliance audit pipeline.
 
-    One of `file` or `raw_text` must be provided.
+    One of `files` or `raw_text` must be provided. Each uploaded file is parsed
+    and chunked independently (so language detection and source-file
+    provenance stay accurate per document) before all chunks are pooled for
+    the rest of the pipeline.
 
     Args:
-        file: Uploaded PDF, DOCX, TXT, or MD file (max 10 MB).
+        files: One or more uploaded PDF, DOCX, TXT, or MD files (max 10 MB each,
+               max settings.upload_max_files files).
         raw_text: Plain text pasted directly into the form.
         wizard_risk_tier: Optional risk tier from the Annex III wizard (pre-audit self-assessment).
 
     Returns:
         APIResponse with audit_id to poll for status.
     """
-    if file is None and not raw_text:
-        raise HTTPException(status_code=400, detail="Provide a file or raw_text.")
+    files = [f for f in (files or []) if f.filename]
+
+    if not files and not raw_text:
+        raise HTTPException(status_code=400, detail="Provide one or more files, or raw_text.")
+
+    if len(files) > settings.upload_max_files:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Too many files ({len(files)}). Maximum is {settings.upload_max_files}.",
+        )
 
     audit_id = str(uuid.uuid4())
+    file_paths: list[str] = []
+    filenames: list[str] = []
 
-    # Validate file type and size
-    if file is not None:
-        ext = Path(file.filename or "").suffix.lower()
-        if ext not in SUPPORTED_EXTENSIONS:
-            raise HTTPException(
-                status_code=415,
-                detail=f"Unsupported file type '{ext}'. Accepted: {', '.join(SUPPORTED_EXTENSIONS)}",
-            )
-        content = await file.read()
-        if len(content) > settings.upload_max_bytes:
-            raise HTTPException(
-                status_code=413,
-                detail=f"File exceeds {settings.upload_max_size_mb} MB limit.",
-            )
+    if files:
+        for idx, file in enumerate(files):
+            ext = Path(file.filename or "").suffix.lower()
+            if ext not in SUPPORTED_EXTENSIONS:
+                raise HTTPException(
+                    status_code=415,
+                    detail=f"Unsupported file type '{ext}' ({file.filename}). "
+                            f"Accepted: {', '.join(SUPPORTED_EXTENSIONS)}",
+                )
+            content = await file.read()
+            if len(content) > settings.upload_max_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"'{file.filename}' exceeds {settings.upload_max_size_mb} MB limit.",
+                )
 
-        # Save to disk
-        upload_path = Path(settings.upload_dir) / f"{audit_id}{ext}"
-        async with aiofiles.open(upload_path, "wb") as f_out:
-            await f_out.write(content)
+            upload_path = Path(settings.upload_dir) / f"{audit_id}_{idx}{ext}"
+            async with aiofiles.open(upload_path, "wb") as f_out:
+                await f_out.write(content)
 
-        filename = file.filename or f"upload{ext}"
-        file_path = str(upload_path)
+            filenames.append(file.filename or f"upload_{idx}{ext}")
+            file_paths.append(str(upload_path))
     else:
         # Raw text — save as .txt
-        filename = "paste.txt"
         upload_path = Path(settings.upload_dir) / f"{audit_id}.txt"
         async with aiofiles.open(upload_path, "w", encoding="utf-8") as f_out:
             await f_out.write(raw_text)  # type: ignore[arg-type]
-        file_path = str(upload_path)
+        filenames.append("paste.txt")
+        file_paths.append(str(upload_path))
 
     # Register audit as UPLOADING
     _audits[audit_id] = AuditResponse(audit_id=audit_id, status=AuditStatus.UPLOADING)
@@ -118,14 +133,14 @@ async def upload_document(
     background_tasks.add_task(
         _run_pipeline,
         audit_id=audit_id,
-        file_path=file_path,
-        filename=filename,
+        file_paths=file_paths,
+        filenames=filenames,
         request=request,
         ollama=ollama,
         wizard_risk_tier=parsed_wizard_tier,
     )
 
-    logger.info("audit_started", audit_id=audit_id, filename=filename)
+    logger.info("audit_started", audit_id=audit_id, filenames=filenames)
     return APIResponse(status="success", data={"audit_id": audit_id})
 
 
@@ -158,13 +173,16 @@ async def get_audit_status(audit_id: str) -> APIResponse:
     audit = _audits.get(audit_id)
     if audit is None:
         raise HTTPException(status_code=404, detail=f"Audit '{audit_id}' not found.")
-    return APIResponse(status="success", data={"status": audit.status.value})
+    return APIResponse(status="success", data={
+        "status": audit.status.value,
+        "progress": audit.progress.model_dump() if audit.progress else None,
+    })
 
 
 async def _run_pipeline(
     audit_id: str,
-    file_path: str,
-    filename: str,
+    file_paths: list[str],
+    filenames: list[str],
     request: Request,
     ollama: OllamaClient,
     wizard_risk_tier: RiskTier | None = None,
@@ -172,6 +190,13 @@ async def _run_pipeline(
     """Full compliance audit pipeline executed as a BackgroundTask.
 
     Stages: parse → chunk → detect language → classify → RAG → gap analysis → score
+
+    Each file in file_paths/filenames is parsed, chunked, and language-detected
+    independently (so per-document provenance and language stay accurate),
+    then all chunks are pooled into one flat list before every downstream
+    stage — those already operate on a flat list[DocumentChunk] regardless of
+    how many source documents it came from.
+
     Updates _audits[audit_id].status at each stage.
     """
 
@@ -181,8 +206,35 @@ async def _run_pipeline(
                 audit_id=audit_id,
                 status=status,
                 report=_audits[audit_id].report,
+                progress=_audits[audit_id].progress,
             )
-    
+
+    def _set_progress(**fields) -> None:
+        """Update fine-grained progress within the current stage, without
+        touching status/report. Safe under asyncio's cooperative scheduling —
+        no true parallelism, so no lock needed even when called from multiple
+        concurrently-running process_article() coroutines."""
+        if audit_id in _audits:
+            current = _audits[audit_id]
+            _audits[audit_id] = AuditResponse(
+                audit_id=audit_id,
+                status=current.status,
+                report=current.report,
+                progress=AuditProgress(**fields),
+            )
+
+    # Mutable boxes so process_article's closure can update shared counters
+    # across concurrently-scheduled tasks (asyncio.gather runs them
+    # concurrently, but gap_analyser.py's _LLM_SEMAPHORE effectively
+    # serializes the actual LLM calls, so "N of 7 done" is real progress,
+    # not a fake animation). _llm_articles_done / _analysing_t0 feed a live
+    # ETA computed from this run's own observed per-article timing — not a
+    # static guess — since only articles with chunks AND applicability
+    # actually go through the slow LLM path; the rest finish instantly.
+    _articles_done = [0]
+    _llm_articles_done = [0]
+    _analysing_t0 = [0.0]
+
     async def process_article(
         article_num,
         domain,
@@ -193,6 +245,8 @@ async def _run_pipeline(
         applicable_articles,
     ):
         art_chunks = domain_chunks.get(domain, [])
+        is_applicable = not applicable_articles or article_num in applicable_articles
+        used_llm = bool(art_chunks) and is_applicable
         query_chunks = await select_query_chunks(art_chunks, article_num, embeddings)
 
         reg_passages = []
@@ -228,6 +282,22 @@ async def _run_pipeline(
             applicable_articles=applicable_articles,
         )
 
+        _articles_done[0] += 1
+
+        eta_seconds = None
+        if used_llm:
+            _llm_articles_done[0] += 1
+            elapsed_in_stage = _time.time() - _analysing_t0[0]
+            avg_per_llm_article = elapsed_in_stage / _llm_articles_done[0]
+            remaining_llm = max(0, _llm_articles_total - _llm_articles_done[0])
+            eta_seconds = round(avg_per_llm_article * remaining_llm)
+
+        _set_progress(
+            articles_done=_articles_done[0],
+            articles_total=len(ARTICLE_DOMAINS),
+            estimated_seconds_remaining=eta_seconds,
+        )
+
         return score
 
     try:
@@ -236,14 +306,34 @@ async def _run_pipeline(
         chroma = request.app.state.chroma
         embeddings = request.app.state.embeddings
 
-        # ── Stage 1: parse → chunk → language ────────────────────────────────
+        # ── Stage 1: parse → chunk → language (per file, then pooled) ────────
+        # Each file is parsed, chunked, and language-detected independently so
+        # a multi-document upload with mixed languages (e.g. an English risk
+        # policy + a German technical file) doesn't have one file's language
+        # misapplied to another's chunks. Only the resulting chunk lists are
+        # pooled — everything from here on operates on a flat list[DocumentChunk].
         _set_status(AuditStatus.PARSING)
+        _set_progress(files_done=0, files_total=len(file_paths))
         _t0 = _time.time()
-        raw_text = await parse_document(file_path, filename)
-        chunks = await proposition_chunk_text(raw_text, source_file=filename)
-        language = await detect_language(raw_text)
-        for chunk in chunks:
-            chunk.language = language
+        raw_texts: list[str] = []
+        chunks: list = []
+        primary_language: str | None = None
+        for idx, (path, name) in enumerate(zip(file_paths, filenames)):
+            file_raw_text = await parse_document(path, name)
+            file_chunks = await proposition_chunk_text(file_raw_text, source_file=name)
+            file_language = await detect_language(file_raw_text)
+            for chunk in file_chunks:
+                chunk.language = file_language
+            raw_texts.append(file_raw_text)
+            chunks.extend(file_chunks)
+            if primary_language is None:
+                primary_language = file_language  # report-level language = first file's
+            _set_progress(files_done=idx + 1, files_total=len(file_paths))
+        # Actor classification takes one text blob for pattern matching (not
+        # chunking/heading-sensitive like the chunker), so concatenating raw
+        # texts here is safe — this reasoning is specific to classify_actor,
+        # not a general license to concatenate raw text elsewhere.
+        raw_text = "\n\n".join(raw_texts)
         _monitor.record_stage("parsing", _time.time() - _t0)
 
         # ── Stage 2: NER entity extraction ───────────────────────────────────
@@ -272,8 +362,29 @@ async def _run_pipeline(
         )
 
         # ── Stage 4: chunk classification (BERT/Ollama) ───────────────────────
+        # Sequential Ollama classification is the biggest, previously-invisible
+        # wait for large real documents (~150 chunks observed taking 5+ minutes
+        # with zero progress shown). ETA starts as a rough guess from a
+        # calibrated default rate the instant we know the chunk count, then
+        # gets replaced by this run's own live-observed average after the
+        # first chunk completes — same "start rough, refine live" pattern as
+        # the ANALYSING stage below.
         _set_status(AuditStatus.CLASSIFYING_CHUNKS)
-        chunks, classifier_backend = await classify_chunks(chunks, ollama)
+        _classify_t0 = _time.time()
+        _DEFAULT_SEC_PER_CHUNK = 2.7  # calibrated from observed real-document runs
+        _set_progress(
+            chunks_done=0,
+            chunks_total=len(chunks),
+            estimated_seconds_remaining=round(len(chunks) * _DEFAULT_SEC_PER_CHUNK),
+        )
+
+        def _on_classify_progress(done: int, total: int) -> None:
+            elapsed_in_stage = _time.time() - _classify_t0
+            avg_per_chunk = elapsed_in_stage / done if done > 0 else _DEFAULT_SEC_PER_CHUNK
+            eta = round(avg_per_chunk * max(0, total - done))
+            _set_progress(chunks_done=done, chunks_total=total, estimated_seconds_remaining=eta)
+
+        chunks, classifier_backend = await classify_chunks(chunks, ollama, on_progress=_on_classify_progress)
 
         # ── Stage 5: NER domain correction ───────────────────────────────────
         # Now that chunk.domain is set, correct UNRELATED chunks that NER
@@ -295,6 +406,23 @@ async def _run_pipeline(
                 domain_chunks[chunk.domain].append(chunk)
 
         applicable_articles = applicability_result.applicable_articles
+
+        # Count articles that will actually need an LLM call (chunks present
+        # AND applicable) — the rest finish near-instantly via gap_analyser.py's
+        # own short-circuits, so only these drive real wait time. Used to turn
+        # per-article completion timing into a live "N seconds remaining" ETA.
+        _llm_articles_total = sum(
+            1
+            for article_num, domain in ARTICLE_DOMAINS.items()
+            if domain_chunks.get(domain) and (not applicable_articles or article_num in applicable_articles)
+        )
+        _analysing_t0[0] = _time.time()
+        _DEFAULT_SEC_PER_ARTICLE = 45  # calibrated from observed real gap-analysis runs
+        _set_progress(
+            articles_done=0,
+            articles_total=len(ARTICLE_DOMAINS),
+            estimated_seconds_remaining=round(_llm_articles_total * _DEFAULT_SEC_PER_ARTICLE),
+        )
 
         tasks = []
         for article_num, domain in ARTICLE_DOMAINS.items():
@@ -330,8 +458,8 @@ async def _run_pipeline(
             article_scores=article_scores,
             chunks=chunks,
             audit_id=audit_id,
-            source_files=[filename],
-            language=language,
+            source_files=filenames,
+            language=primary_language,
             emotion_flag=emotion_flag,
             classifier_backend=classifier_backend,
             wizard_risk_tier=wizard_risk_tier,
@@ -355,8 +483,9 @@ async def _run_pipeline(
         _set_status(AuditStatus.FAILED)
 
     finally:
-        # Clean up uploaded file
-        try:
-            os.remove(file_path)
-        except OSError:
-            pass
+        # Clean up all uploaded files
+        for path in file_paths:
+            try:
+                os.remove(path)
+            except OSError:
+                pass

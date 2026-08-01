@@ -2,7 +2,7 @@
 Evaluation 4 — Hallucination / Citation Verification.
 
 Every compliance gap the system surfaces must be traceable to actual
-regulatory text.  This eval enforces four rules:
+regulatory text.  This eval enforces six rules:
 
   Rule 1 — Evidence linkage:
       Each ArticleScore must have ≥ 1 regulatory_passage retrieved.
@@ -17,14 +17,41 @@ regulatory text.  This eval enforces four rules:
       Recommendations must reference a regulatory concept
       (checked via keyword matching against a known vocabulary).
 
-  Rule 4 — Semantic entailment:
-      Each gap's description must be entailed by at least one of the
+  Rule 4 — Semantic entailment (topical grounding):
+      Each gap's *topic* (its title) must be discussed by at least one of the
       article's retrieved regulatory passages, per the NLI cross-encoder
       already used in evidence_mapper.py (cross-encoder/nli-deberta-v3-small).
       Rule 1 only checks that *some* passage was retrieved for an article;
       Rule 4 checks that the reported gap is actually *about* what the
-      retrieved text says, catching gaps that cite a real passage but
-      describe something the passage doesn't support.
+      retrieved text says, catching gaps that cite a real passage but are
+      actually about an unrelated topic.
+
+      The hypothesis is built from gap.title, not gap.description — gap
+      descriptions are deficiency findings ("X is not done"), which read as
+      CONTRADICTIONS of a regulatory requirement even when the citation is
+      perfectly grounded. Framing the hypothesis as a topic-presence claim
+      ("This passage discusses the requirement: {title}"), matching
+      evidence_mapper.py's own proven pattern, checks topical relevance
+      instead of asking the passage to logically prove the deficiency.
+
+  Rule 5 — Fabricated-specifics faithfulness:
+      Gap descriptions and recommendations sometimes cite a specific
+      Article number or a specific figure (a duration, a percentage) as
+      justification. Rule 4 only checks topical grounding — it would not
+      catch a gap that's topically about the right requirement but invents
+      a figure no retrieved passage or user chunk actually contains (e.g.
+      "Article 12 requires 36-month retention" when no source text says
+      36 months). This rule regex-extracts Article-number mentions and
+      numeric claims and verifies they appear verbatim in the source text
+      the LLM was given (retrieved passages + the user's own chunks).
+
+  Rule 6 — Recommendation specificity:
+      A recommendation identical (after normalisation) to another
+      recommendation issued for a *different* article in the same run is
+      flagged as likely generic/templated boilerplate — Rule 3's keyword
+      check can be satisfied by any recommendation containing a common
+      word like "system" or "data" without the recommendation actually
+      being specific to the gap it's attached to.
 
 Uses proposition_chunk_text (the production chunker) so the chunking
 strategy matches what the real pipeline produces. Uses select_query_chunks
@@ -48,6 +75,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -59,6 +87,37 @@ sys.path.insert(0, str(_API_DIR))
 
 # Minimum NLI entailment score for a passage to count as supporting a gap description
 _NLI_ENTAILMENT_THRESHOLD = 0.5
+
+# Rule 5 patterns — Article-number mentions and numeric-with-unit claims
+_ARTICLE_MENTION_RE = re.compile(r"\bArticle\s+(\d{1,2})\b", re.IGNORECASE)
+_NUMERIC_CLAIM_RE = re.compile(r"\b(\d+)\s*(months?|years?|days?|weeks?|hours?|%|percent)\b", re.IGNORECASE)
+
+
+def _check_fabricated_specifics(current_article: int, text: str, source_text: str) -> list[str]:
+    """Flag Article-number mentions and numeric claims in `text` that don't
+    appear anywhere in `source_text` (the concatenated retrieved passages the
+    LLM was actually given). Citing the article currently being scored is
+    always fine; citing a different one, or a duration/percentage, must be
+    traceable to the source text or it's treated as a fabricated specific."""
+    issues: list[str] = []
+    source_lower = source_text.lower()
+
+    for m in _ARTICLE_MENTION_RE.finditer(text):
+        cited_article = int(m.group(1))
+        if cited_article == current_article:
+            continue
+        if f"article {cited_article}" not in source_lower:
+            issues.append(
+                f"cites 'Article {cited_article}' but no retrieved passage "
+                f"references Article {cited_article}"
+            )
+
+    for m in _NUMERIC_CLAIM_RE.finditer(text):
+        claim = m.group(0)
+        if claim.lower() not in source_lower:
+            issues.append(f"claims '{claim}' but no retrieved passage contains this figure")
+
+    return issues
 
 # Keywords that a grounded recommendation should contain
 REGULATORY_VOCAB = {
@@ -88,11 +147,13 @@ def _is_grounded_recommendation(text: str) -> bool:
     return any(kw in lower for kw in REGULATORY_VOCAB)
 
 
-def _score_entailment(nli_model, pairs: list[tuple[str, str]]) -> list[bool]:
-    """Batch-score (premise, hypothesis) pairs; return per-pair entailment booleans.
+def _score_entailment(nli_model, pairs: list[tuple[str, str]]) -> list[tuple[bool, float]]:
+    """Batch-score (premise, hypothesis) pairs; return per-pair (entailed, score).
 
     Mirrors the scoring convention in evidence_mapper.py's _evidence_present:
     predicted label must be ENTAILMENT and its score must clear the threshold.
+    `score` is the raw entailment-class probability, returned so callers can
+    pick the best-supporting passage per gap for citation display.
     """
     labels: dict = getattr(
         nli_model.model.config,
@@ -104,24 +165,29 @@ def _score_entailment(nli_model, pairs: list[tuple[str, str]]) -> list[bool]:
         None,
     )
     batch_scores = nli_model.predict(pairs)
-    results = []
+    results: list[tuple[bool, float]] = []
     for scores in batch_scores:
+        ent_score = float(scores[entailment_idx]) if entailment_idx is not None else 0.0
         predicted_label = labels.get(int(scores.argmax()), "").upper()
-        if "ENTAILMENT" not in predicted_label:
-            results.append(False)
-            continue
-        if entailment_idx is not None and float(scores[entailment_idx]) < _NLI_ENTAILMENT_THRESHOLD:
-            results.append(False)
-            continue
-        results.append(True)
+        if "ENTAILMENT" not in predicted_label or ent_score < _NLI_ENTAILMENT_THRESHOLD:
+            results.append((False, ent_score))
+        else:
+            results.append((True, ent_score))
     return results
 
 
-def _check_article_score(score, nli_model=None) -> tuple[list[str], dict]:
-    """Return (violation strings, entailment stats) for a single ArticleScore."""
+def _check_article_score(score, nli_model=None) -> tuple[list[str], dict, list[dict]]:
+    """Return (violation strings, entailment stats, gap_citations) for one ArticleScore.
+
+    gap_citations gives the frontend enough to show, per gap, which retrieved
+    passage (if any) was compared against it and whether it was judged to
+    support the gap — the actual "citation detail" a reviewer needs, not just
+    a pass/fail count.
+    """
     violations: list[str] = []
     art = score.article_num
     entailment_stats = {"checked": 0, "entailed": 0}
+    gap_citations: list[dict] = []
 
     # Rule 1: articles where actual user chunks were analysed must have regulatory
     # passages backing their gaps. Articles with no classified chunks produce a
@@ -152,41 +218,98 @@ def _check_article_score(score, nli_model=None) -> tuple[list[str], dict]:
                 f"regulatory vocabulary: '{rec[:80]}'"
             )
 
-    # Rule 4: semantic entailment — does any retrieved passage actually support
-    # the gap's description, or does the LLM just cite a passage count without
-    # the gap content being about that passage at all?
-    if nli_model is not None and score.regulatory_passages and score.gaps:
+    # Rule 4: semantic entailment — does any retrieved passage actually cover the
+    # topic of the gap, or does the LLM just cite a passage count without the
+    # gap being about that passage at all? Also builds gap_citations: for each
+    # gap, the single best-matching passage + its score, so the frontend can
+    # show actual citation text instead of just a pass/fail count.
+    #
+    # NOTE: the hypothesis is built from gap.title (a topic label), NOT
+    # gap.description. Gap descriptions are deficiency findings ("X is not
+    # done") — the *negation* of what a regulatory passage states — so
+    # entailment(passage, description) is almost always CONTRADICTION even for
+    # a perfectly well-grounded citation. Mirroring evidence_mapper.py's own
+    # proven pattern (a topic-presence claim, not a deficiency claim) fixes this:
+    # "This passage discusses the requirement: {title}." correctly reads as
+    # ENTAILMENT when the passage is genuinely on-topic.
+    checkable_gaps = [
+        (gi, gap) for gi, gap in enumerate(score.gaps)
+        if gap.title and gap.title.strip()
+    ]
+
+    if nli_model is not None and score.regulatory_passages and checkable_gaps:
         pairs: list[tuple[str, str]] = []
         pair_gap_index: list[int] = []
-        for gi, gap in enumerate(score.gaps):
-            if not gap.description or not gap.description.strip():
-                continue  # already flagged by Rule 2
-            for passage in score.regulatory_passages:
-                pairs.append((passage.text, gap.description))
+        pair_passage_index: list[int] = []
+        for gi, gap in checkable_gaps:
+            hypothesis = f"This passage discusses the requirement: {gap.title}."
+            for pi, passage in enumerate(score.regulatory_passages):
+                pairs.append((passage.text, hypothesis))
                 pair_gap_index.append(gi)
+                pair_passage_index.append(pi)
 
-        if pairs:
-            try:
-                entailed_flags = _score_entailment(nli_model, pairs)
-                entailed_gaps = {
-                    gi for gi, ok in zip(pair_gap_index, entailed_flags) if ok
-                }
-                checked_gaps = set(pair_gap_index)
-                entailment_stats["checked"] = len(checked_gaps)
-                entailment_stats["entailed"] = len(entailed_gaps)
-                for gi in sorted(checked_gaps - entailed_gaps):
-                    gap = score.gaps[gi]
+        try:
+            scored = _score_entailment(nli_model, pairs)  # [(entailed, score), ...]
+            per_gap_best: dict[int, tuple[int, float, bool]] = {}  # gi -> (pi, score, entailed)
+            entailed_gaps: set[int] = set()
+            for (entailed, ent_score), gi, pi in zip(scored, pair_gap_index, pair_passage_index):
+                if entailed:
+                    entailed_gaps.add(gi)
+                if gi not in per_gap_best or ent_score > per_gap_best[gi][1]:
+                    per_gap_best[gi] = (pi, ent_score, entailed)
+
+            checked_gaps = {gi for gi, _ in checkable_gaps}
+            entailment_stats["checked"] = len(checked_gaps)
+            entailment_stats["entailed"] = len(entailed_gaps)
+
+            for gi, gap in checkable_gaps:
+                pi, ent_score, entailed = per_gap_best[gi]
+                passage = score.regulatory_passages[pi]
+                gap_citations.append({
+                    "title": gap.title,
+                    "description": gap.description,
+                    "entailed": entailed,
+                    "score": round(ent_score, 3),
+                    "passage_ref": passage.article_ref or passage.title,
+                    "passage_text": passage.text[:300],
+                })
+                if not entailed:
                     violations.append(
-                        f"Article {art} gap[{gi}]: description not entailed by any "
-                        f"retrieved passage: '{gap.description[:80]}'"
+                        f"Article {art} gap[{gi}]: no retrieved passage discusses "
+                        f"the topic '{gap.title}' — possible off-topic citation"
                     )
-            except Exception as exc:
-                logger_warn = f"Article {art}: NLI entailment scoring failed: {exc}"
-                # Non-fatal — fall back to Rules 1-3 only for this article, matching
-                # evidence_mapper.py's own NLI-unavailable fallback behaviour.
-                print(f"  [warn] {logger_warn}")
+        except Exception as exc:
+            # Non-fatal — fall back to Rules 1-3 only for this article, matching
+            # evidence_mapper.py's own NLI-unavailable fallback behaviour.
+            print(f"  [warn] Article {art}: NLI entailment scoring failed: {exc}")
+    elif score.regulatory_passages and checkable_gaps:
+        # NLI unavailable — still surface the first retrieved passage per gap so
+        # the frontend has *something* to show, marked as "not checked."
+        for gi, gap in checkable_gaps:
+            passage = score.regulatory_passages[0]
+            gap_citations.append({
+                "title": gap.title,
+                "description": gap.description,
+                "entailed": None,
+                "score": None,
+                "passage_ref": passage.article_ref or passage.title,
+                "passage_text": passage.text[:300],
+            })
 
-    return violations, entailment_stats
+    # Rule 5: fabricated-specifics faithfulness — Article-number mentions and
+    # numeric claims in gaps/recommendations must be traceable to a retrieved
+    # passage. Only meaningful when passages exist; skipped otherwise (Rule 1
+    # already flags the zero-passage case).
+    if score.regulatory_passages:
+        source_text = " ".join(p.text for p in score.regulatory_passages)
+        for i, gap in enumerate(score.gaps):
+            for issue in _check_fabricated_specifics(art, gap.description, source_text):
+                violations.append(f"Article {art} gap[{i}]: {issue}")
+        for i, rec in enumerate(score.recommendations):
+            for issue in _check_fabricated_specifics(art, rec, source_text):
+                violations.append(f"Article {art} rec[{i}]: {issue}")
+
+    return violations, entailment_stats, gap_citations
 
 
 async def _run_async(strict: bool, verbose: bool) -> dict:
@@ -253,6 +376,9 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
     article_results: dict[int, dict] = {}
     total_gaps_checked = 0
     total_gaps_entailed = 0
+    # Rule 6: recommendation text (normalised) -> set of article_nums it appeared in.
+    # Built across the whole run since templating only shows up cross-article.
+    recommendation_articles: dict[str, set[int]] = {}
 
     for art_num, domain in ARTICLE_DOMAINS.items():
         art_chunks = [c for c in classified if c.domain == domain]
@@ -291,10 +417,20 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
                 print(f"  gap analysis failed for Article {art_num}: {ex}")
             continue
 
-        violations, ent_stats = _check_article_score(score, nli_model)
+        violations, ent_stats, gap_citations = _check_article_score(score, nli_model)
         all_violations.extend(violations)
         total_gaps_checked  += ent_stats["checked"]
         total_gaps_entailed += ent_stats["entailed"]
+
+        # Skip the deterministic "no chunks classified" fallback path
+        # (gap_analyser.py returns a hardcoded, intentionally-identical
+        # recommendation for every such article — that's by design, not
+        # LLM templating, so it must not trip the duplicate-recommendation check.
+        if score.chunk_count > 0:
+            for rec in score.recommendations:
+                normalized = " ".join(rec.strip().lower().split())
+                if normalized:
+                    recommendation_articles.setdefault(normalized, set()).add(art_num)
 
         article_results[art_num] = {
             "gaps":            len(score.gaps),
@@ -304,6 +440,7 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
             "violations":      violations,
             "gaps_checked_for_entailment": ent_stats["checked"],
             "gaps_entailed":               ent_stats["entailed"],
+            "gap_citations":   gap_citations,
         }
 
         if verbose:
@@ -328,6 +465,20 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
         if total_gaps_checked > 0 else None
     )
 
+    # Rule 6: recommendation specificity — a recommendation reused verbatim
+    # across different articles is almost certainly generic boilerplate, not
+    # advice specific to the gap it's attached to.
+    templated_recommendations = [
+        {"text": text, "articles": sorted(arts)}
+        for text, arts in recommendation_articles.items()
+        if len(arts) > 1
+    ]
+    for tr in templated_recommendations:
+        all_violations.append(
+            f"Recommendation reused verbatim across Articles {tr['articles']}: "
+            f"'{tr['text'][:80]}'"
+        )
+
     if strict:
         status = "pass" if not all_violations else "fail"
     else:
@@ -341,6 +492,7 @@ async def _run_async(strict: bool, verbose: bool) -> dict:
         "citation_rate":           round(citation_rate, 4),
         "entailment_rate":         entailment_rate,
         "nli_model_available":     nli_model is not None,
+        "templated_recommendations": templated_recommendations,
         "total_violations":        len(all_violations),
         "violations":              all_violations,
         "article_results":         article_results,
@@ -440,6 +592,29 @@ def test_citation_rate_above_90() -> None:
     assert r["citation_rate"] >= 0.90, (
         f"Citation rate {r['citation_rate']:.2%} below 90%. "
         "Some articles have no regulatory passages retrieved."
+    )
+
+
+def test_no_fabricated_specifics() -> None:
+    """pytest: gaps/recommendations must not cite figures absent from source text (Rule 5)."""
+    r = run(strict=False)
+    if r["status"] == "skip":
+        import pytest
+        pytest.skip(r.get("reason", ""))
+    fabricated = [v for v in r.get("violations", []) if "claims" in v or "no retrieved passage references" in v]
+    assert not fabricated, "Fabricated specifics detected:\n" + "\n".join(fabricated)
+
+
+def test_no_templated_recommendations() -> None:
+    """pytest: recommendations must not be reused verbatim across articles (Rule 6)."""
+    r = run(strict=False)
+    if r["status"] == "skip":
+        import pytest
+        pytest.skip(r.get("reason", ""))
+    templated = r.get("templated_recommendations", [])
+    assert not templated, (
+        "Templated/generic recommendations reused across articles:\n"
+        + "\n".join(f"  {t['text'][:80]!r} -> Articles {t['articles']}" for t in templated)
     )
 
 

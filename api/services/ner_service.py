@@ -99,6 +99,13 @@ def _extract_article_nums(entity_texts: list[str]) -> list[int]:
 
 # ── Phase 1: entity extraction ────────────────────────────────────────────────
 
+def _write_entities(chunk: DocumentChunk, doc) -> None:
+    entities: dict[str, list[str]] = {}
+    for ent in doc.ents:
+        entities.setdefault(ent.label_, []).append(ent.text)
+    chunk.metadata["ner_entities"] = entities
+
+
 def extract_ner_entities(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
     """Run spaCy NER over every chunk and write entities to chunk.metadata.
 
@@ -106,24 +113,36 @@ def extract_ner_entities(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
     Does NOT touch chunk.domain — call apply_ner_domain_correction after
     classify_chunks has set chunk.domain.
 
+    Uses nlp.pipe() to batch-process all chunks in one call instead of one
+    nlp() call per chunk — spaCy's own internal batching, a free speedup with
+    no change to NER output (same model, same per-doc result). Falls back to
+    the original one-call-per-chunk loop (with per-chunk error isolation) if
+    the batched call itself raises, so a single malformed chunk can never
+    take down NER for the rest of the document — pipe() doesn't support
+    resuming mid-batch after an exception, so the fallback re-processes
+    everything one at a time, exactly as before this change.
+
     Returns the same list (mutated in place).
     """
     nlp = _get_nlp()
     if nlp is None:
         return chunks
 
-    for chunk in chunks:
-        try:
-            doc = nlp(chunk.text[:1000])  # cap at 1000 chars to limit latency
-        except Exception as exc:
-            logger.warning("ner_chunk_failed", chunk_id=chunk.chunk_id, error=str(exc))
-            continue
+    texts = [chunk.text[:1000] for chunk in chunks]  # cap at 1000 chars to limit latency
 
-        entities: dict[str, list[str]] = {}
-        for ent in doc.ents:
-            entities.setdefault(ent.label_, []).append(ent.text)
-
-        chunk.metadata["ner_entities"] = entities
+    try:
+        docs = nlp.pipe(texts)
+        for chunk, doc in zip(chunks, docs):
+            _write_entities(chunk, doc)
+    except Exception as exc:
+        logger.warning("ner_batch_failed_falling_back", error=str(exc))
+        for chunk in chunks:
+            try:
+                doc = nlp(chunk.text[:1000])
+            except Exception as chunk_exc:
+                logger.warning("ner_chunk_failed", chunk_id=chunk.chunk_id, error=str(chunk_exc))
+                continue
+            _write_entities(chunk, doc)
 
     logger.info("ner_extraction_done", total=len(chunks))
     return chunks

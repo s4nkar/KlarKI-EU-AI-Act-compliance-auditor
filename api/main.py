@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     app = FastAPI(
-        title="KlarKI — EU AI Act & GDPR Compliance Auditor",
+        title="KlarKI | EU AI Act & GDPR Compliance Auditor",
         description=(
             "Local-first compliance auditor for German SMEs. "
             "Analyses documentation against EU AI Act Articles 9–15 and GDPR."

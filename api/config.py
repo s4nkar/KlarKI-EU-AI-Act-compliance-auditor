@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
     # Uploads
     upload_max_size_mb: int = 10
+    upload_max_files: int = 5
     upload_dir: str = "/data/uploads"
 
     # Triton BERT backend
